@@ -1,0 +1,15 @@
+#### Appserver
+django
+whitenoise
+
+#### trading
+TA-Lib
+vectorbtpro
+yfinance
+pandas
+numpy
+python-telegram-bot
+sklearn
+joblib
+asyncio
+ib_insync

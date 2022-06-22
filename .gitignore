@@ -1,0 +1,7 @@
+**/__pycache__
+**/apicache-py3/
+**/trading_bot/etc/
+**/staticfiles/
+**/migrations/ 
+!migrations/__init__.py
+.ipynb_checkpoints/
