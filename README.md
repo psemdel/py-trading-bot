@@ -36,8 +36,6 @@ Deployment of the bot on external machine has not been achieved yet for several 
 
 # Open points
 - Tests
-- Handle summer/winter time
-- Create automatically the pf
 
 # Disclaimer
 Do not risk money which you are afraid to lose. USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.

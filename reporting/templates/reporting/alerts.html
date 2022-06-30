@@ -1,0 +1,24 @@
+<h1>Alerts</h1>
+{% if alerts %}
+<table>
+    <thead>
+        <tr>
+            <th>Action</th>
+            <th>Short</th>
+            <th>Alarm</th>
+            <th>Triggering</th>
+        </tr>
+    </thead>
+     {% for alert in alerts %}
+    <tr>
+        <td>{{alert.action.name}}</td>
+        <td>{{alert.short}}</td>
+        <td>{{alert.alarm}}</td>
+        <td>{{alert.trigger_date}}</td>
+    </tr>
+    {% endfor %}
+</table>      
+
+{% else %}
+<p>No alert active</p>
+{% endif %}

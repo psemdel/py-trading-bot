@@ -1,0 +1,100 @@
+{% load static %}
+<link rel="stylesheet" type="text/css" href="{% static 'reporting/report.css' %}">
+{% if report %}
+
+{% if report.it_is_index %}
+    <h1>Daily trend report {{report.date}}</h1>
+{% else %}
+    <h1>Daily trend report {{report.stock_ex}} {{report.date}}</h1>
+{% endif %}
+
+<p>{{report.text|linebreaks }}</p>
+
+<h1>Action list</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Symbol</th>
+
+                <th>Pattern light, ent</th>
+                <th>Pattern light, ex</th>
+                <th>Kama, ent</th>
+                <th>Kama, ex</th>
+                <th>Stoch, ent</th>
+                <th>Stoch, ex</th>   
+                <th>Stoch</th>  
+                
+                <th>Ma, ent</th>
+                <th>Ma, ex</th>            
+
+            </tr>
+        </thead>
+         {% for ar in ars %}
+        <tr>
+            <td>{{ar.action.name}}{{ar.index.name}}</td>
+            <td>{{ar.action.symbol}}{{ar.index.symbol}}</td>
+            
+            {% if ar.pattern_light_ent %}
+                <td class="true">{{ar.pattern_light_ent}}</td> 
+            {% else %}
+                <td class="false">{{ar.pattern_light_ent}}</td> 
+            {% endif %}                 
+
+             {% if ar.pattern_light_ex %}
+                 <td class="exit">{{ar.pattern_light_ex}}</td> 
+             {% else %}
+                 <td class="false">{{ar.pattern_light_ex}}</td> 
+             {% endif %} 
+             
+
+            {% if ar.kama_ent %}
+                <td class="true">{{ar.kama_ent}}</td>
+            {% else %}
+                <td class="false">{{ar.kama_ent}}</td>
+            {% endif %}
+
+            {% if ar.kama_ex %}
+                <td class="exit">{{ar.kama_ex}}</td> 
+            {% else %}
+                <td class="false">{{ar.kama_ex}}</td> 
+            {% endif %}
+                
+            {% if ar.stoch_ent %}
+                <td class="true">{{ar.stoch_ent}}</td> 
+            {% else %}
+                <td class="false">{{ar.stoch_ent}}</td> 
+            {% endif %}
+             
+            {% if ar.stoch_ex %}
+                <td class="exit">{{ar.stoch_ex}}</td> 
+            {% else %}
+                <td class="false">{{ar.stoch_ex}}</td> 
+            {% endif %}
+            
+            <td>{{ar.stoch}}</td> 
+            
+            {% if ar.ma_ent %}
+                <td class="true">{{ar.ma_ent}}</td> 
+            {% else %}
+                <td class="false">{{ar.ma_ent}}</td> 
+            {% endif %}                         
+
+             {% if ar.ma_ex %}
+                 <td class="exit">{{ar.ma_ex}}</td> 
+             {% else %}
+                 <td class="false">{{ar.ma_ex}}</td> 
+             {% endif %}           
+        </tr>
+        {% endfor %}
+    </table>      
+
+{% else %}
+<p>No report found</p>
+{% endif %}
+<h2>Legend</h2>
+<p>Pattern light uses some patterns to determine entries (ent) and exits (ex) signals</p>
+<p>KAMA extrema can be used for the same purposed. So the price curve is smoothed with KAMA and we look for extrema.</p>
+<p>STOCH is the corresponding function. When it crosses 20, it is an entries signal, 80 an exit one here.</p>
+<p>MA is coded the following way. If the smoothed (MA) price over 5 days cross the one over 15 days, a signal is produced.
+Entries if the fast signal becomes greater than the slow one and exits if it is the opposite.</p>

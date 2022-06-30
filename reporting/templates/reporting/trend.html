@@ -1,0 +1,134 @@
+{% load static %}
+<link rel="stylesheet" type="text/css" href="{% static 'reporting/report.css' %}">
+{% if report %}
+
+{% if report.it_is_index %}
+    <h1>Daily trend report {{report.date}}</h1>
+{% else %}
+    <h1>Daily trend report {{report.stock_ex}} {{report.date}}</h1>
+{% endif %}
+<p>{{report.text|linebreaks }}</p>
+
+<h1>Action list</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>Symbol</th>
+                <th>Trend</th>
+                <th>Macro trend</th>
+                <th>BBands bandwith</th>
+                <th>Volatility</th>
+                <th>3 month evol</th>
+                <th>3 month evol, sm</th>
+                <th>1 month evol</th>
+                <th>1 month evol, sm</th>
+
+            </tr>
+        </thead>
+         {% for ar in ars %}
+        <tr>
+            <td>{{ar.action.name}}{{ar.index.name}}</td>
+            <td>{{ar.action.symbol}}{{ar.index.symbol}}</td>
+
+            {% if ar.trend == -10 %}
+                <td class="blue">{{ar.trend}}</td>
+            {% elif ar.trend == 10 %}
+                <td class="red">{{ar.trend}}</td>
+            {% elif ar.trend < 0 %}    
+                <td class="cyan">{{ar.trend}}</td>
+            {% elif ar.trend > 0 %}    
+                <td class="pink">{{ar.trend}}</td>               
+            {% else %}
+                <td class="yellow">{{ar.trend}}</td>    
+            {% endif %}    
+ 
+            {% if ar.macro_trend < -0.5 %}
+                <td class="blue">{{ar.macro_trend}}</td>
+            {% elif ar.macro_trend > 0.5 %}
+                <td class="red">{{ar.macro_trend}}</td>
+            {% else %}
+                <td class="yellow">{{ar.macro_trend}}</td>    
+            {% endif %}     
+
+             {% if ar.bbands_bandwith > 0.2 %}
+                 <td class="blue">{{ar.bbands_bandwith|floatformat:2}}</td>
+             {% elif ar.bbands_bandwith < -0.2 %}
+                 <td class="red">{{ar.bbands_bandwith|floatformat:2}}</td>
+             {% elif ar.bbands_bandwith > 0.1 %}    
+                 <td class="cyan">{{ar.bbands_bandwith|floatformat:2}}</td>
+             {% elif ar.bbands_bandwith < -0.1 %}    
+                 <td class="pink">{{ar.bbands_bandwith|floatformat:2}}</td>               
+             {% else %}
+                 <td class="yellow">{{ar.bbands_bandwith|floatformat:2}}</td>    
+             {% endif %}               
+
+             {% if ar.vol > 2 %}
+                 <td class="blue">{{ar.vol|floatformat:2}}</td>
+             {% elif ar.vol > 1 %}    
+                 <td class="cyan">{{ar.vol|floatformat:2}}</td>
+             {% else %}
+                 <td class="yellow">{{ar.vol|floatformat:2}}</td>    
+             {% endif %}             
+            
+    
+            {% if ar.three_mo_evol > 10 %}
+                <td class="blue">{{ar.three_mo_evol|floatformat:2}}</td>
+            {% elif ar.three_mo_evol < -10 %}
+                <td class="red">{{ar.three_mo_evol|floatformat:2}}</td>
+            {% elif ar.three_mo_evol > 5 %}    
+                <td class="cyan">{{ar.three_mo_evol|floatformat:2}}</td>
+            {% elif ar.three_mo_evol < -5 %}    
+                <td class="pink">{{ar.three_mo_evol|floatformat:2}}</td>               
+            {% else %}
+                <td class="yellow">{{ar.three_mo_evol|floatformat:2}}</td>    
+            {% endif %}  
+                
+            {% if ar.three_mo_evol_sm > 10 %}
+                <td class="blue">{{ar.three_mo_evol_sm|floatformat:2}}</td>
+            {% elif ar.three_mo_evol_sm < -10 %}
+                <td class="red">{{ar.three_mo_evol_sm|floatformat:2}}</td>
+            {% elif ar.three_mo_evol_sm > 5 %}    
+                <td class="cyan">{{ar.three_mo_evol_sm|floatformat:2}}</td>
+            {% elif ar.three_mo_evol_sm < -5 %}    
+                <td class="pink">{{ar.three_mo_evol_sm|floatformat:2}}</td>               
+            {% else %}
+                <td class="yellow">{{ar.three_mo_evol_sm|floatformat:2}}</td>    
+            {% endif %}  
+
+            {% if ar.one_mo_evol > 10 %}
+                <td class="blue">{{ar.one_mo_evol|floatformat:2}}</td>
+            {% elif ar.one_mo_evol < -10 %}
+                <td class="red">{{ar.one_mo_evol|floatformat:2}}</td>
+            {% elif ar.one_mo_evol > 5 %}    
+                <td class="cyan">{{ar.one_mo_evol|floatformat:2}}</td>
+            {% elif ar.one_mo_evol < -5 %}    
+                <td class="pink">{{ar.one_mo_evol|floatformat:2}}</td>               
+            {% else %}
+                <td class="yellow">{{ar.one_mo_evol|floatformat:2}}</td>    
+            {% endif %}  
+
+            {% if ar.one_mo_evol_sm > 10 %}
+                <td class="blue">{{ar.one_mo_evol_sm|floatformat:2}}</td>
+            {% elif ar.one_mo_evol_sm < -10 %}
+                <td class="red">{{ar.one_mo_evol_sm|floatformat:2}}</td>
+            {% elif ar.one_mo_evol_sm > 5 %}    
+                <td class="cyan">{{ar.one_mo_evol_sm|floatformat:2}}</td>
+            {% elif ar.one_mo_evol_sm < -5 %}    
+                <td class="pink">{{ar.one_mo_evol_sm|floatformat:2}}</td>               
+            {% else %}
+                <td class="yellow">{{ar.one_mo_evol_sm|floatformat:2}}</td>    
+            {% endif %}  
+        </tr>
+        {% endfor %}
+    </table>      
+
+{% else %}
+<p>No report found</p>
+{% endif %}
+<h2>Legend</h2>
+<p>Trend is a fast trend evaluated with help of the bband and the MACD. It can change quickly.<br/>
+trend>0 means bear here, <0 bull. 10 is the maximum possible trend.</p>
+<p>Macro trend is a slow trend evaluated by determining the extrema of a smoothed price curve.<br/>
+macro_trend>0 means bear, <0 bull, =0 means that it is unclear.</p>
+<p>3 month evol, means the price change over the past 3 month. "sm" means smoothed here.</p>
