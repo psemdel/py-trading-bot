@@ -11,9 +11,24 @@ IB_PORT=7496
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
 DIC_PRESEL={
-    "Paris":["macd_vol","retard","wq7","wq31","wq53","wq54","divergence"],
-    "XETRA":["retard"], #"retard"
-    "Nasdaq":["macd_vol","retard","wq7","wq31","wq53","wq54","divergence"] #,"macd_vol",
+    "Paris":["retard_manual","wq7","wq54"],
+    "XETRA":["retard_manual","wq7","wq53"], 
+    "Nasdaq":["retard","wq31","wq53"],
+    #"NYSE":["retard"]
+    }
+
+DIC_PRESEL_SECTOR={
+    "realestate":["retard"],
+    "industry":[],
+    "it":["retard"],
+    "com":[],
+    "staples":[],
+    "consumer":[],
+    "utilities":[],
+    "energy":[],
+    "fin":[],
+    "materials":[],
+    "healthcare":[],
     }
 
 ## Configuration of Telegram ##
@@ -27,17 +42,19 @@ ALERT_THRESHOLD=3 #in %
 ALARM_THRESHOLD=5 #in %
 ALERT_HYST=1 #margin to avoid alert/recovery at high frequency
 
-
 ## Order settings ##
 USE_IB_FOR_DATA=False #use IB for Data or YF
+TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
 
 PERFORM_ORDER=False #test or use IB to perform orders
 ## Can be configured for each strategy separately (depending on how often the strategy will trade)
 ## relation is PERFORM_ORDER and DIC_PERFORM_ORDER
 DIC_PERFORM_ORDER={
     "normal":True,
+    "normal_index":False,
     "macd_vol":True,
     "retard":True,
+    "retard_manual":False,
     "wq7":False,
     "wq31":False,
     "wq53":False,
@@ -51,7 +68,7 @@ DIC_PERFORM_ORDER={
 DIVERGENCE_MACRO=True
 RETARD_MACRO=True
 
-DAILY_REPORT_PERIOD="3y"
+DAILY_REPORT_PERIOD=3 #in year
 
 VOL_MAX_CANDIDATES_NB=1
 MACD_VOL_MAX_CANDIDATES_NB=1
@@ -71,6 +88,9 @@ RETARD_MAX_HOLD_DURATION=15
 STOCH_LL=20
 STOCH_LU=80
 BBAND_THRESHOLD=0.15
+
+#for some major events, that cannot be detected only with technical analysis
+FORCE_MACRO_TO="bear" #"bull"/"uncertain"/""
 
 
 """

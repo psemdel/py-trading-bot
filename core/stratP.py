@@ -24,26 +24,37 @@ class StratPRD(Strat):
         self.symbols=symbols
         self.period=period
         
-        if kwargs.get("close",False):
+        if kwargs.get("close") is not None:
+            self.open=kwargs.get("open_")
             self.high=kwargs.get("high")
             self.low=kwargs.get("low")
             self.close=kwargs.get("close")
-            self.open=kwargs.get("open")
+            self.open_ind=kwargs.get("open_ind")
             self.high_ind=kwargs.get("high_ind")
             self.low_ind=kwargs.get("low_ind")
             self.close_ind=kwargs.get("close_ind")
-            self.open_ind=kwargs.get("open_ind")
         else:
             self.high, self.low, self.close, self.open,self.volume,\
             self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind\
             =retrieve_data(symbols,period,**kwargs)
-
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
     
     def call_strat(self,name,**kwargs):
         meth=getattr(self,name)
-        meth(**kwargs)
+        meth(prd=True,**kwargs)
         
+    def get_last_decision(self, symbol_complex_ent, symbol_complex_ex):
+        for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):
+            if self.entries[symbol_complex_ent].values[-ii]:
+                return -1
+            elif self.exits[symbol_complex_ex].values[-ii]:
+                return 1
+            elif self.entries_short[symbol_complex_ex].values[-ii]:
+                return 1
+            elif self.exits_short[symbol_complex_ent].values[-ii]:
+                return -1
+        return 0
+    
     def grow_past(self,distance, ma):
         res=ic.VBTGROW.run(self.close,distance=distance, ma=ma).res 
         self.symbols_complex_yn=res.columns.values

@@ -8,52 +8,72 @@ Created on Mon May 16 08:27:34 2022
 
 import vectorbtpro as vbt
 import talib
+from talib.abstract import *
 import numpy as np
 from numba import njit
-import math
 import inspect
 
 from core import constants
+import sys
 
 from trading_bot.settings import STOCH_LL, STOCH_LU, BBAND_THRESHOLD
 
 ### General functions ###
 def rel_dif(n,d): #for instance to calculate distance between MA and signal
-    if d==0 or math.isnan(n) or math.isnan(d):
+    if d==0 or np.isnan(n) or np.isnan(d):
         return 0
     else:
         return round(n/d-1,4)
 
 #Wrapper for talib functions
 def func_name_to_res(func_name, open_, high, low, close):
-    PRecognizer = vbt.IF.from_talib(func_name)    
-    needed_args=inspect.getfullargspec(PRecognizer.run).args
+    try:
+        if func_name[-4:]=="_INV":
+            func_name=func_name[:-4]
+            inputs={
+                'open': open_,
+                'high': low, #error that makes different patterns actually
+                'low': high,
+                'close': close,
+            }        
+        else:
+            inputs={
+                'open': open_,
+                'high': high,
+                'low': low,
+                'close': close,
+            }
+        
+        f=getattr(talib.abstract,func_name)
+        return f(inputs)
+    
+    except Exception as msg:
+        print("exception in " + __name__)
+        print(msg)
+        _, e_, exc_tb = sys.exc_info()
+        print("line " + str(exc_tb.tb_lineno))
+        pass 
 
-    if func_name=="ATR":
-        res = PRecognizer.run(high, low, close,timeperiod=7)
-    elif ('open' in needed_args) and ('close' in needed_args) and\
-       ('high' in needed_args) and ('low' in needed_args) :
-           res = PRecognizer.run(open_, high, low, close)
-    elif ('close' in needed_args) and\
-       ('high' in needed_args) and ('low' in needed_args) :  
-           res = PRecognizer.run(high, low, close)
-    elif ('open' in needed_args) and\
-          ('high' in needed_args) and ('low' in needed_args) :  
-           res = PRecognizer.run(open_,  low, close)
-    elif  ('close' in needed_args)  and ('low' in needed_args) :  
-           res = PRecognizer.run(low, close)
-    elif  ('high' in needed_args)  and ('low' in needed_args) :  
-           res = PRecognizer.run(high, low)
-    else:
-           res = PRecognizer.run(close) 
-           
-    if hasattr(res, 'integer'):
-        out=res.integer
-    elif hasattr(res, 'real'):
-        out=res.real  
-
-    return out
-
+VBTOR= vbt.IF(
+     class_name='VbtOr',
+     short_name='or',
+     input_names=['b1', 'b2'],
+     output_names=['out'],
+).with_apply_func(
+     np.logical_or, 
+     takes_1d=True,  
+     )
+    
+VBTAND= vbt.IF(
+     class_name='VbtOr',
+     short_name='or',
+     input_names=['b1', 'b2'],
+     output_names=['out'],
+).with_apply_func(
+     np.logical_and, 
+     takes_1d=True,  
+     )
+    
 ### Supertrend ###
 def get_basic_bands(med_price, atr, multiplier):
     matr = multiplier * atr
@@ -118,7 +138,7 @@ def supertrend_ma(high, low, close):
     _, _, _, supers=faster_supertrend(high, low, close)
 
     for ii in range(len(supers)):
-        if not math.isnan(supers[ii]):
+        if not np.isnan(supers[ii]):
             ex[ii]=True #ex or ex2 
     
     return ent, ex
@@ -295,7 +315,7 @@ def kama_trend_sub(kama):
             trend[ii]=0
             duration[ii]=0
         else:
-            if math.isnan(kama[ii]):
+            if np.isnan(kama[ii]):
                 trend[ii]=0 #undefined
                 delta=0
             else:
@@ -324,23 +344,25 @@ VBTKAMATREND = vbt.IF(
 
 ### PATTERN ###
 #Calculate entry and exit signals based on candlelight patterns
+
+#Calculate for a list of patterns and give the result for all
 def pattern(open_, high, low, close, light=False):  
     if light:
-        arr=[constants.bear_patterns_light(), constants.bull_patterns_light()]
+        arr=[constants.BEAR_PATTERNS_LIGHT, constants.BULL_PATTERNS_LIGHT]
     else:
-        arr=[constants.bear_patterns(), constants.bull_patterns()]
+        arr=[constants.BEAR_PATTERNS, constants.BULL_PATTERNS]
 
     entries=np.full(close.shape, False)
     exits=np.full(close.shape, False)
 
     for kk, pat in enumerate(arr):
-        for p in pat:
-            res=func_name_to_res(p, open_, high, low, close)
+        for func_name in pat:
+            res=func_name_to_res(func_name, open_, high, low, close)
             for ii in range(len(res)):
                 if kk==0:
-                    exits[ii]=(bool(exits[ii]) or res[ii]==pat[p]*100)
+                    exits[ii]=(bool(exits[ii]) or res[ii]==pat[func_name])
                 else:
-                    entries[ii]=(bool(entries[ii]) or res[ii]==pat[p]*100)
+                    entries[ii]=(bool(entries[ii]) or res[ii]==pat[func_name])
                     
     return entries, exits
                     
@@ -354,7 +376,42 @@ VBTPATTERN = vbt.IF(
       pattern, 
       takes_1d=True,  
  )  
+   
+     
+#For only one pattern
+def pattern_one(open_, high, low, close, func_name, ent_or_ex):
+    try:
+        out=np.full(close.shape, False)
+        
+        if ent_or_ex=="ent":
+            arr=constants.BULL_PATTERNS
+        else:
+            arr=constants.BEAR_PATTERNS
+        
+        res=func_name_to_res(func_name, open_, high, low, close)
     
+        for ii in range(len(res)):
+            out[ii]=(res[ii]==arr[func_name])
+    
+        return out
+    except Exception as msg:
+        print("exception in " + __name__)
+        print(msg)
+        _, e_, exc_tb = sys.exc_info()
+        print("line " + str(exc_tb.tb_lineno))
+        pass 
+                    
+VBTPATTERNONE = vbt.IF(
+      class_name='VBTPatternOne',
+      short_name='pattern_one',
+      input_names=['open_','high', 'low', 'close'],
+      param_names=['func_name','ent_or_ex'],
+      output_names=['out']
+ ).with_apply_func(
+      pattern_one, 
+      takes_1d=True,  
+ )       
+ 
 ### Bbands trend
 #Determine the strenght of a trend based on the value of the bbands bandwidth
 #The direction is determined by kama_f
@@ -438,8 +495,9 @@ def macd_trend_sub2(close, bb_bw, direction):   #trend,
             elif trend_dir_arr<=0 and d==-1:
                 t=-10
                  
-            if e<bband_lim: #reset
-                trend_dir_arr=0
+        if e<bband_lim: #reset
+            trend_dir_arr=0
+            trend_dir_arr_dim=0
         if t!=0:
             trend[ii]=t
     return trend  
@@ -539,3 +597,6 @@ VBTDIVERGENCE = vbt.IF(
       divergence_f, 
       takes_1d=True,  
  ) 
+     
+     
+    

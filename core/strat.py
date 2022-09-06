@@ -7,95 +7,17 @@ Created on Sat May 14 22:36:16 2022
 """
 import vectorbtpro as vbt
 import numpy as np
-import math
 
 import inspect
-import talib
-
 from core.common import VBTfunc, save_vbt_both
 import core.indicators as ic
+from core.macro import major_int, VBTMACROFILTER, VBTMACROMODE, VBTMACROTREND, VBTMACROTRENDPRD
+from core.constants import BEAR_PATTERNS, BULL_PATTERNS
 
+import sys
 ### Strategies on one action, no preselection ###
 #So it determines entries and exits for one action to optimize the return
 
-## Determine the "major" extremum of the KAMA function to determine the long term trend
-# Should change significantly less often than trend
-def ext_major(close):
-    kama=talib.KAMA(close,timeperiod=30)
-    
-    threshold=0.03
-    ll=1-threshold
-    lu=1+threshold
-    window=150
-    deadband=0.1
-
-    macro_trend= np.full(kama.shape, 0)
-    macro_trend_raw= np.full(kama.shape, 0)
-    max_ind= np.full(kama.shape, 0)
-    min_ind= np.full(kama.shape, 0)
-    
-    ext=[]
-    ext_bot=[]
-    max_arr=[]
-    min_arr=[]
-    
-    for ii in range(2,len(kama)):
-        win_start=max(0,ii-window)
-        win_end=ii  #min(len(self.res),ii)
-        change=0
-
-        if not math.isnan(kama[win_start]) and not math.isnan(kama[win_end]):
-            maximum=np.max(kama[win_start:win_end+1])
-            ind=win_start+np.argmax(kama[win_start:win_end+1])
-            
-            if ind==win_start:
-                local_min=kama[win_start]
-            else:
-                local_min=np.min(kama[win_start:ind])
-           
-            minimum=np.min(kama[win_start:win_end+1])
-            ind_bot=win_start+np.argmin(kama[win_start:win_end+1]) 
-
-            if ind_bot==win_start:
-                local_max=kama[win_start]
-            else:
-                local_max=np.max(kama[win_start:ind_bot])
-
-            if local_min<ll*maximum and kama[win_end]<ll*maximum:
-                if ind not in ext:
-                    ext.append(ind)
-                    max_arr.append(maximum)
-                    change=1
-                    macro_trend_raw[ii]=1
-                    if ii > len(kama)-2: #for alerting
-                        max_ind[-1]=ind
-            
-            if local_max>lu*minimum and kama[win_end]>lu*minimum:
-                if ind_bot not in ext_bot:
-                    ext_bot.append(ind_bot)  
-                    min_arr.append(minimum)
-                    change=1
-                    macro_trend_raw[ii]=-1
-                    if ii > len(kama)-2: #for alerting
-                        min_ind[-1]=ind
-   
-        if change==0:
-            macro_trend_raw[ii]=macro_trend_raw[ii-1]
-        macro_trend[ii]=macro_trend_raw[ii]
-            
-        if deadband!=0:
-            #the max or min were exceeded, correction of the direction
-            if macro_trend[ii]==1 and kama[ii]>max_arr[-1]:
-                macro_trend[ii]=-1
-            elif macro_trend[ii]==-1 and kama[ii]<min_arr[-1]:
-                macro_trend[ii]=1
-            #uncertain, as in a small band around the min/max
-            elif macro_trend[ii]==1 and kama[ii]/max_arr[-1]>(1-deadband):
-                macro_trend[ii]=0
-            elif macro_trend[ii]==-1 and kama[ii]/min_arr[-1]<(1+deadband):
-                macro_trend[ii]=0
-   
-    return macro_trend, min_ind, max_ind
 
 #wrapper for talib function
 def function_to_res(f_name, open_, high, low, close,**kwargs):
@@ -137,11 +59,183 @@ def function_to_res(f_name, open_, high, low, close,**kwargs):
         else:
            res = f_callable.run(close)
     
-    
     return res.entries, res.exits
 
+#Convert a binary array intro entries and exits
+#A faster algorithm is possible, but then the optimization algorithm would differ
+#Speed should still be acceptable
+def defi_i( open_,high, low, close):
+    
+    try:
+        all_t_ent=[]
+        all_t_ex=[]
+        
+        t=ic.VBTMA.run(close)
+        all_t_ent.append(t.entries)
+        all_t_ex.append(t.exits)
+        
+        t=ic.VBTSTOCHKAMA.run(high,low,close)
+        all_t_ent.append(t.entries_stoch)
+        all_t_ex.append(t.exits_stoch)    
+    
+        all_t_ent.append(t.entries_kama)
+        all_t_ex.append(t.exits_kama)   
+    
+        t=ic.VBTSUPERTRENDMA.run(high,low,close)
+        all_t_ent.append(t.entries)
+        all_t_ex.append(t.exits)
+                        
+        t=vbt.BBANDS.run(close)
+        all_t_ent.append(t.lower_above(close))
+        all_t_ex.append(t.upper_below(close))
+    
+        t=vbt.RSI.run(close)
+        all_t_ent.append(t.rsi_crossed_below(20))
+        all_t_ex.append(t.rsi_crossed_above(80))
+        
+        all_t_ent.append(t.rsi_crossed_below(30))
+        all_t_ex.append(t.rsi_crossed_above(70))
+    
+        for func_name in BULL_PATTERNS:
+            t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ent").out
+            all_t_ent.append(t)
+            
+        for func_name in BEAR_PATTERNS:
+            t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ex").out
+            all_t_ex.append(t)        
+        return all_t_ent, all_t_ex
+    except Exception as msg:
+        print(msg)
+        print("exception in " + __name__)
+        _, e_, exc_tb = sys.exc_info()
+        print("line " + str(exc_tb.tb_lineno))
+        print(msg)  
+        
+def defi(close,all_t,ent_or_ex, calc_arrs,macro_trend):
+    len_ent=7+len(BULL_PATTERNS)
+    len_ex=7+len(BEAR_PATTERNS)
+    ents_raw=None 
+    
+    for nb_macro_mode in range(3): #bull, bear, uncertain
+        calc_arr=calc_arrs[nb_macro_mode]
+
+        if ent_or_ex=="ent":
+            arr=calc_arr[0:len_ent] 
+        else:
+            arr=calc_arr[len_ent:len_ent+len_ex]  
+
+        for ii in range(len(arr)):
+            if arr[ii]:
+                t=all_t[ii]
+                        
+                if ents_raw is None:
+                    ents_raw=t
+                else:
+                    ents_raw=ic.VBTOR.run(ents_raw,t).out
+        
+        #agregate the signals for different macro trends
+        if nb_macro_mode==0:
+            ent=VBTMACROFILTER.run(ents_raw,macro_trend,-1).out
+        elif nb_macro_mode==1:
+            ents_raw=VBTMACROFILTER.run(ents_raw,macro_trend,1).out
+            ent=ic.VBTOR.run(ent, ents_raw).out
+        else:
+            ents_raw=VBTMACROFILTER.run(ents_raw,macro_trend,0).out
+            ent=ic.VBTOR.run(ent, ents_raw).out                    
+    
+    return ent
+
+def defi_nomacro(close,all_t,ent_or_ex, calc_arr):
+    len_ent=7+len(BULL_PATTERNS)
+    len_ex=7+len(BEAR_PATTERNS)
+    ent=None
+
+    if ent_or_ex=="ent":
+        arr=calc_arr[0:len_ent] 
+    else:
+        arr=calc_arr[len_ent:len_ent+len_ex]  
+    
+    for ii in range(len(arr)):
+        if arr[ii]:
+            t=all_t[ii]
+                    
+            if ent is None:
+                ent=t
+            else:
+                ent=ic.VBTOR.run(ent,t).out
+                
+    default=ic.VBTAND.run(ent, np.full(all_t[0].shape, False)).out #trick to keep the right shape
+    return ent, default
+
 #wrapper for the different strategy functions
-def strat_wrapper(high, low, close, open_, close_ind,
+def strat_wrapper_simple(open_,high, low, close, arr,
+                        direction="long"):
+   
+    #calculate all signals and patterns, is a bit long
+    all_t_ent, all_t_ex=defi_i(open_,high, low, close)
+    
+    #combine for the given array the signals and patterns
+    ent, _=defi_nomacro(close,all_t_ent,"ent", arr)
+    ex, default=defi_nomacro(close,all_t_ex,"ex", arr)
+
+    if direction in ["long","both"]:
+        entries=ent
+        exits=ex
+    else:
+        entries=default
+        exits=default
+        
+    if direction in ["both","short"]:
+        entries_short=ex
+        exits_short=ent
+    else:
+        entries_short=default
+        exits_short=default
+
+    return entries, exits, entries_short, exits_short
+
+#not called from a IF, because it cannot interpret correctly the input arrays
+def strat_wrapper_macro(open_,high, low, close, a_bull, a_bear, a_uncertain,
+                        macro_trend_bull="long", macro_trend_bear="both",
+                        macro_trend_uncertain="both",**kwargs):
+    
+    try:
+        if kwargs.get("prd"):
+            t=VBTMACROTRENDPRD.run(close)
+        else:
+            t=VBTMACROTREND.run(close)
+        macro_trend=t.macro_trend
+        min_ind=t.min_ind
+        max_ind=t.max_ind
+        
+        #calculate all signals and patterns, is a bit long
+        all_t_ent, all_t_ex=defi_i(open_,high, low, close)
+        
+        calc_arrs=[]
+        
+        calc_arrs.append(a_bull)
+        calc_arrs.append(a_bear)
+        calc_arrs.append(a_uncertain)
+        
+        #combine for the given array the signals and patterns
+        ent=defi(close,all_t_ent,"ent", calc_arrs,macro_trend)
+        ex=defi(close,all_t_ex,"ex", calc_arrs,macro_trend)
+    
+        t=VBTMACROMODE.run(ent,ex, macro_trend,\
+                           macro_trend_bull=macro_trend_bull,
+                           macro_trend_bear=macro_trend_bear,
+                           macro_trend_uncertain=macro_trend_uncertain)
+    
+        return t.entries, t.exits, t.entries_short, t.exits_short, macro_trend, min_ind, max_ind  
+    except Exception as msg:
+        print(msg)
+        print("exception in " + __name__)
+        _, e_, exc_tb = sys.exc_info()
+        print("line " + str(exc_tb.tb_lineno))
+        print(msg)  
+
+#wrapper for the different strategy functions
+def strat_wrapper(open_,high, low, close, close_ind,
                 f_bull="VBTSTOCHKAMA", f_bear="VBTSTOCHKAMA", f_uncertain="VBTSTOCHKAMA",
                 f_very_bull="VBTSTOCHKAMA", f_very_bear="VBTSTOCHKAMA",
                 trend_lim=1.5, trend_lim2=10, macro_trend_bool=False,macro_trend_bull="long", macro_trend_bear="short",
@@ -153,9 +247,9 @@ def strat_wrapper(high, low, close, open_, close_ind,
     
     if macro_trend_bool:
         if macro_trend_index:
-            macro_trend,min_ind, max_ind=ext_major(close_ind)
+            macro_trend,min_ind, max_ind=major_int(close_ind)
         else:   
-            macro_trend,min_ind, max_ind=ext_major(close)
+            macro_trend,min_ind, max_ind=major_int(close,threshold=0.03)
         
     if trend_key=="bbands":
         t=ic.VBTBBANDSTREND.run(close)
@@ -289,16 +383,6 @@ STRATWRAPPER = vbt.IF(
      macro_trend_index=False,
      light=True
 )    
-    
-VBTMACROTREND = vbt.IF(
-     class_name='MacroTrend',
-     short_name='macro_trend',
-     input_names=[ 'close'],
-     output_names=['macro_trend','min_ind', 'max_ind']
-).with_apply_func(
-     ext_major, 
-     takes_1d=True, 
-)  
 
 ### For backtesting ###
 class Strat(VBTfunc):
@@ -322,14 +406,17 @@ class Strat(VBTfunc):
         self.entries_short=s.entries_short
         self.exits_short=s.exits_short
         self.trend=s.trend
-        self.macro_trend=s.macro_trend
         self.kama=s.kama
         self.bb_bw=s.bb_bw
+        self.macro_trend=s.macro_trend
         self.max_ind=s.max_ind
         self.min_ind=s.min_ind
-
-    def symbols_simple_to_complex(self,symbol_simple):
-        self.symbols_complex=self.exits.columns.values
+  
+    def symbols_simple_to_complex(self,symbol_simple,ent_or_ex):
+        if ent_or_ex=="ent":
+            self.symbols_complex=self.entries.columns.values
+        else:
+            self.symbols_complex=self.exits.columns.values
         
         for ii, e in enumerate(self.symbols_complex):
             if e[-1]==symbol_simple: #9
@@ -357,14 +444,125 @@ class Strat(VBTfunc):
         return delta
 
 ########## Strats ##############
+# The best strategy without macro is hold, here strat D bear is acceptable and provides some signals
+# to define pattern light
+    def stratDbear(self,**kwargs):
+        a=[0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
+       0., 1., 0., 0., 0., 0., 0., 0., 1., 0.]
+
+
+        self.entries, self.exits, self.entries_short, self.exits_short= \
+        strat_wrapper_simple(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            arr=a)
+        
+    def stratTestSimple(self,**kwargs):
+        a=[0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+
+
+        self.entries, self.exits, self.entries_short, self.exits_short= \
+        strat_wrapper_simple(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            arr=a)
+#In long/both/both, on period 2007-2022, CAC40 return 5.26 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)  
+
+
+    def stratD(self,**kwargs):
+        a_bull= [1., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 1., 1., 0.,
+        1., 0., 0., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.]
+        a_bear= [0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
+        0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 1., 0.]
+        a_uncertain= [0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 1., 0., 1.,
+        1., 1., 1., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)
+        
+#In long/both/both, on period 2007-2022, CAC40 return 4.35 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)      
+
+    def stratE(self,**kwargs):
+        a_bull=[0., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0.,
+        1., 1., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+        0., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0., 0.]
+        a_bear= [0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0.,
+         0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 1., 0.]
+        a_uncertain=  [1., 0., 0., 0., 0., 1., 0., 0., 1., 1., 0., 1., 1., 1., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 1., 1., 0., 0., 1., 1., 0., 0., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)   
+
+
+    def stratReal(self,**kwargs):
+        a_bull=[1., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 1., 1., 0., 1.,
+       0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 1., 0., 0., 0., 0., 0., 0., 0.]
+        a_bear=[0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
+       0., 1., 0., 0., 0., 0., 0., 0., 1., 0.]
+        a_uncertain= [0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 1., 0., 1., 1.,
+       0., 1., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)   
+
+############## Strategies below are widely deprecated ##############
+
 #### No trend at all
 
     #Use the kama extremum and the STOCH (20/80) to determine entries and exits
     def strat_kama_stoch(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=False,
@@ -376,10 +574,10 @@ class Strat(VBTfunc):
     #Use candlelight pattern to determine entries and exits        
     def strat_pattern_light(self,**kwargs): 
 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=False,
@@ -392,10 +590,10 @@ class Strat(VBTfunc):
     # As strat_kama_stoch for bear and uncertain trend
     # Use MA for bull, so if the 5 days smoothed price crosses the 15 days smoothed price, a signal is created
     def strat_kama_stoch_matrend_bbands(self,**kwargs): #ex strat11
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -410,10 +608,10 @@ class Strat(VBTfunc):
        
     # As strat_kama_stoch_matrend_bbands, but in addition to MA use also supertrend when bull
     def strat_kama_stoch_super_bbands(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -428,10 +626,10 @@ class Strat(VBTfunc):
         
     #Same as strat_kama_stoch_matrend_bbands but with different trend calculation
     def strat_kama_stoch_matrend_macdbb(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -446,10 +644,10 @@ class Strat(VBTfunc):
         
     #Same as strat_kama_stoch_super_bbands but with different trend calculation
     def strat_kama_stoch_super_macdbb(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -465,10 +663,10 @@ class Strat(VBTfunc):
     #strat_pattern_light for bear and uncertain trends
     #MA for bull
     def strat_pattern_light_matrend_bbands(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -484,10 +682,10 @@ class Strat(VBTfunc):
     #strat_pattern_light for bear and uncertain trends
     #MA+Supertrend for bull        
     def strat_pattern_light_super_bbands(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -504,10 +702,10 @@ class Strat(VBTfunc):
     #MA+Supertrend for bull
     #if the trend is extremely strong, no entries or respectively no exits take place
     def strat_careful_super_bbands(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -522,10 +720,10 @@ class Strat(VBTfunc):
      
     #As strat_pattern_light_matrend_bbands but with different trend calculation
     def strat_pattern_light_matrend_macdbb(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -540,10 +738,10 @@ class Strat(VBTfunc):
     
     #As strat_pattern_light_super_bbands but with different trend calculation
     def strat_pattern_light_super_macdbb(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
@@ -560,10 +758,10 @@ class Strat(VBTfunc):
 
     #As strat_kama_stoch_matrend_bbands but the short/long is determined by macro trend
     def strat_kama_stoch_matrend_bbands_macro(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=True,
@@ -581,10 +779,10 @@ class Strat(VBTfunc):
         
     #As strat_kama_stoch_matrend_macdbb but the short/long is determined by macro trend
     def strat_kama_stoch_matrend_macdbb_macro(self,**kwargs): 
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=True,
@@ -602,10 +800,10 @@ class Strat(VBTfunc):
         
     #As strat_kama_stoch but the short/long is determined by macro trend
     def strat_kama_stoch_macro(self,**kwargs):
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=True,
@@ -619,10 +817,10 @@ class Strat(VBTfunc):
     
     #As strat_pattern_light but the short/long is determined by macro trend
     def strat_pattern_light_macro(self,**kwargs):
-        s = STRATWRAPPER.run(self.high, 
+        s = STRATWRAPPER.run(self.open,
+                             self.high, 
                              self.low,
                              self.close,
-                             self.open,
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=True,

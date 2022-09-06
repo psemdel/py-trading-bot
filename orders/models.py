@@ -3,48 +3,37 @@ from django.utils import timezone
 from django.db.models import Q
 
 import asyncio
-from ib_insync import IB, Stock, MarketOrder, util
-from core.common import  empty_append
+from ib_insync import IB, Stock, MarketOrder, util, Contract
 from core.indicators import rel_dif
 
 import vectorbtpro as vbt
+from vectorbtpro.data.custom import RemoteData
+from vectorbtpro import _typing as tp
+
 import sys
 import math
+import traceback
 
-import pandas as pd
 import numpy as np
 
 from trading_bot.settings import (PERFORM_ORDER, USE_IB_FOR_DATA,DIC_PERFORM_ORDER,
                                   IB_LOCALHOST, IB_PORT)
 
 ### Interactive brockers and data retrieval ###
-'''
-Contains:
-- Communication with Interactive brokers
-- Retrieval of live data (Interactive brokers or YFinance)
-- Performing order
-- Models for financial products, stock exchanges...
 
-Note: for some reasons, it does not work if myIB class is not in models
-'''
+class IBData(RemoteData):
+    @classmethod
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        period: tp.Optional[str] = None,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        timeframe: tp.Optional[str] = None,
+        **kwargs,
+        ) -> tp.Frame:
 
-## All symbols must be from same stock exchange
-def retrieve_data(symbols,period,**kwargs):
-    try:
-        IBok=True
-        for symbol in symbols:
-            if kwargs.get("index",False):
-                action=Index.objects.get(symbol=symbol)
-            else:
-                action=Action.objects.get(symbol=symbol)
-            
-            if action.stock_ex.ib_ticker in ["BVME.ETF"]:
-                IBok=False
-                break
-        
-        index_symbol=exchange_to_symbol(action)
-        
-        if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False):         
+        try:
             fig= ''.join(x for x in period if x.isdigit())
             if period.find("d")!=-1:
                 period_ib=fig +" D"
@@ -64,16 +53,22 @@ def retrieve_data(symbols,period,**kwargs):
                     interval=fig +" day"
             else:
                 interval='1 day'
-            
-            open_=[]
-            close=[]
-            low=[]
-            high=[]
+                            
+            with MyIB() as myIB:
+                actions=Action.objects.filter(symbol=symbol)
+                if len(actions)==0:
+                    if symbol=="BZ=F":
+                        contract = Stock("BRNT","BVME.ETF", "EUR")
+                    else:
+                        action=Index.objects.get(symbol=symbol)
+                        contract = Contract(symbol=action.ib_ticker(),secType="IND") 
+                        cds=myIB.ib.reqContractDetails(contract)
+                        contracts = [cd.contract for cd in cds]
+                        contract=contracts[0]
+                else:
+                    action=actions[0]
+                    contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
                     
-            myIB=MyIB()
-            for symbol in symbols:
-                action=Action.objects.get(symbol=symbol)
-                contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
                 bars = myIB.ib.reqHistoricalData(
                         contract,
                         endDateTime='',
@@ -82,72 +77,77 @@ def retrieve_data(symbols,period,**kwargs):
                         whatToShow='TRADES',
                         useRTH=True,
                         formatDate=1)
-        
-                df=util.df(bars)
-                open_=empty_append(open_,df["open"].values,axis=1)
-                close=empty_append(close,df["close"].values,axis=1)
-                high=empty_append(high,df["high"].values,axis=1)
-                low=empty_append(low,df["low"].values,axis=1)
-                volume=empty_append(low,df["volume"].values,axis=1)
+                t=util.df(bars)
+                t.columns = ['Date', 'Open', 'High', 'Low','Close','Volume','Average','BarCount']
+                return t
             
-            cours_open=pd.DataFrame(data=open_,index=df["date"],columns=symbols)
-            cours_close=pd.DataFrame(data=close,index=df["date"],columns=symbols)
-            cours_low=pd.DataFrame(data=low,index=df["date"],columns=symbols)
-            cours_high=pd.DataFrame(data=high,index=df["date"],columns=symbols)
-            cours_volume=pd.DataFrame(data=volume,index=df["date"],columns=symbols)
-    
-            action=Action.objects.get(symbol=index_symbol)
-            contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
-            bars = myIB.ib.reqHistoricalData(
-                    contract,
-                    endDateTime='',
-                    durationStr=period_ib, #"10 D","1 M"
-                    barSizeSetting=interval, #"1 day", "1 min"
-                    whatToShow='TRADES',
-                    useRTH=True,
-                    formatDate=1)
-            
-            df=util.df(bars)
-            cours_open_ind=df["open"]
-            cours_close_ind=df["close"]
-            cours_high_ind=df["high"]
-            cours_low_ind=df["low"]
-            cours_volume_ind=df["volume"]
-            #Volume
-            
-            if len(cours_close_ind)!=len(cours_close):
-                print("cours index is different from cours length")
-            
-            myIB.disconnect()
-        else:
-            all_symbols=symbols+[index_symbol]
-            cours=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
-            cours_action=cours.select(symbols)
-            cours_open =cours_action.get('Open')
-            cours_high=cours_action.get('High')
-            cours_low=cours_action.get('Low')
-            cours_close=cours_action.get('Close')
-            cours_volume=cours_action.get('Volume')
-            print("number of days retrieved: " + str(np.shape(cours_close)[0]))
-            
-            cours_index=cours.select(index_symbol)
-            cours_open_ind =cours_index.get('Open')
-            cours_high_ind=cours_index.get('High')
-            cours_low_ind=cours_index.get('Low')
-            cours_close_ind=cours_index.get('Close')
-            cours_volume_ind=cours_index.get('Volume')
+        except Exception as msg:
+            print(msg)
+            print("exception in " + __name__)
+            _, e_, exc_tb = sys.exc_info()
+            print("line " + str(exc_tb.tb_lineno))
+            print(msg)
 
-            debug=False
-            if debug:
-                for symbol in all_symbols:
+## All symbols must be from same stock exchange
+def retrieve_data(symbols,period,**kwargs):
+    try:
+        IBok=True
+        
+        for symbol in symbols:
+            if kwargs.get("index",False):
+                action=Index.objects.get(symbol=symbol)
+            else:
+                action=Action.objects.get(symbol=symbol)
+            
+            if action.stock_ex.ib_ticker in ["BVME.ETF", "IBIS"]:
+                IBok=False
+                break
+        
+        if kwargs.get("index",False):
+            index_symbol=symbols[0]
+            all_symbols=symbols
+        else:
+            index_symbol=exchange_to_symbol(action)
+            all_symbols=symbols+[index_symbol]
+            
+        if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False): 
+            try:
+                cours=IBData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            except:
+                print("Error with IB for data retrieval, fallback with YF")
+                cours=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+        else:
+            cours=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+
+        cours_action=cours.select(symbols)
+        cours_open =cours_action.get('Open')
+        cours_high=cours_action.get('High')
+        cours_low=cours_action.get('Low')
+        cours_close=cours_action.get('Close')
+        cours_volume=cours_action.get('Volume')
+        print("number of days retrieved: " + str(np.shape(cours_close)[0]))
+            
+        cours_index=cours.select(index_symbol)
+        cours_open_ind =cours_index.get('Open')
+        cours_high_ind=cours_index.get('High')
+        cours_low_ind=cours_index.get('Low')
+        cours_close_ind=cours_index.get('Close')
+        cours_volume_ind=cours_index.get('Volume')
+
+        debug=False
+        if debug:
+            for symbol in all_symbols:
+                if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False):    
+                    data=vbt.IBData.fetch(symbol, period=period,**kwargs)
+                else:
                     data=vbt.YFData.fetch(symbol, period=period,**kwargs)
-                
-                    #knowing what we drop
-                    close_debug=data.get("Close")
-                    for ii in range(len(close_debug)):
-                        if math.isnan(close_debug.values[ii]):
-                            print(symbol)
-                            print("dropping at least " + str(close_debug.index[ii]))
+            
+                #knowing what we drop
+                close_debug=data.get("Close")
+                for ii in range(len(close_debug)):
+                    if math.isnan(close_debug.values[ii]):
+                        print(symbol)
+                        print("dropping at least " + str(close_debug.index[ii]))
           
         return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
@@ -167,34 +167,53 @@ def exchange_to_symbol(action):
         return "^GDAXI"
     elif action.stock_ex.ib_ticker=="NASDAQ":
         return "^IXIC"
+    elif action.stock_ex.ib_ticker=="NYSE":
+        return "^DJI"
     elif action.stock_ex.ib_ticker=="BVME.ETF":
-        return "^IXIC" #it is only ETF anyhow
+        return "^IXIC"
 
-def get_exchange_actions(exchange):
+def get_exchange_actions(exchange,**kwargs):
     cat=ActionCategory.objects.get(short="ACT")
     stockEx=StockEx.objects.get(name=exchange)
     
     c1 = Q(category=cat)
     c2 = Q(stock_ex=stockEx)
+    c3 = Q(delisted=False)
     
-    actions=Action.objects.filter(c1 & c2)
+    if exchange=="NYSE":
+        sector=kwargs.get("sector")
+        if sector:
+            action_sector=ActionSector.objects.get(name=sector)
+            c4 = Q(sector=action_sector)
+            actions=Action.objects.filter(c1 & c2 & c3 & c4)
+        else:
+            actions=Action.objects.filter(c1 & c2 & c3)
+    else:
+        actions=Action.objects.filter(c1 & c2 & c3)
+    
     return [ob.symbol for ob in actions]
         
 def retrieve_ib_pf():
-    myIB=MyIB()
-    pf=[]
-    pf_short=[]
-    
-    for pos in myIB.ib.positions():
-        contract=pos.contract
-        action=Action.objects.get(ib_ticker=contract.localSymbol)
+    print("myIB retrieve")
+    with MyIB() as myIB:
+        pf=[]
+        pf_short=[]
         
-        if pos.position>0:
-            pf.append(action.symbol)
-        else:
-            pf_short.append(action.symbol)
+        for pos in myIB.ib.positions():
+            contract=pos.contract
+            actions=Action.objects.filter(symbol__contains=contract.localSymbol)
+            if len(actions)==1:
+                action=actions[0]
+            else:
+                for a in actions:
+                    if a.ib_ticker()==contract.localSymbol:
+                        action=a
 
-    myIB.disconnect()
+            if pos.position>0:
+                pf.append(action.symbol)
+            else:
+                pf_short.append(action.symbol)
+
     return pf, pf_short
 
 #for SL check
@@ -205,11 +224,16 @@ def get_last_price(symbol,**kwargs):
         else:
             action=Action.objects.get(symbol=symbol)   
 
-        if USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in ["BVME.ETF"]:
-            myIB=MyIB()
-            contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
-            cours_pres=myIB.get_last_price(contract)
-            myIB.disconnect()
+        if USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in ["BVME.ETF", "IBIS"]:
+            with MyIB() as myIB:
+                if kwargs.get("index",False):
+                    contract = Contract(symbol=action.ib_ticker(),secType="IND")
+                    cds=myIB.ib.reqContractDetails(contract)
+                    contracts = [cd.contract for cd in cds]
+                    contract=contracts[0]
+                else:
+                    contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
+                cours_pres=myIB.get_last_price(contract)
         else: #YF
             cours=vbt.YFData.fetch([symbol], period="2d")
             cours_close=cours.get("Close")
@@ -228,16 +252,21 @@ def get_ratio(symbol,**kwargs):
         else:
             action=Action.objects.get(symbol=symbol)
         
-        if USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in ["BVME.ETF"]:
-            myIB=MyIB()
-            contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
-            cours_pres=myIB.get_last_price(contract)
-            cours_ref, cours_open=myIB.get_past_closing_price(contract)
-            
-            if kwargs.get("opening",False):
-                cours_pres=cours_open
-            
-            myIB.disconnect()
+        if USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in ["BVME.ETF","Index"]:
+            with MyIB() as myIB:
+                if kwargs.get("index",False):
+                    contract = Contract(symbol=action.ib_ticker(),secType="IND")
+                    cds=myIB.ib.reqContractDetails(contract)
+                    contracts = [cd.contract for cd in cds]
+                    contract=contracts[0]
+                else:
+                    contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
+
+                cours_pres=myIB.get_last_price(contract)
+                cours_ref, cours_open=myIB.get_past_closing_price(contract)
+                
+                if kwargs.get("opening",False):
+                    cours_pres=cours_open
         else: #YF
             cours=vbt.YFData.fetch([symbol], period="2d")
             cours_close=cours.get("Close")
@@ -264,8 +293,20 @@ class MyIB():
         asyncio.set_event_loop(loop)
 
         self.ib = IB()
-        self.ib.connect(host=IB_LOCALHOST, port=IB_PORT, clientId=1)
     
+    def __enter__(self):
+        try:
+            self.ib.connect(host=IB_LOCALHOST, port=IB_PORT, clientId=1)
+            return self
+        except:
+            return self
+        
+    def __exit__(self, exc_type, exc_value, tb):
+        #print("disconnecting myIB")
+        if exc_type is not None:
+            traceback.print_exception(exc_type, exc_value, tb)
+        self.ib.disconnect()
+
     def cash_balance(self):
         try:
             for v in self.ib.accountSummary():
@@ -293,24 +334,35 @@ class MyIB():
         return util.df(bars)
     
     def get_last_price(self,contract):
+        timeout=2
+        t=0
         m_data = self.ib.reqMktData(contract)
-        while m_data.last != m_data.last:  #Wait until data is in. 
+        while m_data.last != m_data.last and t<timeout:  #Wait until data is in. 
+            t+=0.01
             self.ib.sleep(0.01)
+        if t==timeout:
+            m_data.last=0
         self.ib.cancelMktData(contract)
         return m_data.last
     
     def get_past_closing_price(self,contract):
         period="2 D"
-        bars = self.ib.reqHistoricalData(
-                contract,
-                endDateTime='',
-                durationStr=period, #"10 D","1 M"
-                barSizeSetting='1 day', #"1 day", "1 min"
-                whatToShow='TRADES',
-                useRTH=True,
-                formatDate=1)
-        df=util.df(bars)
-        return df.iloc[0]["close"], df.iloc[-1]["open"]
+        try:
+            bars = self.ib.reqHistoricalData(
+                    contract,
+                    endDateTime='',
+                    durationStr=period, #"10 D","1 M"
+                    barSizeSetting='1 day', #"1 day", "1 min"
+                    whatToShow='TRADES',
+                    useRTH=True,
+                    formatDate=1)
+            if len(bars)!=0:
+                df=util.df(bars)
+                return df.iloc[0]["close"], df.iloc[-1]["open"]
+            else:
+                return 0, 0
+        except:
+            return 0, 0
     
     def place(self,buy,ticker,currency,exchange,**kwargs): #quantity in euros
         if ticker=="AAA":
@@ -340,8 +392,8 @@ class MyIB():
     def exit_order(self,symbol,strategy, exchange,short,**kwargs):   
         #type check necessary for indexes
         try:
-            pf= get_pf(strategy, exchange,short)
-            ocap=get_order_capital(strategy, exchange)
+            pf= get_pf(strategy, exchange,short,**kwargs)
+            ocap=get_order_capital(strategy, exchange,**kwargs)
             
             if kwargs.get("index",False):
                 index=Index.objects.get(symbol=symbol) #actually should be more complex
@@ -395,9 +447,9 @@ class MyIB():
     def entry_order(self,symbol,strategy, exchange,short,**kwargs): 
         try:
             #type check necessary for indexes
-            pf= get_pf(strategy, exchange,short)
-            order_size=5000
-            ocap=get_order_capital(strategy, exchange)
+            pf= get_pf(strategy, exchange,short,**kwargs)
+            order_size=10000
+            ocap=get_order_capital(strategy, exchange,**kwargs)
             #accountSummary
             
             if kwargs.get("index",False):
@@ -448,7 +500,7 @@ class MyIB():
 def check_hold_duration(symbol,strategy, exchange,short,**kwargs): 
         #type check necessary for indexes
     try:
-        pf= get_pf(strategy, exchange,short)
+        pf= get_pf(strategy, exchange,short,**kwargs)
         
         #accountSummary
         if kwargs.get("index",False):
@@ -474,25 +526,28 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
          print(msg)
          return 0
 
-def entry_order(symbol,strategy, exchange,short,**kwargs): 
-    if PERFORM_ORDER and DIC_PERFORM_ORDER[strategy]:
-        myIB=MyIB()
-        return myIB.entry_order(symbol,strategy, exchange,short,**kwargs), True
+def entry_order(symbol,strategy, exchange,short,auto,**kwargs): 
+    if (PERFORM_ORDER and DIC_PERFORM_ORDER[strategy] and not kwargs.get("index",False)
+        and not exchange=="XETRA" and not auto==False): #ETF trading requires too high permissions on IB, XETRA data too expansive
+        print("myIB")
+        with MyIB() as myIB:
+            return myIB.entry_order(symbol,strategy, exchange,short,**kwargs), True
     else:   
         return entry_order_test(symbol,strategy, exchange,short,**kwargs), False
     
-def exit_order(symbol,strategy, exchange,short,**kwargs): 
-    if PERFORM_ORDER and DIC_PERFORM_ORDER[strategy]:
-        myIB=MyIB()
-        return myIB.exit_order(symbol,strategy, exchange,short,**kwargs), True
+def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
+    if (PERFORM_ORDER and DIC_PERFORM_ORDER[strategy] and not kwargs.get("index",False)
+        and not exchange=="XETRA" and not auto==False): #ETF trading requires too high permissions on IB, XETRA data too expansive
+        with MyIB() as myIB:
+            return myIB.exit_order(symbol,strategy, exchange,short,**kwargs), True
     else:   
         return exit_order_test(symbol,strategy, exchange,short,**kwargs), False
 
 def entry_order_test(symbol,strategy, exchange,short,**kwargs): 
     try:
         #type check necessary for indexes
-        pf= get_pf(strategy, exchange,short)
-        ocap=get_order_capital(strategy, exchange)
+        pf= get_pf(strategy, exchange,short,**kwargs)
+        ocap=get_order_capital(strategy, exchange,**kwargs)
         
         if kwargs.get("index",False):
             index=Index.objects.get(symbol=symbol)
@@ -531,8 +586,8 @@ def entry_order_test(symbol,strategy, exchange,short,**kwargs):
     
 def exit_order_test(symbol,strategy, exchange,short,**kwargs):   
     try:
-        pf= get_pf(strategy, exchange,short)
-        ocap=get_order_capital(strategy, exchange)
+        pf= get_pf(strategy, exchange,short,**kwargs)
+        ocap=get_order_capital(strategy, exchange,**kwargs)
         
         if kwargs.get("index",False):
             index=Index.objects.get(symbol=symbol) #actually should be more complex
@@ -608,6 +663,7 @@ class Strategy(models.Model):
 class Index(models.Model):
     symbol=models.CharField(max_length=15, blank=False, primary_key=True)
     ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
+    ibticker=models.CharField(max_length=15, blank=True,default="AAA")
     name=models.CharField(max_length=100, blank=False)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
@@ -618,19 +674,22 @@ class Index(models.Model):
         ordering = ["name"]
 
     def ib_ticker(self):
-        return self.ib_ticker
+        return self.ibticker
         
     def __str__(self):
         return self.name  
 
 class Action(models.Model):
     symbol=models.CharField(max_length=15, blank=False, primary_key=True)
-    ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
+    #ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
     name=models.CharField(max_length=100, blank=False)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
     category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=10)
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
+    delisted=models.BooleanField(blank=False,default=False)
+    #introduction_date=models.DateTimeField(null=True, blank=True, auto_now_add=True)
     
     class Meta:
         ordering = ["name"]
@@ -672,8 +731,10 @@ def pf_retrieve_all(**kwargs):
             actions=pf.actions.filter(c1 & (c2|c3))
         elif kwargs.get("opening")=="15h":
             stockEx1=StockEx.objects.filter(name="Nasdaq")
+            stockEx2=StockEx.objects.filter(name="NYSE")
             c2 = Q(stock_ex=stockEx1[0])
-            actions=pf.actions.filter(c1 & c2)
+            c3 = Q(stock_ex=stockEx2[0])
+            actions=pf.actions.filter(c1 & (c2|c3))
         else:
             actions=pf.actions.filter(c1)
         
@@ -687,6 +748,7 @@ class PF(models.Model):
     # can be replaced with ib.positions() or ib.portfolio()
     name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=10)
     short=models.BooleanField(blank=False,default=False)
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
@@ -727,7 +789,7 @@ class PF(models.Model):
             print("line " + str(exc_tb.tb_lineno))
             pass    
 
-def get_pf(strategy, exchange,short):
+def get_pf(strategy, exchange,short,**kwargs):
     
     s=Strategy.objects.get(name=strategy)
     e=StockEx.objects.get(name=exchange)
@@ -737,6 +799,12 @@ def get_pf(strategy, exchange,short):
     c3 = Q(short=short)
     
     try:
+        if exchange=="NYSE":
+            sector=kwargs.get("sector")
+            if sector:
+                action_sector=ActionSector.objects.get(name=sector)
+                c4 = Q(sector=action_sector)
+                return PF.objects.filter(c1 & c2 & c3 & c4)
         return PF.objects.get(c1 & c2 & c3)
     except:
         name=strategy+"_"+exchange
@@ -754,6 +822,14 @@ class ActionCategory(models.Model):
     def __str__(self):
         return self.name 
 
+###GICS sectors    
+class ActionSector(models.Model):
+    name=models.CharField(max_length=100, blank=False)
+
+    def __str__(self):
+        return self.name     
+    
+
 ###To define the capital assigned to one strategy.
 ###Not used presently  
 class Capital(models.Model):
@@ -766,13 +842,20 @@ class Capital(models.Model):
     def __str__(self):
         return self.name 
 
-def get_capital(strategy, exchange,short):
+def get_capital(strategy, exchange,short,**kwargs):
     s=Strategy.objects.get(name=strategy)
     e=StockEx.objects.get(name=exchange)
 
     c1 = Q(stock_ex=e)
     c2 = Q(strategy=s) 
     c3 = Q(short=short)
+
+    if exchange=="NYSE":
+        sector=kwargs.get("sector")
+        if sector:
+            action_sector=ActionSector.objects.get(name=sector)
+            c4 = Q(sector=action_sector)
+            return Capital.objects.get(c1 & c2 & c3 & c4)
 
     return Capital.objects.get(c1 & c2 & c3)
 
@@ -784,17 +867,24 @@ class OrderCapital(models.Model):
     name=models.CharField(max_length=100, blank=False,default="")
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=10)
     
     def __str__(self):
         return self.name 
 
-def get_order_capital(strategy, exchange):
+def get_order_capital(strategy, exchange,**kwargs):
     s=Strategy.objects.get(name=strategy)
     e=StockEx.objects.get(name=exchange)
 
     c1 = Q(stock_ex=e)
     c2 = Q(strategy=s) 
-
+    
+    if exchange=="NYSE":
+        sector=kwargs.get("sector")
+        if sector:
+            action_sector=ActionSector.objects.get(name=sector)
+            c3 = Q(sector=action_sector)
+            return OrderCapital.objects.get(c1 & c2 & c3)
     return OrderCapital.objects.get(c1 & c2)
 
 ###For strategy using two time frame, in the slow one (10 days) candidates are defined

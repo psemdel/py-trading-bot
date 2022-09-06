@@ -65,7 +65,8 @@ def empty_append(x, v, axis, **kwargs):
                 return temp
             else:
                 return av
-    except:
-        print("error by append")
-        print(np.shape(v))
-        return x   
+    except Exception as msg:
+        print("error by append " +str(msg))
+        print("shape x: " + str(np.shape(x)))
+        print("shape v: " + str(np.shape(v)))
+        return x     

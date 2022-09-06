@@ -4,11 +4,10 @@ from reporting.telegram import start
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert
 from core import bt, btP
-from orders.models import ActionCategory, StockEx, Action, get_exchange_actions
+from orders.models import ActionCategory, StockEx, Action, get_exchange_actions, MyIB
+
 
 from .filter import ReportFilter
-from datetime import date
-
 
 def reportsView(request): 
     reports= Report.objects.all()
@@ -44,7 +43,6 @@ def alertsView(request):
 #manual start to avoid multiple instanciation
 def start_bot(request):
     start()
-    #return HttpResponse("bot_start ok")
     print("bot_start ok")
     return redirect('reporting:reports')
 
@@ -70,7 +68,7 @@ def trigger_17h(request):
     report3=Report()
     report3.save()    
 
-    report3.daily_report_index(["BZ=F","^FCHI","^GDAXI"])
+    report3.daily_report_index(["^FCHI","^GDAXI"]) #"CL=F",
     send_order_test(report3)
 
     return HttpResponse("report written")
@@ -172,19 +170,30 @@ def cleaning(request):
         
     return HttpResponse("cleaning done")
 
+def test_order(request):
+    symbol=""
+    strategy=""
+    exchange="XETRA"
+    short=False
+    
+    with MyIB() as myIB:
+        return myIB.entry_order(symbol,strategy, exchange,short), True
+    
+    return HttpResponse("test order done")
+
 def test(request):
     from orders.models import MyIB, retrieve_data
     from ib_insync import Stock
     import vectorbt as vbt
-    
+        
     #action=Action.objects.get(symbol="EN.PA")
     #myIB=MyIB()
     
     #contract = Stock(action.ib_ticker,action.stock_ex.ib_ticker, action.currency.symbol)
     #myIB.get_past_closing_price(contract)
-    cours_open, cours_close, cours_low, cours_high=retrieve_data(["EN.PA","DG.PA"],"1y")
-    macd=vbt.MACD.run(cours_close)
-    print(macd.macd)
+    #cours_open, cours_close, cours_low, cours_high=retrieve_data(["EN.PA","DG.PA"],"1y")
+    #macd=vbt.MACD.run(cours_close)
+    #print(macd.macd)
     #print(myIB.positions())
     
     

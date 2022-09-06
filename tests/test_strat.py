@@ -7,7 +7,8 @@ Created on Fri Jun 24 19:45:34 2022
 """
 
 import unittest
-from core import strat
+from core import strat, macro
+
 import vectorbtpro as vbt
 
 class TestStrat(unittest.TestCase):
@@ -15,7 +16,7 @@ class TestStrat(unittest.TestCase):
         self.st=strat.Strat("CAC40","2007_2022","test")  
         
     def test_ext_major(self):
-        t=strat.VBTMACROTREND.run(self.st.close)
+        t=macro.VBTMACROTREND.run(self.st.close)
         
         self.assertEqual(t.macro_trend['AC'].values[-1],1)
         self.assertEqual(t.macro_trend['AI'].values[-1],-1)

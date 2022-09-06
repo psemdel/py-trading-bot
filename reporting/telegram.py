@@ -26,7 +26,9 @@ from core import constants
 
 from trading_bot.settings import (PF_CHECK, INDEX_CHECK, REPORT_17h, REPORT_22h, HEARTBEAT, 
                                   SUMMER_TIME_US, SUMMER_TIME_EUROPE,
-                                  ALERT_THRESHOLD, ALARM_THRESHOLD, ALERT_HYST)
+                                  ALERT_THRESHOLD, ALARM_THRESHOLD, ALERT_HYST,
+                                  TIME_INTERVAL_CHECK)
+from reporting import telegram_sub
 
 ''' Contains the logic for:
  - Telegram bot
@@ -49,11 +51,9 @@ def start():
 def async_sched(self,TELEGRAM_TOKEN): 
     #note: only serializable data can be sent to async task
     #TelegramBot without change here
-    bot = vbt.TelegramBot(token=TELEGRAM_TOKEN)
+    bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN)
     bot.start(in_background=True)
-    
-    sched=MyScheduler(bot)
-    sched.update_simple()
+    MyScheduler(bot)
 
 def stop(bot, sched):
     bot.stop()
@@ -73,7 +73,7 @@ class MyScheduler():
         self.cleaning=True
 
         if self.pf_check:
-            self.manager.every(10, 'minutes').do(self.check_pf)
+            self.manager.every(TIME_INTERVAL_CHECK, 'minutes').do(self.check_pf)
             if SUMMER_TIME_EUROPE:
                 self.do_weekday('07:03', self.check_pf, opening="9h")
             else:
@@ -84,7 +84,7 @@ class MyScheduler():
             else:                
                 self.do_weekday('14:03', self.check_pf, opening="15h")   
         if self.index_check:
-            self.manager.every(10, 'minutes').do(self.check_index)
+            self.manager.every(TIME_INTERVAL_CHECK, 'minutes').do(self.check_index)
             if SUMMER_TIME_EUROPE:
                 self.do_weekday('07:03', self.check_index, opening="9h")
             else:
@@ -150,7 +150,7 @@ class MyScheduler():
         
     def check_change(self,ratio, symbol,short,**kwargs):
         try:
-            symbols_opportunity=constants.indexes()+constants.raw()
+            symbols_opportunity=constants.INDEXES+constants.RAW
             now=timezone.now().time()
             
             threshold=ALERT_THRESHOLD
@@ -422,7 +422,7 @@ class MyScheduler():
             report3=Report()
             report3.save()    
 
-            report3.daily_report_index(["BZ=F","^FCHI","^GDAXI"])
+            report3.daily_report_index(["BZ=F","^FCHI","^GDAXI"]) 
             self.send_order(report3)
 
             self.telegram_bot.send_message_to_all("Daily report 17h ready")

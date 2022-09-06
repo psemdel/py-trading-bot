@@ -16,11 +16,18 @@ import pandas as pd
 ### To back stage recent data
 # As strat but adapted to download every time the data
 class StratLIVE(Strat):
-    def __init__(self,symbols,period,index_symbol):
+    def __init__(self,symbols,period,index_symbol,**kwargs):
         self.period=period
         self.symbols=symbols
         self.index_symbol=index_symbol
         self.retrieve_live()
+        
+        if kwargs.get("index",False):
+            #self.only_index=True
+            self.close=self.close_ind
+            self.open=self.open_ind
+            self.low=self.low_ind
+            self.high=self.high_ind
         
     ##to plot the last days for instance
     def retrieve_live(self):

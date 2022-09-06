@@ -9,7 +9,8 @@ import vectorbtpro as vbt
 import pandas as pd
 import numpy as np
 
-from core.strat import Strat, VBTMACROTREND
+from core.strat import Strat
+from core.macro import VBTMACROTREND, VBTMACROTRENDOLD
 import core.indicators as ic
 from core.common import VBTfunc#, save_vbt_both
 
@@ -28,7 +29,7 @@ from trading_bot.settings import (DIVERGENCE_THRESHOLD, VOL_SLOW_FREQUENCY, VOL_
 # I just select one, two,... actions and put all my orders on them
 
 class BT(VBTfunc):
-    def __init__(self,symbol_index,period,suffix,longshort):
+    def __init__(self,symbol_index,period,suffix,longshort,**kwargs):
         super().__init__(symbol_index,period)
         self.suffix="_" + suffix
         
@@ -49,7 +50,9 @@ class BT(VBTfunc):
         
         #Underlying strategy to decide when to enter/exit for a group of candidates
         st=Strat(symbol_index,period,suffix)
-        st.strat_kama_stoch_matrend_bbands()
+        #st.strat_kama_stoch_matrend_bbands()
+        #st.stratD()
+        st.stratReal()
         
         self.ent11=st.entries
         self.ex11=st.exits
@@ -63,12 +66,25 @@ class BT(VBTfunc):
         self.candidates_short=[[] for ii in range(len(self.close))]
         
         self.symbols_simple=self.close.columns.values
-        self.symbols_complex=self.ent11.columns.values
+        #self.symbols_complex=self.ent11.columns.values
+        self.symbols_complex_ent=self.ent11.columns.values
+        self.symbols_complex_ex=self.ex11.columns.values
         
         self.last_order_dir="long"
+    
+    def overwrite_strat11(self,ent,ex):
+        self.ent11=ent
+        self.ex11=ex
+        self.symbols_complex_ent=self.ent11.columns.values
+        self.symbols_complex_ex=self.ex11.columns.values
         
-    def symbols_simple_to_complex(self,symbol_simple):
-        for ii, e in enumerate(self.symbols_complex):
+    def symbols_simple_to_complex(self,symbol_simple,ent_or_ex):
+        if ent_or_ex=="ent":
+            symbols=self.symbols_complex_ent
+        else:
+            symbols=self.symbols_complex_ex
+        
+        for ii, e in enumerate(symbols):
             if e[-1]==symbol_simple: #9
                 return e
             
@@ -78,17 +94,18 @@ class BT(VBTfunc):
             if ii!=0:
                 if not kwargs.get("short",False):
                     #sell
+                    new_pf=self.pf.copy()
                     for symbol_simple in self.pf:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple)
+                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
                         
                         if self.ex11[symbol_complex].values[ii] or kwargs.get("nostrat11",False):
-                            self.pf.remove(symbol_simple)
+                            new_pf.remove(symbol_simple)
                             self.capital+=self.order_size
                             self.exits[symbol_simple].iloc[ii]=True
-                
+                    self.pf=new_pf
                     #buy
                     for symbol_simple in self.candidates[ii]:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple)
+                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
                         
                         if self.capital>=self.order_size and\
                             (self.ent11[symbol_complex].values[ii] or kwargs.get("nostrat11",False)
@@ -99,16 +116,18 @@ class BT(VBTfunc):
                             
                 if kwargs.get("short",False):
                     #re-buy
+                    new_pf=self.pf_short.copy()
                     for symbol_simple in self.pf_short:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple)
+                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
               
                         if self.ent11[symbol_complex].values[ii] or kwargs.get("nostrat11",False):
-                            self.pf_short.remove(symbol_simple)
+                            new_pf.remove(symbol_simple)
                             self.capital+=self.order_size #wrong but I want only one
                             self.exits_short[symbol_simple].iloc[ii]=True 
+                    self.pf_short=new_pf
 
                     for symbol_simple in self.candidates_short[ii]:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple)
+                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
                         
                         if self.capital>=self.order_size and\
                         (self.ex11[symbol_complex].values[ii] or kwargs.get("nostrat11",False) or 
@@ -122,10 +141,11 @@ class BT(VBTfunc):
         for ii in range(len(self.close.index)): #for each day
             #sell
             for symbol_simple in self.pf:
-                symbol_complex=self.symbols_simple_to_complex(symbol_simple)
+                symbol_complex_ent=self.symbols_simple_to_complex(symbol_simple,"ent")
+                symbol_complex_ex=self.symbols_simple_to_complex(symbol_simple,"ex")
                 
-                if (self.last_order_dir=="long" and self.ex11[symbol_complex].values[ii] ) or\
-                   (self.last_order_dir!="long" and self.ent11[symbol_complex].values[ii] ) or\
+                if (self.last_order_dir=="long" and self.ex11[symbol_complex_ex].values[ii] ) or\
+                   (self.last_order_dir!="long" and self.ent11[symbol_complex_ent].values[ii] ) or\
                     kwargs.get("nostrat11",False):
                         
                     self.pf.remove(symbol_simple)
@@ -145,12 +165,13 @@ class BT(VBTfunc):
                 
             
             for symbol_simple in cand:
-                symbol_complex=self.symbols_simple_to_complex(symbol_simple)
+                symbol_complex_ent=self.symbols_simple_to_complex(symbol_simple,"ent")
+                symbol_complex_ex=self.symbols_simple_to_complex(symbol_simple,"ex")
                 
                 if self.capital>=self.order_size and\
-                    (not short and (self.ent11[symbol_complex].values[ii] or kwargs.get("nostrat11",False)
+                    (not short and (self.ent11[symbol_complex_ent].values[ii] or kwargs.get("nostrat11",False)
                      or kwargs.get("only_exit_strat11",False))) or \
-                    (short and (self.ex11[symbol_complex].values[ii] or kwargs.get("nostrat11",False)
+                    (short and (self.ex11[symbol_complex_ex].values[ii] or kwargs.get("nostrat11",False)
                      or kwargs.get("only_exit_strat11",False))):
                         
                     self.pf.append(symbol_simple)
@@ -177,11 +198,8 @@ class BT(VBTfunc):
                  cand=self.candidates_short[ii]
              else:
                  cand=self.candidates[ii]   
-             
-
-                
+  
              for symbol in self.pf:
-                     
                  if symbol not in cand:
                      self.pf.remove(symbol)
                      self.capital+=self.order_size
@@ -219,7 +237,7 @@ class BT(VBTfunc):
         
         for e in res:
             symbol_simple=e[0]
-            symbol_complex=self.symbols_simple_to_complex(symbol_simple)
+            symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
 
             #we need a candidate that fulfill strat11 criterium
             #otherwise the chance to buy something is very low.
@@ -416,7 +434,7 @@ class BT(VBTfunc):
      #Obviously the logic is reverted
     def preselect_retard_macro(self,**kwargs):
            self.dur=ic.VBTKAMATREND.run(self.close).duration
-           self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend
+           self.macro_trend=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
            
            if kwargs.get("PRD",False) and not kwargs.get("reset_excluded",False):
                short=(self.macro_trend.values[-1]==1)
@@ -435,7 +453,7 @@ class BT(VBTfunc):
                    self.calculate_retard(ii,short)
            self.res=res #last one    
            self.last_short=short
-           return res #for display
+           #return res #for display
 
     #See preselect_divergence
     def preselect_divergence_sub(self,ii,short,**kwargs):
@@ -607,7 +625,6 @@ class BT(VBTfunc):
          self.frequency=REALMADRID_FREQUENCY
          self.max_candidates_nb=REALMADRID_MAX_CANDIDATES_NB
          self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend  
-         
          v={}
          grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
         

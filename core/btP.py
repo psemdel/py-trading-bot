@@ -13,7 +13,7 @@ Created on Sat May 14 22:36:16 2022
 @author: maxime
 """
 import vectorbtpro as vbt
-from core.strat import VBTMACROTREND
+from core.macro import VBTMACROTRENDPRD
 from core.stratP import StratPRD
 import core.indicators as ic
 from core.bt import BT, WQ
@@ -83,12 +83,12 @@ class Presel(BT):
         if kwargs.get("macro_trend_ind",False):
             self.macro_trend_ind=kwargs.get("macro_trend_ind")
         else:
-            self.macro_trend_ind=VBTMACROTREND.run(self.close_ind).macro_trend
+            self.macro_trend_ind=VBTMACROTRENDPRD.run(self.close_ind).macro_trend
         
         if kwargs.get("macro_trend",False):
             self.macro_trend=kwargs.get("macro_trend")
         else:
-            self.macro_trend=VBTMACROTREND.run(self.close).macro_trend
+            self.macro_trend=VBTMACROTRENDPRD.run(self.close).macro_trend
 
         self.symbols_simple=self.close.columns.values
         self.symbols_complex=self.ent11.columns.values 

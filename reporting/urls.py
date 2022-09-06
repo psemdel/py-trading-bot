@@ -29,4 +29,5 @@ urlpatterns = [
     path('17h/', views.trigger_17h,name="17h"),
     path('22h/', views.trigger_22h,name="22h"),
     path('cleaning/', views.cleaning,name="cleaning"),
+    path('test_order/', views.test_order,name="test_order"),
     ]
