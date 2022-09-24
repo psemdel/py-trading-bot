@@ -76,12 +76,12 @@ def defi_i( open_,high, low, close):
         
         t=ic.VBTSTOCHKAMA.run(high,low,close)
         all_t_ent.append(t.entries_stoch)
-        all_t_ex.append(t.exits_stoch)    
+        all_t_ex.append(t.exits_stoch)   
     
         all_t_ent.append(t.entries_kama)
         all_t_ex.append(t.exits_kama)   
     
-        t=ic.VBTSUPERTRENDMA.run(high,low,close)
+        t=ic.VBTSUPERTREND.run(high,low,close)
         all_t_ent.append(t.entries)
         all_t_ex.append(t.exits)
                         
@@ -204,13 +204,13 @@ def strat_wrapper_macro(open_,high, low, close, a_bull, a_bear, a_uncertain,
             t=VBTMACROTRENDPRD.run(close)
         else:
             t=VBTMACROTREND.run(close)
+
         macro_trend=t.macro_trend
         min_ind=t.min_ind
         max_ind=t.max_ind
         
         #calculate all signals and patterns, is a bit long
         all_t_ent, all_t_ex=defi_i(open_,high, low, close)
-        
         calc_arrs=[]
         
         calc_arrs.append(a_bull)
@@ -459,7 +459,53 @@ class Strat(VBTfunc):
                             self.low,
                             self.close,
                             #self.close_ind,
-                            arr=a)
+                            a)
+        
+    def stratReal(self,**kwargs):
+        a_bull=[1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0.,
+       1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        a_bear=[1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       1., 0., 0., 0., 0., 1., 0., 0., 0., 0.]
+        a_uncertain= [1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1.,
+       1., 0., 0., 0., 0., 1., 0., 1., 1., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)        
+
+    def stratDiv(self,**kwargs):
+        
+        #optimal with fee 0,0005
+        a=[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1.,
+       1., 0., 1., 0., 0., 0., 0., 1., 0., 0.]
+        
+        #optimal with fee 0,0001
+       # a=[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       # 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
+        #1., 1., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0.]
+
+        self.entries, self.exits, self.entries_short, self.exits_short= \
+        strat_wrapper_simple(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a)
+
         
     def stratTestSimple(self,**kwargs):
         a=[0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
@@ -474,7 +520,7 @@ class Strat(VBTfunc):
                             self.low,
                             self.close,
                             #self.close_ind,
-                            arr=a)
+                            a)
 #In long/both/both, on period 2007-2022, CAC40 return 5.26 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)  
 
 
@@ -526,32 +572,7 @@ class Strat(VBTfunc):
                             a_bull, 
                             a_bear, 
                             a_uncertain,
-                            **kwargs)   
-
-
-    def stratReal(self,**kwargs):
-        a_bull=[1., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 1., 1., 0., 1.,
-       0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       0., 0., 1., 0., 0., 0., 0., 0., 0., 0.]
-        a_bear=[0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0.,
-       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
-       0., 1., 0., 0., 0., 0., 0., 0., 1., 0.]
-        a_uncertain= [0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 1., 0., 1., 1.,
-       0., 1., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)   
+                            **kwargs)  
 
 ############## Strategies below are widely deprecated ##############
 

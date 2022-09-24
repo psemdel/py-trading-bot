@@ -88,12 +88,16 @@ def get_final_bands_nb(close, upper, lower):
     dir_ = np.full(close.shape, 1)
     long = np.full(close.shape, np.nan)
     short = np.full(close.shape, np.nan)
+    entries = np.full(close.shape, False) #needed if combined with other methods.
+    exits = np.full(close.shape, False)
 
     for i in range(1, close.shape[0]):
          if close[i] > upper[i - 1]:  
              dir_[i] = 1
+             entries[i]=True
          elif close[i] < lower[i - 1]:
              dir_[i] = -1
+             exits[i]=True
          else:
              dir_[i] = dir_[i - 1]
              if dir_[i] > 0 and lower[i] < lower[i - 1]:
@@ -106,7 +110,7 @@ def get_final_bands_nb(close, upper, lower):
          else:
              trend[i] = short[i] = upper[i]
              
-    return trend, dir_, long, short
+    return trend, dir_, long, short, entries, exits
 
 def faster_supertrend(high, low, close, period=5, multiplier=3):
     medprice=talib.MEDPRICE(high, low)
@@ -120,7 +124,7 @@ VBTSUPERTREND = vbt.IF(
      short_name='st',
      input_names=['high', 'low', 'close'],
      param_names=['period', 'multiplier'],
-     output_names=['supert', 'superd', 'superl', 'supers']
+     output_names=['supert', 'superd', 'superl', 'supers','entries','exits']
 ).with_apply_func(
      faster_supertrend, 
      takes_1d=True,  
@@ -135,7 +139,8 @@ def supertrend_ma(high, low, close):
     ent =  fast_ma.ma_crossed_above(slow_ma)
     ex = fast_ma.ma_crossed_below(slow_ma)
 
-    _, _, _, supers=faster_supertrend(high, low, close)
+
+    _, _, _, supers, _, _=faster_supertrend(high, low, close)
 
     for ii in range(len(supers)):
         if not np.isnan(supers[ii]):
@@ -575,9 +580,12 @@ def divergence_f_sub(close,close_ind):
     out= np.full(close.shape, 0.0)
     
     for ii in range(2,len(close)):
-        p1=close[ii]/close[ii-1]
-        p1_ind=close_ind[ii]/close_ind[ii-1]
-        out[ii]=p1-p1_ind
+        if np.isnan(close[ii]) or np.isnan(close[ii-1]):
+            out[ii]=0
+        else:
+            p1=close[ii]/close[ii-1]
+            p1_ind=close_ind[ii]/close_ind[ii-1]
+            out[ii]=p1-p1_ind
         
     return out
 

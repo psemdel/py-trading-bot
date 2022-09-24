@@ -422,7 +422,7 @@ class MyScheduler():
             report3=Report()
             report3.save()    
 
-            report3.daily_report_index(["BZ=F","^FCHI","^GDAXI"]) 
+            report3.daily_report_index(["^FCHI","^GDAXI"]) # "BZ=F" issue
             self.send_order(report3)
 
             self.telegram_bot.send_message_to_all("Daily report 17h ready")
@@ -443,6 +443,16 @@ class MyScheduler():
             report1.presel(st,"Nasdaq")
             report1.presel_wq(st,"Nasdaq")
             self.send_order(report1)
+            
+            for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
+                      "fin","materials","healthcare"]:
+                report=Report()
+                report.save()
+            
+                st=report.daily_report_action("NYSE",sector=s) 
+                report.presel(st,"NYSE",sector=s)
+                report.presel_wq(st,"NYSE",sector=s)
+                self.send_order(report)
             
             report2=Report()
             report2.save()            

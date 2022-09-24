@@ -133,7 +133,7 @@ class Opt(VBTfunc):
             all_t_ent.append(t.entries_kama)
             all_t_ex.append(t.exits_kama)   
 
-            t=ic.VBTSUPERTRENDMA.run(high,low,close)
+            t=ic.VBTSUPERTREND.run(high,low,close)
             all_t_ent.append(t.entries)
             all_t_ex.append(t.exits)
                             

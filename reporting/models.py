@@ -424,7 +424,7 @@ class Report(models.Model):
                                 "normal",
                                 exchange,
                                 **kwargs)
-                            decision=self.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
+                            decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
                             if decision==1:
                                 self.concat(symbol + " present decision : sell")
                             elif decision==-1:

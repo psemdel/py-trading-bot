@@ -49,14 +49,16 @@ class BT(VBTfunc):
         self.pf_short=[]
         
         #Underlying strategy to decide when to enter/exit for a group of candidates
-        st=Strat(symbol_index,period,suffix)
-        #st.strat_kama_stoch_matrend_bbands()
-        #st.stratD()
-        st.stratReal()
+        self.st=Strat(symbol_index,period,suffix)
+        #self.st.strat_kama_stoch_matrend_bbands()
+        #self.st.strat_kama_stoch()
+        self.st.stratDiv()
+        #self.st.strat_kama_stoch()
+        #self.st.stratD()
         
-        self.ent11=st.entries
-        self.ex11=st.exits
-
+        self.ent11=self.st.entries
+        self.ex11=self.st.exits
+        
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
 
         self.excluded=[]
@@ -66,16 +68,28 @@ class BT(VBTfunc):
         self.candidates_short=[[] for ii in range(len(self.close))]
         
         self.symbols_simple=self.close.columns.values
-        #self.symbols_complex=self.ent11.columns.values
         self.symbols_complex_ent=self.ent11.columns.values
         self.symbols_complex_ex=self.ex11.columns.values
         
         self.last_order_dir="long"
     
+    def reinit(self):
+        self.capital=self.start_capital        
+        self.pf=[]
+        self.pf_short=[]
+        self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+    
     def overwrite_strat11(self,ent,ex):
+        self.reinit()
         self.ent11=ent
         self.ex11=ex
         self.symbols_complex_ent=self.ent11.columns.values
+        self.symbols_complex_ex=self.ex11.columns.values
+        
+    def overwrite_ex_strat11(self,ex):
+        self.reinit()
+        self.ex11=ex
         self.symbols_complex_ex=self.ex11.columns.values
         
     def symbols_simple_to_complex(self,symbol_simple,ent_or_ex):
@@ -83,7 +97,9 @@ class BT(VBTfunc):
             symbols=self.symbols_complex_ent
         else:
             symbols=self.symbols_complex_ex
-        
+
+        if type(symbols[0])==str:
+            return symbol_simple
         for ii, e in enumerate(symbols):
             if e[-1]==symbol_simple: #9
                 return e
@@ -108,8 +124,8 @@ class BT(VBTfunc):
                         symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
                         
                         if self.capital>=self.order_size and\
-                            (self.ent11[symbol_complex].values[ii] or kwargs.get("nostrat11",False)
-                             or kwargs.get("only_exit_strat11",False)):
+                            (kwargs.get("nostrat11",False)
+                             or kwargs.get("only_exit_strat11",False) or self.ent11[symbol_complex].values[ii]):
                             self.pf.append(symbol_simple)
                             self.capital-=self.order_size
                             self.entries[symbol_simple].iloc[ii]=True
@@ -120,7 +136,7 @@ class BT(VBTfunc):
                     for symbol_simple in self.pf_short:
                         symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
               
-                        if self.ent11[symbol_complex].values[ii] or kwargs.get("nostrat11",False):
+                        if kwargs.get("nostrat11",False) or self.ent11[symbol_complex].values[ii]:
                             new_pf.remove(symbol_simple)
                             self.capital+=self.order_size #wrong but I want only one
                             self.exits_short[symbol_simple].iloc[ii]=True 
@@ -130,8 +146,9 @@ class BT(VBTfunc):
                         symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
                         
                         if self.capital>=self.order_size and\
-                        (self.ex11[symbol_complex].values[ii] or kwargs.get("nostrat11",False) or 
-                           kwargs.get("only_exit_strat11",False)):
+                        (kwargs.get("nostrat11",False) or 
+                         kwargs.get("only_exit_strat11",False) or 
+                         self.ex11[symbol_complex].values[ii]):
                             self.pf_short.append(symbol_simple)
                             self.capital-=self.order_size
                             self.entries_short[symbol_simple].iloc[ii]=True  
@@ -290,22 +307,22 @@ class BT(VBTfunc):
     #Calculate the number of day in a row when the smoother price of an action has been decreasing
     #The action the longest duration is bought
     def preselect_retard(self,**kwargs):
-       self.dur=ic.VBTKAMATREND.run(self.close).duration
+        self.dur=ic.VBTKAMATREND.run(self.close).duration
            
-       short=kwargs.get("short",False)
-       
-       if kwargs.get("PRD",False):
-           self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)   
-       else:
-           for ii in range(len(self.close.index)):
-               if self.hold_dur > RETARD_MAX_HOLD_DURATION:
-                   self.excluded.append(self.pf[0])
-                
-               res=self.preselect_retard_sub(ii,short,**kwargs)                         
-               self.calculate_retard(ii,short,**kwargs)
- 
-       self.res=res #last one  
-       return res
+        short=kwargs.get("short",False)
+        if kwargs.get("PRD",False):
+            self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)   
+        else:
+            for ii in range(len(self.close.index)):
+                 if self.hold_dur > RETARD_MAX_HOLD_DURATION:
+                     self.excluded.append(self.pf[0])
+                  
+                 res=self.preselect_retard_sub(ii,short,**kwargs)                         
+                 self.calculate_retard(ii,short,**kwargs)
+                    
+        self.res=res #last one  
+        return res                   
+
         
     #See preselect_macd_vol
     def preselect_macd_vol_sub(self,ii,short,**kwargs):    
@@ -433,27 +450,27 @@ class BT(VBTfunc):
      #Like retard, but the long/short is decided in function of the macro trend
      #Obviously the logic is reverted
     def preselect_retard_macro(self,**kwargs):
-           self.dur=ic.VBTKAMATREND.run(self.close).duration
-           self.macro_trend=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
-           
-           if kwargs.get("PRD",False) and not kwargs.get("reset_excluded",False):
-               short=(self.macro_trend.values[-1]==1)
-               res=self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)
-           else:    
-               if kwargs.get("reset_excluded",False):
-                   self.excluded.reset()
+        self.dur=ic.VBTKAMATREND.run(self.close).duration
+        self.macro_trend=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
+        
+        if kwargs.get("PRD",False) and not kwargs.get("reset_excluded",False):
+            short=(self.macro_trend.values[-1]==1)
+            res=self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)
+        else:    
+            if kwargs.get("reset_excluded",False):
+                self.excluded.reset()
 
-               for ii in range(len(self.close.index)):
-                   short=(self.macro_trend.values[ii]==1)
-                   
-                   if self.hold_dur > RETARD_MAX_HOLD_DURATION:
-                       self.excluded.append(self.pf[0])
+            for ii in range(len(self.close.index)):
+                short=(self.macro_trend.values[ii]==1)
+                
+                if self.hold_dur > RETARD_MAX_HOLD_DURATION:
+                    self.excluded.append(self.pf[0])
 
-                   res=self.preselect_retard_sub(ii,short,**kwargs)           
-                   self.calculate_retard(ii,short)
-           self.res=res #last one    
-           self.last_short=short
-           #return res #for display
+                res=self.preselect_retard_sub(ii,short,**kwargs)           
+                self.calculate_retard(ii,short)
+        self.res=res #last one    
+        self.last_short=short
+        #return res #for display
 
     #See preselect_divergence
     def preselect_divergence_sub(self,ii,short,**kwargs):
@@ -483,6 +500,9 @@ class BT(VBTfunc):
     #When the difference is negative, the action is bought. So the action which evolves lower than 
     #the index is bought
     def preselect_divergence(self,**kwargs):
+        self.st.stratDiv()
+        self.overwrite_ex_strat11(self.st.exits)
+        
         self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
 
         if kwargs.get("PRD",False):
@@ -491,6 +511,7 @@ class BT(VBTfunc):
             for ii in range(len(self.close)):
                 self.preselect_divergence_sub(ii,False,**kwargs)
             self.calculate(only_exit_strat11=True,**kwargs) 
+            self.entries.to_csv('initial')
             
     #Like preselect_divergence, but the mechanism is blocked when macro_trend is bear
     #Reverting the mechanism did not prove to be very rewarding for this strategy
@@ -598,7 +619,10 @@ class BT(VBTfunc):
          
 #Strategy that bet on the actions that growed the most in the past
 #Bet on the one that usually win    
-    def preselect_realmadrid(self,**kwargs):        
+    def preselect_realmadrid(self,**kwargs):   
+         self.st.stratReal()
+         self.overwrite_strat11(self.st.entries,self.st.exits)
+
          distance=REALMADRID_DISTANCE
          self.frequency=REALMADRID_FREQUENCY
          self.max_candidates_nb=REALMADRID_MAX_CANDIDATES_NB
@@ -644,6 +668,33 @@ class BT(VBTfunc):
                  self.candidates[ii]=self.candidates[ii-1]                         
          self.calculate(**kwargs)   
          
+    def preselect_onlybull_vol(self,**kwargs):
+        self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
+        
+        for ii in range(len(self.close.index)):
+            bull_symbols=self.macro_trend.loc[:,(self.macro_trend.iloc[ii] == -1)].columns
+
+            #we want to change the action only if it is not anymore bull
+            find_new_cand=True
+            
+            if ii!=0 and len(self.candidates[ii-1])>0:
+                if self.candidates[ii-1][0] in bull_symbols:
+                    find_new_cand=False #keep the same
+                    self.candidates[ii]=self.candidates[ii-1]
+                    
+            if find_new_cand:
+                v={}    
+                self.candidates[ii]=[]
+                for symbol in bull_symbols:
+                    v[symbol]=self.vol[symbol].values[ii]
+                res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+                for e in res:
+                    symbol=e[0]
+                    self.candidates[ii].append(symbol)
+                    break
+            self.calculate_retard(ii,False,**kwargs)            
+        #self.calculate(nostrat11=True,**kwargs)   
+        
 #WQ uses the prebuild 101 Formulaic Alphas
 #No underlying strategy is necessary
 class WQ(VBTfunc):

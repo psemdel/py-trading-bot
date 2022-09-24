@@ -6,69 +6,6 @@ Created on Sun Dec 12 11:27:07 2021
 @author: maxime
 """
 
-
-#For use with Talib
-PATTERNS={}
-PATTERNS["Pattern"]=["CDL2CROWS", "CDL3BLACKCROWS", "CDL3INSIDE", "CDL3LINESTRIKE",
-          "CDL3OUTSIDE", "CDL3STARSINSOUTH", "CDL3WHITESOLDIERS",
-          "CDLABANDONEDBABY","CDLADVANCEBLOCK", "CDLBELTHOLD",
-          "CDLBREAKAWAY", "CDLCLOSINGMARUBOZU", "CDLCONCEALBABYSWALL",
-          "CDLCOUNTERATTACK", "CDLDARKCLOUDCOVER", "CDLDOJI",
-          "CDLDOJISTAR", "CDLDRAGONFLYDOJI", "CDLENGULFING", 
-          "CDLEVENINGDOJISTAR", "CDLEVENINGSTAR", "CDLGAPSIDESIDEWHITE",
-          "CDLGRAVESTONEDOJI", "CDLHAMMER", "CDLHANGINGMAN", "CDLHARAMI",
-          "CDLHARAMICROSS", "CDLHIGHWAVE", "CDLHIKKAKE", "CDLHIKKAKEMOD",
-          "CDLHOMINGPIGEON", "CDLIDENTICAL3CROWS", "CDLINNECK",
-          "CDLINVERTEDHAMMER", "CDLKICKING", "CDLKICKINGBYLENGTH",
-          "CDLLADDERBOTTOM", "CDLLONGLEGGEDDOJI", "CDLLONGLINE",
-          "CDLMARUBOZU", "CDLMATCHINGLOW", "CDLMATHOLD", "CDLMORNINGDOJISTAR",
-          "CDLMORNINGSTAR", "CDLONNECK", "CDLPIERCING", "CDLRICKSHAWMAN",
-          "CDLRISEFALL3METHODS", "CDLSEPARATINGLINES", "CDLSHOOTINGSTAR",
-          "CDLSHORTLINE", "CDLSPINNINGTOP", "CDLSTALLEDPATTERN",
-          "CDLSTICKSANDWICH", "CDLTAKURI", "CDLTASUKIGAP","CDLTHRUSTING",
-          "CDLTRISTAR","CDLUNIQUE3RIVER","CDLUPSIDEGAP2CROWS",
-          "CDLXSIDEGAP3METHODS"
-          ]
-
-PATTERNS["Trends"]=["HT_TRENDMODE"]
-PATTERNS["Trends2"]=["MACD","BBANDS"]
-
-PATTERNS["Crosses"]=["HT_SINE", "MACD","AROON","STOCH"]  # "APO" crosses 0 also interesting
-PATTERNS["Extremum"]=["APO", "ADX"] 
-PATTERNS["Extremum2"]=[ "KAMA","EMA"]  
-PATTERNS["Extremum_approx"]=["APO", "ADX", "KAMA","EMA"]  
-PATTERNS["Medtrends"]=["KAMA", "EMA"]  
-PATTERNS["Bands"]=["BBANDS"]
-PATTERNS["Over"]=["RSI","WILLR","ULTOSC","STOCH"]
-PATTERNS["Vol"]=["NATR","TRANGE"]
-PATTERNS["Flag"]=["Flag_reverse_bear","Flag_reverse_bull"]
-
-
-#To find the columns afterwards
-PATTERNS2=PATTERNS.copy()
-PATTERNS2["YN1"]=["TRENDPASTDAY"] 
-PATTERNS2["Extremum2"]=["KAMAEXT", "EMAEXT"]
-
-PATTERNS_HIGH=[ "CDLBELTHOLD"]
-"""    
-    "CDL3BLACKCROWS", "CDL3INSIDE", "CDL3LINESTRIKE","CDLABANDONEDBABY",
-               "CDLBELTHOLD",
-               "CDLCLOSINGMARUBOZU", "CDLCONCEALBABYSWALL",
-               "CDLCOUNTERATTACK", "CDLDARKCLOUDCOVER", 
-               "CDLENGULFING", 
-               "CDLEVENINGDOJISTAR", "CDLEVENINGSTAR", 
-               "CDLHIKKAKE", "CDLHIKKAKEMOD",
-               "CDLIDENTICAL3CROWS", "CDLKICKING", "CDLKICKINGBYLENGTH",
-               "CDLLONGLINE",
-               "CDLMARUBOZU", "CDLMATHOLD", "CDLMORNINGDOJISTAR",
-               "CDLMORNINGSTAR", 
-               "CDLRISEFALL3METHODS", "CDLSEPARATINGLINES", 
-               "CDLSTICKSANDWICH", "CDLUPSIDEGAP2CROWS",
-               "CDLXSIDEGAP3METHODS"
-               ]#highly reliable pattern
-"""
-#PATTERNS2["Pattern"]=PATTERNS_HIGH #TEMP
-
 BEAR_PATTERNS={
     "CDLLONGLINE":-100,
     "CDLENGULFING":-100,
@@ -119,20 +56,6 @@ BULL_PATTERNS_LIGHT={
     "CDLMORNINGSTAR":100,
     "CDLHANGINGMAN":-100,
     }
-
-def all_methods():
-    METHODS=["Pattern","Crosses", "Extremum","Extremum2",#"Extremum_approx",
-             "Medtrends","Trends", "Trends2", #"Vol",
-             "Bands", "Over", "YN1"]
-    
-    return METHODS
-
-def patterns():
-    return PATTERNS
-
-def patterns_search():
-
-    return PATTERNS2
 
 CAC40=[
     "AC.PA",
@@ -185,6 +108,7 @@ CAC40_INTRO={
     "WLN.PA":"2014-07-02",
     "ACA.PA":"2002-01-01",
     "SW.PA":"2000-03-01",
+    "ACA.PA":"2007-01-22" #for some inexplicable reason on YF
     }
 
 DAX=[
@@ -234,8 +158,8 @@ DAX=[
 DAX_INTRO={
     "DTG.DE":"2021-12-10",
     "ENR.DE":"2020-09-28",
-    "LIN.DE":"2004-09-01", #from YF
-    "DHER.DE":"2017-07-01",
+    "LIN.DE":"2018-11-01", #buggy before
+    "DHER.DE":"2017-07-01", 
     "HFG.DE":"2017-11-01",
     "1COV.DE":"2015-11-01",
     "SHL.DE":"2018-05-01",

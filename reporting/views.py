@@ -83,6 +83,16 @@ def trigger_22h(request):
     report1.presel_wq(st,"Nasdaq")
     send_order_test(report1)
     
+    for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
+              "fin","materials","healthcare"]:
+        report=Report()
+        report.save()
+    
+        st=report.daily_report_action("NYSE",sector=s) 
+        report.presel(st,"NYSE",sector=s)
+        report.presel_wq(st,"NYSE",sector=s)
+        send_order_test(report)
+
     report2=Report()
     report2.save()            
     report2.daily_report_index(["^IXIC"])
