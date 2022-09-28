@@ -319,7 +319,10 @@ class Report(models.Model):
                                         low_ind=st.low_ind,
                                         close_ind=st.close_ind,                                        
                                          **kwargs)
-                stnormal.stratD()
+                if self.it_is_index:
+                    stnormal.stratIndex()
+                else:
+                    stnormal.stratD()
                 
                 sk=ic.VBTSTOCHKAMA.run(st.high,st.low,st.close)
                 sma=ic.VBTMA.run(st.close)

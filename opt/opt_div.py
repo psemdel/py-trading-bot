@@ -1,6 +1,7 @@
 from core import indicators as ic
 from core.common import VBTfunc
 from core.macro import VBTMACROTREND, VBTMACROMODE, VBTMACROFILTER
+from core import bt
 
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
@@ -9,7 +10,8 @@ import gc
 import copy
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
 
-#Script to optimize the combination of patterns/signals used for a given strategy
+#Script to optimize the underlying combination of patterns/signals used for a given preselection strategy
+#Divergence use only exit signal from the underlying strategies, no need to variate the entry strategy
 
 #The optimization takes place on the actions from CAC40, DAX and Nasdaq
 #Parameters very good on some actions but very bad for others should not be selected
@@ -31,7 +33,7 @@ vbt.settings['caching']=Config(
 )
 
 def log(text):
-    filename="strat.txt"
+    filename="div.txt"
     #print(text)
     with open("opt/output/"+filename, "a") as f:
         f.write("\n"+str(text))  
@@ -43,24 +45,20 @@ class Opt(VBTfunc):
         self.open_dic={}
         self.low_dic={}
         self.high_dic={}
-        self.indexes=["CAC40", "DAX", "NASDAQ","IT"]
-        self.index=kwargs.get("index",False)
-        
+        self.bti={}
+        self.indexes=["CAC40", "DAX", "NASDAQ", "IT","FIN"] #
+        #
+       
+        #self.indexes=["CAC40", "DAX", "NASDAQ", "IT","REALESTATE","INDUSTRY","STAPLES", #"COM"
+        #              "HEALTHCARE","CONSUMER","FIN","COM","ENERGY","UTILITIES"]
         
         for ind in self.indexes:
-            super().__init__(ind,period)
-            if self.index:
-                #self.only_index=True
-                self.close_dic[ind]=self.close_ind
-                self.open_dic[ind]=self.open_ind
-                self.low_dic[ind]=self.low_ind
-                self.high_dic[ind]=self.high_ind
-            else:
-                self.close_dic[ind]=self.close
-                self.open_dic[ind]=self.open
-                self.low_dic[ind]=self.low
-                self.high_dic[ind]=self.high        
-        
+            self.bti[ind]=bt.BT(ind,period,"test","long")
+            self.close_dic[ind]=self.bti[ind].close
+            self.open_dic[ind]=self.bti[ind].open
+            self.low_dic[ind]=self.bti[ind].low
+            self.high_dic[ind]=self.bti[ind].high    
+            
         self.out={}
         
         #init
@@ -124,7 +122,6 @@ class Opt(VBTfunc):
     
     def defi_i(self):
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            all_t_ent=[]
             all_t_ex=[]
             open_=self.open_dic[ind]
             high=self.high_dic[ind]
@@ -132,40 +129,28 @@ class Opt(VBTfunc):
             close=self.close_dic[ind]
             
             t=ic.VBTMA.run(close)
-            all_t_ent.append(t.entries)
             all_t_ex.append(t.exits)
             
             t=ic.VBTSTOCHKAMA.run(high,low,close)
-            all_t_ent.append(t.entries_stoch)
             all_t_ex.append(t.exits_stoch)    
 
-            all_t_ent.append(t.entries_kama)
             all_t_ex.append(t.exits_kama)   
 
             t=ic.VBTSUPERTREND.run(high,low,close)
-            all_t_ent.append(t.entries)
             all_t_ex.append(t.exits)
                             
             t=vbt.BBANDS.run(close)
-            all_t_ent.append(t.lower_above(close))
             all_t_ex.append(t.upper_below(close))
 
             t=vbt.RSI.run(close)
-            all_t_ent.append(t.rsi_crossed_below(20))
             all_t_ex.append(t.rsi_crossed_above(80))
             
-            all_t_ent.append(t.rsi_crossed_below(30))
             all_t_ex.append(t.rsi_crossed_above(70))
-
-            for func_name in BULL_PATTERNS:
-                t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ent").out
-                all_t_ent.append(t)
                 
             for func_name in BEAR_PATTERNS:
                 t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ex").out
                 all_t_ex.append(t)  
               
-            self.all_t_ents[ind]=all_t_ent
             self.all_t_exs[ind]=all_t_ex
             
         del t
@@ -185,7 +170,7 @@ class Opt(VBTfunc):
             arr=arr_input[self.len_ent:self.len_ent+self.len_ex]  
             patterns=BEAR_PATTERNS
         
-        l=["MA","STOCH","KAMA","SUPERTREND","BBANDS","RSI20","RSI30"]
+        l=["MA","STOCH","KAMA","STOCHKAMA","BBANDS","RSI20","RSI30"]
         for _, k in enumerate(patterns):
             l.append(k)
 
@@ -196,11 +181,7 @@ class Opt(VBTfunc):
     
     #put the patterns/signals together (OR)
     #note: this is the time consuming operation
-    def defi_ent(self):
-        self.ents={}
-        self.ents_short={}
-        self.defi("ent")
-    
+   
     def defi_ex(self):
         self.exs={}
         self.exs_short={}
@@ -214,17 +195,11 @@ class Opt(VBTfunc):
                 for nb_macro_mode in range(self.nb_macro_modes): #bull, bear, uncertain
                     calc_arr=self.calc_arrs[nb_macro_mode]
     
-                    if ent_or_ex=="ent":
-                        arr=calc_arr[0:self.len_ent] 
-                    else:
-                        arr=calc_arr[self.len_ent:self.len_ent+self.len_ex]  
+                    arr=calc_arr[self.len_ent:self.len_ent+self.len_ex]  
                 
                     for ii in range(len(arr)):
                         if arr[ii]:
-                            if ent_or_ex=="ent":
-                                t=self.all_t_ents[ind][ii]
-                            else:
-                                t=self.all_t_exs[ind][ii]
+                            t=self.all_t_exs[ind][ii]
                         
                             if ents_raw is None:
                                 ents_raw=t
@@ -254,52 +229,26 @@ class Opt(VBTfunc):
             del t, arr
         except ValueError:
             print("ents_raw was zero!")
-        
-    def macro_mode(self):
-        if (self.nb_macro_modes ==1 or
-           self.macro_trend_bull_mode=='long' and self.macro_trend_bear_mode=='long' 
-           and self.macro_trend_uncertain_mode=='long'):
-            for ind in self.indexes: 
-                self.ents_short[ind]=np.full(self.ents[ind].shape,False)
-                self.exs_short[ind]=np.full(self.ents[ind].shape,False)
-        else:
-            for ind in self.indexes: #CAC, DAX, NASDAQ
-                t=VBTMACROMODE.run(self.ents[ind],self.exs[ind], self.macro_trend[ind],\
-                                   macro_trend_bull=self.macro_trend_bull_mode,
-                                   macro_trend_bear=self.macro_trend_bear_mode,
-                                   macro_trend_uncertain=self.macro_trend_uncertain_mode)
-                self.ents[ind]=t.entries
-                self.exs[ind]=t.exits
-                self.ents_short[ind]=t.entries_short
-                self.exs_short[ind]=t.exits_short           
+    
 
     def calculate_eq_ret(self,pf):
-        if self.index:
-            rb=pf.total_market_return
-            rr=pf.get_total_return()           
-        else:
-            rb=pf.total_market_return.values
-            rr=pf.get_total_return().values
-            
-        delta=rr-rb
+        m_rb=pf.total_market_return
+        m_rr=pf.get_total_return()
         
-        #check that there is no extrem value that bias the whole result
-        #if it the case, this value is not considered in the calculation of the score
-        while np.std(delta)>10:
-            ii=np.argmax(delta)
-            delta=np.delete(delta,ii,0)
-            rb=np.delete(rb,ii,0)
-            rr=np.delete(rr,ii,0)
-        
-        m_rb=np.mean(rb)
-        m_rr=np.mean(rr)
-
         if abs(m_rb)<0.1: #avoid division by zero
             p=(m_rr)/ 0.1*np.sign(m_rb)   
         else:
             p=(m_rr- m_rb )/ abs(m_rb)
-      
+
         return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed
+    
+    def summarize_eq_ret(self,ret_arr):
+        while np.std(ret_arr)>10:
+            ii=np.argmax(ret_arr)
+            ret_arr=np.delete(ret_arr,ii,0)
+            
+        return np.mean(ret_arr)
+        
   
     def manual_calculate_pf(self,ind,*args): #the order is bull/bear/uncertain
         self.calc_arrs=[]
@@ -308,10 +257,7 @@ class Opt(VBTfunc):
         
         self.defi_ent()
         self.defi_ex()
-        self.macro_mode()
         pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
-                                      short_entries=self.ents_short[ind],
-                                      short_exits=self.exs_short[ind],
                                       freq="1d",fees=self.fees)
 
         print("equivalent return " + str(self.calculate_eq_ret(pf)))
@@ -324,7 +270,7 @@ class Opt(VBTfunc):
             if nb_macro_mode in self.tested_arrs:
                 if any((self.tested_arrs[nb_macro_mode][:]==self.calc_arrs[nb_macro_mode]).all(1)): #in np.array
                     found+=1
-                    
+    
         if found==self.nb_macro_modes: #same combination
             return best_arrs_cand, best_ret_cand
         elif nb_macro_mode in self.tested_arrs:
@@ -332,36 +278,30 @@ class Opt(VBTfunc):
         else:
             self.tested_arrs[nb_macro_mode]=[self.calc_arrs[nb_macro_mode]]
 
-        self.defi_ent()
+        #create the underlying strategy
         self.defi_ex()
-        self.macro_mode()
-        
-        if self.index:
-            ret_arr=[]
-        else:
-            ret=0
+            
+        ret=0
+        ret_arr=[]
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
-                                          short_entries=self.ents_short[ind],
-                                          short_exits=self.exs_short[ind],
-                                          freq="1d",fees=self.fees)
+            self.bti[ind].overwrite_ex_strat11(self.exs[ind])
+            self.bti[ind].preselect_divergence()
+
+            pf=vbt.Portfolio.from_signals(self.bti[ind].close, 
+                                          self.bti[ind].entries,
+                                          self.bti[ind].exits,
+                                          #short_entries=self.bti[ind].entries_short,
+                                          #short_exits=self.bti[ind].exits_short,
+                                          freq="1d",fees=self.fees,
+                                          call_seq='auto',cash_sharing=True,)
             
-            if self.index:
-                ret_arr.append(self.calculate_eq_ret(pf))
-            else:
-                ret+=self.calculate_eq_ret(pf)
+            ret_arr.append(self.calculate_eq_ret(pf))
 
-        if self.index:
-            while np.std(ret_arr)>10:
-                 ii=np.argmax(ret_arr)
-                 ret_arr=np.delete(ret_arr,ii,0)
-         
-            ret=np.mean(ret_arr)
-
+        ret=self.summarize_eq_ret(ret_arr)
         trades =len(pf.get_trades().records_arr)
         del pf
-         
+        
         if ret> best_arrs_ret and ret>best_ret_cand and trades>50:
             return self.calc_arrs, ret
         
@@ -390,7 +330,7 @@ class Opt(VBTfunc):
         best_ret_cand=self.init_threshold
             
         for nb_macro_mode in range(self.nb_macro_modes): 
-            for ii in range(len(self.arrs[nb_macro_mode])):
+            for ii in range(self.len_ent,len(self.arrs[nb_macro_mode])): #variates only the exit
                 self.calc_arrs=copy.deepcopy(self.arrs)
                 
                 if self.arrs[nb_macro_mode][ii]==0:
@@ -414,12 +354,13 @@ class Opt(VBTfunc):
             
             if self.predefined:
                 self.arrs=self.predef()
+                self.arrs=self.arrs[0:self.nb_macro_modes]
+                
             else:
                 while found==self.nb_macro_modes:
                     found=0
     
                     arr=self.random()
-            
                     for nb_macro_mode in range(self.nb_macro_modes):
                         if nb_macro_mode in self.tested_arrs:
                             if any((self.tested_arrs[nb_macro_mode][:]==arr).all(1)):
@@ -429,7 +370,7 @@ class Opt(VBTfunc):
                     self.arrs.append(arr.copy())
 
             self.calc_arrs=copy.deepcopy(self.arrs)
-            
+
             best_arrs_cand, best_ret_cand=self.calculate_pf([],self.init_threshold,self.init_threshold) #reset 
             if best_ret_cand>self.init_threshold: #normally true
                 self.best_arrs[self.best_arrs_index,:,:]= best_arrs_cand
@@ -454,7 +395,6 @@ class Opt(VBTfunc):
                     self.arrs=best_arrs_cand
                 else:
                     calc=False
-                    
                     self.best_end_arrs[self.best_end_arrs_index,:]= self.best_arrs[self.best_arrs_index-1,:]
                     self.best_end_arrs_ret[self.best_end_arrs_index]=self.best_arrs_ret[self.best_arrs_index-1]
                     self.best_end_arrs_index+=1

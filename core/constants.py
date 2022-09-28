@@ -827,6 +827,7 @@ INDEXES=["^GSPC", #SP500
          "^GDAXI", #DAX
          "^N225", #Nikkei
          "^FTSE",
+         "^DJI"
     ]
 RAW=["BZ=F", #brent
      "CL=F",  #crude

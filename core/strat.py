@@ -572,8 +572,56 @@ class Strat(VBTfunc):
                             a_bull, 
                             a_bear, 
                             a_uncertain,
-                            **kwargs)  
+                            **kwargs) 
 
+    def stratF(self,**kwargs):
+        a_bull=[0., 0., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
+            1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+            0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        a_bear= [0., 1., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 1.,
+         0., 0., 0., 0., 0., 1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
+         1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        a_uncertain=  [0., 1., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0.,
+         0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs) 
+    
+    def stratIndex(self,**kwargs):
+        a_bull=[1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 1., 1., 0., 0., 1.,
+       0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
+        a_bear=[1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0.,
+       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1.,
+       0., 0., 0., 0., 1., 0., 0., 0., 1., 0.]
+        a_uncertain=[1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0.,
+       0., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 1.,
+       0., 0., 1., 0., 0., 0., 1., 0., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)       
+        
 ############## Strategies below are widely deprecated ##############
 
 #### No trend at all
