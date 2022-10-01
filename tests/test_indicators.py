@@ -185,9 +185,9 @@ class TestIndicator(unittest.TestCase):
         self.assertTrue(t.entries[(True,'BNP')].values[-2])
         self.assertTrue(t.entries[(True,'BN')].values[-4])
         #exit should be identical to not light
-        self.assertTrue(t.exits[(True,'AI')].values[-1])
-        self.assertTrue(t.exits[(True,'BN')].values[-1])
-        self.assertTrue(t.exits[(True,'SAN')].values[-1])  
+        self.assertFalse(t.exits[(True,'AI')].values[-1])
+        self.assertFalse(t.exits[(True,'BN')].values[-1])
+        self.assertFalse(t.exits[(True,'SAN')].values[-1])  
         self.assertTrue(t.exits[(True,'RI')].values[-3])
       
     def test_VBTBBANDSTREND(self):          

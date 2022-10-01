@@ -10,7 +10,7 @@ import unittest
 from django.test import TestCase
 import reporting.telegram as tel
 from reporting.models import Alert
-from orders.models import Fees, StockEx, Action, ActionCategory, Strategy, Currency
+from orders.models import Fees, StockEx, Action, ActionSector, ActionCategory, Strategy, Currency
 
 class MockTelegramBot():
     def send_message_to_all(self,msg):
@@ -26,6 +26,8 @@ class TestTelegram(TestCase):
         c=Currency.objects.create(name="euro")
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         strategy=Strategy.objects.create(name="none")
+        s=ActionSector.objects.create(name="sec")
+        
         self.strategy=strategy
         a=Action.objects.create(
             symbol='AC.PA',
@@ -34,7 +36,8 @@ class TestTelegram(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         self.a=a
         a=Action.objects.create(
@@ -44,7 +47,8 @@ class TestTelegram(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
 
         bot=MockTelegramBot()

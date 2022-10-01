@@ -11,7 +11,7 @@ import numpy as np
 from django.test import TestCase
 import reporting.models as m
 from reporting.models import Alert
-from orders.models import (Fees, StockEx, Action, Index, ActionCategory, Strategy, 
+from orders.models import (Fees, StockEx, Action, Index, ActionCategory, ActionSector, Strategy, 
                           Currency, StratCandidates, PF, Excluded, OrderCapital)
 import vectorbtpro as vbt
 
@@ -34,6 +34,7 @@ class TestReporting(TestCase):
         strategy7=Strategy.objects.create(name="wq53")
         strategy8=Strategy.objects.create(name="wq54")
         StratCandidates.objects.create(name="normal",strategy=strategy2)
+        s=ActionSector.objects.create(name="sec")
         
         self.strategy=strategy
         a=Action.objects.create(
@@ -43,7 +44,8 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         self.a=a
         a=Action.objects.create(
@@ -53,7 +55,8 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         a=Action.objects.create(
             symbol='AIR.PA',
@@ -62,7 +65,8 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )   
         
         etf1=Action.objects.create(
@@ -72,7 +76,8 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat2,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )   
 
         Index.objects.create(
@@ -93,15 +98,18 @@ class TestReporting(TestCase):
             etf_long=etf1,
             etf_short=etf1
             )           
-        PF.objects.create(name="divergence",short=False,strategy= strategy3,stock_ex=e)
+        PF.objects.create(name="divergence",short=False,strategy= strategy3,stock_ex=e,sector=s)
+        PF.objects.create(name="retard",short=False,strategy= strategy4,stock_ex=e,sector=s)
+        PF.objects.create(name="retard",short=True,strategy= strategy4,stock_ex=e,sector=s)
+        
         Excluded.objects.create(name="retard", strategy=strategy4)
         Excluded.objects.create(name="all",strategy=strategy)
-        OrderCapital.objects.create(capital=1,name="divergence",strategy=strategy3,stock_ex=e)
-        OrderCapital.objects.create(capital=1,name="retard",strategy=strategy4,stock_ex=e)
-        OrderCapital.objects.create(capital=1,name="wq7",strategy=strategy5,stock_ex=e)
-        OrderCapital.objects.create(capital=1,name="wq31",strategy=strategy6,stock_ex=e)
-        OrderCapital.objects.create(capital=1,name="wq53",strategy=strategy7,stock_ex=e)
-        OrderCapital.objects.create(capital=1,name="wq54",strategy=strategy8,stock_ex=e)
+        OrderCapital.objects.create(capital=1,name="divergence",strategy=strategy3,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,name="retard",strategy=strategy4,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,name="wq7",strategy=strategy5,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,name="wq31",strategy=strategy6,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,name="wq53",strategy=strategy7,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,name="wq54",strategy=strategy8,stock_ex=e,sector=s)
         
         self.report1=m.Report()
         self.report1.save()

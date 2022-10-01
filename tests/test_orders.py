@@ -21,6 +21,9 @@ class TestOrders(TestCase):
         c=m.Currency.objects.create(name="euro")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         strategy=m.Strategy.objects.create(name="none")
+        s=m.ActionSector.objects.create(name="sec")
+        self.s=s
+        
         self.strategy=strategy
         m.Action.objects.create(
             symbol='AC.PA',
@@ -29,7 +32,8 @@ class TestOrders(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         a=m.Action.objects.create(
             symbol='AI.PA',
@@ -38,7 +42,8 @@ class TestOrders(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         self.a=a
         a2=m.Action.objects.create(
@@ -48,7 +53,8 @@ class TestOrders(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         self.a2=a2
         m.Action.objects.create(
@@ -58,7 +64,8 @@ class TestOrders(TestCase):
             stock_ex=e2,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         symbols=['AC.PA','AI.PA','AIR.PA'] 
         m.Excluded.objects.create(name="all",strategy=strategy)
@@ -91,47 +98,47 @@ class TestOrders(TestCase):
         self.assertTrue(t!=0)
         
     def test_get_pf(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e)
+        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf2= m.get_pf("none", "Paris",False)
         
         self.assertEqual(pf,pf2)
         
     def test_pf_retrieve(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e)
+        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         self.assertEqual(pf.retrieve(),[])      
         pf.actions.add(self.a)
         self.assertEqual(pf.retrieve(),["AI.PA"])        
         
     def test_pf_retrieve_all(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e)
+        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.actions.add(self.a)
-        pf2=m.PF.objects.create(name="abc2",short=False,strategy=self.strategy,stock_ex=self.e)
+        pf2=m.PF.objects.create(name="abc2",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf2.actions.add(self.a2)        
         
         self.assertEqual(m.pf_retrieve_all(),["AI.PA","AIR.PA"])      
 
     def test_pf_append(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e)
+        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append("AI.PA")
         
         self.assertEqual(pf.retrieve(),["AI.PA"])  
         
     def test_pf_remove(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e)
+        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append("AI.PA")
         pf.remove("AI.PA")
         
         self.assertEqual(pf.retrieve(),[])          
         
     def test_get_order_capital(self):
-        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e)
+        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e,sector=self.s)
         ocap2=m.get_order_capital("none","Paris")
         
         self.assertEqual(ocap,ocap2)
         
     def test_entry_order_test(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e)
-        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e)
+        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e,sector=self.s)
                 
         t=m.entry_order_test("AIR.PA","none","Paris",False)
 
@@ -146,8 +153,8 @@ class TestOrders(TestCase):
         self.assertFalse(t)
         
     def test_exit_order_test(self):        
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e)
-        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e)
+        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e,sector=self.s)
                 
         m.entry_order_test("AIR.PA","none","Paris",False)   
         t=m.exit_order_test("AIR.PA","none","Paris",False)   

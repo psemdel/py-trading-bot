@@ -12,7 +12,7 @@ from core import stratP
 import vectorbtpro as vbt
 import numpy as np
 from django.test import TestCase
-from orders.models import Action, StockEx, Currency, ActionCategory, Strategy, Fees
+from orders.models import Action, ActionSector, StockEx, Currency, ActionCategory, Strategy, Fees
 
 class TestStratP(TestCase):
     def setUp(self):
@@ -22,6 +22,7 @@ class TestStratP(TestCase):
         c=Currency.objects.create(name="euro")
         cat=ActionCategory.objects.create(name="actions")
         strategy=Strategy.objects.create(name="none")
+        s=ActionSector.objects.create(name="sec")
         
         Action.objects.create(
             symbol='AC.PA',
@@ -30,7 +31,8 @@ class TestStratP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         Action.objects.create(
             symbol='AI.PA',
@@ -39,7 +41,8 @@ class TestStratP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         Action.objects.create(
             symbol='AIR.PA',
@@ -48,7 +51,8 @@ class TestStratP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         symbols=['AC.PA','AI.PA','AIR.PA'] 
         self.st=stratP.StratPRD(symbols,"1y")

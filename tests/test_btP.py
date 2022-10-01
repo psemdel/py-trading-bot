@@ -9,7 +9,8 @@ Created on Sun Jun 26 21:38:23 2022
 from django.test import TestCase
 import unittest
 from core import btP, stratP
-from orders.models import Fees, StockEx, Action, ActionCategory, Strategy, Currency, Candidates, Excluded
+from orders.models import (Fees, StockEx, Action, ActionSector,
+                          ActionCategory, Strategy, Currency, Candidates, Excluded)
 from orders.models import  get_candidates
 
 class TestbtP(TestCase):
@@ -20,6 +21,7 @@ class TestbtP(TestCase):
         e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
         self.e=e
         c=Currency.objects.create(name="euro")
+        s=ActionSector.objects.create(name="sec")
         
         self.strategy=strategy
         a=Action.objects.create(
@@ -29,7 +31,8 @@ class TestbtP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         self.a=a
         a=Action.objects.create(
@@ -39,7 +42,8 @@ class TestbtP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )
         a=Action.objects.create(
             symbol='AIR.PA',
@@ -48,7 +52,8 @@ class TestbtP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy
+            strategy=strategy,
+            sector=s,
             )        
         self.st=stratP.StratPRD(["AC.PA", "AI.PA","AIR.PA"],"1y")
         self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro",
