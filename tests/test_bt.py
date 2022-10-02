@@ -29,7 +29,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),1.88)
+        self.assertEqual(round(pf.get_total_return(),2),1.90)
         
     def test_preselect_retard(self):
         self.bti.preselect_retard()
@@ -59,7 +59,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),-0.20) 
+        self.assertEqual(round(pf.get_total_return(),2),1.84) 
         
     def test_preselect_hist_vol(self):
         self.bti.preselect_hist_vol()
@@ -74,7 +74,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),0.24) 
+        self.assertEqual(round(pf.get_total_return(),2),2.94) 
         
     def test_preselect_divergence(self):
         self.bti.preselect_divergence()
@@ -104,7 +104,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),-1.61)  
+        self.assertEqual(round(pf.get_total_return(),2),16.93)  
         
     def test_preselect_retard_macro(self):
         self.bti.preselect_retard_macro()
@@ -149,7 +149,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),-0.12)   
+        self.assertEqual(round(pf.get_total_return(),2),10.99)   
         
     def test_preselect_realmadrid(self):
          self.bti.preselect_realmadrid()
@@ -166,6 +166,22 @@ class TestBT(unittest.TestCase):
 
          self.assertEqual(round(pf.get_total_return(),2),8.05)     
 
+    def test_preselect_realmadrid_blocked(self):
+         self.bti.preselect_realmadrid_blocked()
+
+         pf=vbt.Portfolio.from_signals(self.bti.close,
+                                       self.bti.entries,
+                                       self.bti.exits,
+                                       short_entries=self.bti.entries_short,
+                                       short_exits  =self.bti.exits_short,
+                                       freq="1d",
+                                       call_seq='auto',
+                                       cash_sharing=True,
+                              )
+
+         self.assertEqual(round(pf.get_total_return(),2),5.50) 
+
+
     def test_preselect_macd_vol_slow(self):
          self.bti.preselect_macd_vol_slow()
 
@@ -179,7 +195,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),-0.86) 
+         self.assertEqual(round(pf.get_total_return(),2),-0.61) 
 
          self.bti.preselect_macd_vol_slow(only_exit_strat11=True)
 
@@ -193,7 +209,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),-0.86) 
+         self.assertEqual(round(pf.get_total_return(),2),-0.26) 
 
     def test_preselect_hist_vol_slow(self):
          self.bti.preselect_hist_vol_slow()
@@ -208,7 +224,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),-0.21) 
+         self.assertEqual(round(pf.get_total_return(),2),3.86) 
 
          self.bti.preselect_hist_vol_slow(only_exit_strat11=True)
 
@@ -222,7 +238,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),-0.04) 
+         self.assertEqual(round(pf.get_total_return(),2),0.73) 
            
 if __name__ == '__main__':
     unittest.main()        

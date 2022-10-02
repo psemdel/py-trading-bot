@@ -52,12 +52,12 @@ class BT(VBTfunc):
         self.st=Strat(symbol_index,period,suffix)
         #self.st.strat_kama_stoch_matrend_bbands()
         #self.st.strat_kama_stoch()
-        self.st.stratDiv()
-        #self.st.strat_kama_stoch()
         #self.st.stratD()
+        #self.st.stratE()
+        #self.st.stratF()
         
-        self.ent11=self.st.entries
-        self.ex11=self.st.exits
+        #self.ent11=self.st.entries
+        #self.ex11=self.st.exits
         
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
 
@@ -68,8 +68,8 @@ class BT(VBTfunc):
         self.candidates_short=[[] for ii in range(len(self.close))]
         
         self.symbols_simple=self.close.columns.values
-        self.symbols_complex_ent=self.ent11.columns.values
-        self.symbols_complex_ex=self.ex11.columns.values
+        #self.symbols_complex_ent=self.ent11.columns.values
+        #self.symbols_complex_ex=self.ex11.columns.values
         
         self.last_order_dir="long"
     
@@ -209,6 +209,7 @@ class BT(VBTfunc):
         
     #same with hold_dur and exclusion
     def calculate_retard(self,ii,short,**kwargs):
+        
         if ii!=0:
              #sell
              if short:
@@ -265,6 +266,9 @@ class BT(VBTfunc):
      
     #Preselect action based on the volatility. The highest volatility is chosen.      
     def preselect_vol(self, **kwargs):
+        self.st.strat_kama_stoch_matrend_bbands()
+        self.overwrite_strat11(self.st.entries,self.st.exits)        
+
         #take stoch
         if kwargs.get("PRD",False):
             res=self.preselect_vol_sub(len(self.close)-1,**kwargs)
@@ -348,6 +352,9 @@ class BT(VBTfunc):
     #Preselect action based on the volatility. The highest volatility is chosen.  
     #As supplementary criterium, the MACD must be positive for the long variant.
     def preselect_macd_vol(self,**kwargs):
+         self.st.strat_kama_stoch_matrend_bbands()
+         self.overwrite_strat11(self.st.entries,self.st.exits)
+        
          short=kwargs.get("short",False)
          
          if kwargs.get("PRD",False):
@@ -385,6 +392,8 @@ class BT(VBTfunc):
     #Preselect action based on the volatility. The highest volatility is chosen.  
     #As supplementary criterium, the hist (see MACD) must be positive for the long variant.           
     def preselect_hist_vol(self,**kwargs):
+         self.st.stratF()        
+         self.overwrite_strat11(self.st.entries,self.st.exits)
          short=kwargs.get("short",False)
 
          if kwargs.get("PRD",False):
@@ -432,6 +441,9 @@ class BT(VBTfunc):
         
     #Like preselect_macd_vol, but the long/short is decided in function of the macro trend
     def preselect_macd_vol_macro(self,**kwargs):
+         self.st.stratD()        
+         self.overwrite_strat11(self.st.entries,self.st.exits)
+        
          if kwargs.get("macro_trend_index",False):
              self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend
          else:
@@ -501,7 +513,7 @@ class BT(VBTfunc):
     #the index is bought
     def preselect_divergence(self,**kwargs):
         self.st.stratDiv()
-        self.overwrite_ex_strat11(self.st.exits)
+        self.overwrite_strat11(self.st.entries,self.st.exits)
         
         self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
 
@@ -516,6 +528,9 @@ class BT(VBTfunc):
     #Like preselect_divergence, but the mechanism is blocked when macro_trend is bear
     #Reverting the mechanism did not prove to be very rewarding for this strategy
     def preselect_divergence_blocked(self,**kwargs):
+        self.st.stratDiv()
+        self.overwrite_strat11(self.st.entries,self.st.exits)
+        
         self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
         self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend   
         
@@ -539,6 +554,9 @@ class BT(VBTfunc):
     #Like preselect_vol but slow
     def preselect_vol_slow(self, **kwargs):
         #take stoch
+        self.st.stratF()        
+        self.overwrite_strat11(self.st.entries,self.st.exits)
+
         v={}
         self.frequency=VOL_SLOW_FREQUENCY
         self.max_candidates_nb=VOL_SLOW_MAX_CANDIDATES_NB
@@ -561,6 +579,8 @@ class BT(VBTfunc):
 
     #Like preselect_macd_vol but slow
     def preselect_macd_vol_slow(self,**kwargs):
+         self.st.strat_kama_stoch_matrend_bbands()
+         self.overwrite_strat11(self.st.entries,self.st.exits)
          v={}
          
          self.frequency=MACD_VOL_SLOW_FREQUENCY
@@ -590,6 +610,9 @@ class BT(VBTfunc):
          
     #Like preselect_hist_vol but slow
     def preselect_hist_vol_slow(self,**kwargs):
+         self.st.stratE()        
+         self.overwrite_strat11(self.st.entries,self.st.exits)
+        
          v={}
          
          self.frequency=HIST_VOL_SLOW_FREQUENCY  
@@ -626,7 +649,7 @@ class BT(VBTfunc):
          distance=REALMADRID_DISTANCE
          self.frequency=REALMADRID_FREQUENCY
          self.max_candidates_nb=REALMADRID_MAX_CANDIDATES_NB
-         
+
          v={}
          grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
         
@@ -637,14 +660,17 @@ class BT(VBTfunc):
                  res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
 
                  for e in res:
-                     if len(self.candidates[ii])<self.max_candidates_nb:
-                         symbol=e[0]
-                         self.candidates[ii].append(symbol)
+                    if len(self.candidates[ii])<self.max_candidates_nb:
+                        symbol=e[0]
+                        self.candidates[ii].append(symbol)
              elif ii!=0:
                  self.candidates[ii]=self.candidates[ii-1]                         
          self.calculate(**kwargs)           
 
-    def preselect_realmadrid_blocked(self,**kwargs):        
+    def preselect_realmadrid_blocked(self,**kwargs):   
+         self.st.stratReal()
+         self.overwrite_strat11(self.st.entries,self.st.exits)
+        
          distance=REALMADRID_DISTANCE
          self.frequency=REALMADRID_FREQUENCY
          self.max_candidates_nb=REALMADRID_MAX_CANDIDATES_NB
@@ -687,14 +713,71 @@ class BT(VBTfunc):
                 self.candidates[ii]=[]
                 for symbol in bull_symbols:
                     v[symbol]=self.vol[symbol].values[ii]
-                res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+                res=sorted(v.items(), key=lambda tup: tup[1], reverse=False)
                 for e in res:
                     symbol=e[0]
                     self.candidates[ii].append(symbol)
                     break
             self.calculate_retard(ii,False,**kwargs)            
-        #self.calculate(nostrat11=True,**kwargs)   
+
+    def preselect_onlybull_hist(self,**kwargs):
+        self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
+        macd_tot=vbt.MACD.run(self.close)
+        macd=macd_tot.macd
         
+        for ii in range(len(self.close.index)):
+            bull_symbols=self.macro_trend.loc[:,(self.macro_trend.iloc[ii] == -1)].columns
+
+            #we want to change the action only if it is not anymore bull
+            find_new_cand=True
+            
+            if ii!=0 and len(self.candidates[ii-1])>0:
+                if self.candidates[ii-1][0] in bull_symbols:
+                    find_new_cand=False #keep the same
+                    self.candidates[ii]=self.candidates[ii-1]
+                    
+            if find_new_cand:
+                v={}    
+                self.candidates[ii]=[]
+                for symbol in bull_symbols:
+                    v[symbol]=macd[symbol].values[ii]/self.close[symbol].values[ii]
+                res=sorted(v.items(), key=lambda tup: tup[1], reverse=False)
+                for e in res:
+                    symbol=e[0]
+                    self.candidates[ii].append(symbol)
+                    break
+            self.calculate_retard(ii,False,**kwargs)     
+ 
+    def preselect_onlybull_grow(self,**kwargs):
+        distance=REALMADRID_DISTANCE
+        self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
+        grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
+        
+        for ii in range(len(self.close.index)):
+            bull_symbols=self.macro_trend.loc[:,(self.macro_trend.iloc[ii] == -1)].columns
+
+            #we want to change the action only if it is not anymore bull
+            find_new_cand=True
+            
+            if ii!=0 and len(self.candidates[ii-1])>0:
+                if self.candidates[ii-1][0] in bull_symbols:
+                    find_new_cand=False #keep the same
+                    self.candidates[ii]=self.candidates[ii-1]
+                    
+            if find_new_cand:
+                v={}    
+                self.candidates[ii]=[]
+                for symbol in bull_symbols:
+                    v[symbol]=v[symbol]=grow[(distance,True,symbol)].values[ii]
+                res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+                for e in res:
+                    symbol=e[0]
+                    self.candidates[ii].append(symbol)
+                    break
+            self.calculate_retard(ii,False,**kwargs)     
+                        
+ 
+    
 #WQ uses the prebuild 101 Formulaic Alphas
 #No underlying strategy is necessary
 class WQ(VBTfunc):
