@@ -32,7 +32,7 @@ When you are done:
 - Click on start_bot.sh
 
 # To do
-Using USE_IB_FOR_DATA and PERFORM_ORDER on True is still in beta phase.
+Using USE_IB_FOR_DATA and PERFORM_ORDER on True is still in beta phase. For USE_IB_FOR_DATA, please note that you need the permission for all actions that you need to retrieve. One missing permission lead to the failure of the process.
 
 # Deployment
 Deployment of the bot on external machine has not been achieved yet for several reasons:

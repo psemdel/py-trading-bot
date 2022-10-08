@@ -23,7 +23,6 @@ class StratLIVE(Strat):
         self.retrieve_live()
         
         if kwargs.get("index",False):
-            #self.only_index=True
             self.close=self.close_ind
             self.open=self.open_ind
             self.low=self.low_ind

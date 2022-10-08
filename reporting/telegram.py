@@ -446,6 +446,7 @@ class MyScheduler():
             
             for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
                       "fin","materials","healthcare"]:
+                print("starting report " + s)
                 report=Report()
                 report.save()
             

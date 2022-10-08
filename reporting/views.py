@@ -84,7 +84,8 @@ def trigger_22h(request):
     send_order_test(report1)
     
     for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
-              "fin","materials","healthcare"]:
+              "fin","materials","healthcare"]: 
+        print("starting report " + s)      
         report=Report()
         report.save()
     
@@ -95,7 +96,7 @@ def trigger_22h(request):
 
     report2=Report()
     report2.save()            
-    report2.daily_report_index(["^IXIC"])
+    report2.daily_report_index(["^DJI","^IXIC"])
     send_order_test(report2)
     
     return HttpResponse("report written")

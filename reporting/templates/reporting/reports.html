@@ -58,13 +58,23 @@
     {% for report in reports.qs %}
         {% if report.it_is_index %}
         <tr>
-        <td><a href="{% url 'reporting:rep' report.id %}">Decision index {{ report.date }}</a></td>
-        <td><a href="{% url 'reporting:trend' report.id %}">Trend index {{ report.date }}</a></td>
+            {% if report.sector == "undefined" %}
+            <td><a href="{% url 'reporting:rep' report.id %}">Decision index {{ report.date }}</a></td>
+            <td><a href="{% url 'reporting:trend' report.id %}">Trend index {{ report.date }}</a></td>
+            {% else %}
+            <td><a href="{% url 'reporting:rep' report.id %}">Decision index {{ report.date }} {{report.sector}}</a></td>
+            <td><a href="{% url 'reporting:trend' report.id %}">Trend index {{ report.date }} {{report.sector}}</a></td>
+            {% endif %}
         </tr>
         {% else %}
         <tr>
-        <td><a href="{% url 'reporting:rep' report.id %}">Decision {{report.stock_ex}} {{ report.date }}</a></td>
-        <td><a href="{% url 'reporting:trend' report.id %}">Trend {{report.stock_ex}} {{ report.date }}</a></td>
+            {% if report.sector == "undefined" %}
+            <td><a href="{% url 'reporting:rep' report.id %}">Decision {{report.stock_ex}} {{ report.date }}</a></td>
+            <td><a href="{% url 'reporting:trend' report.id %}">Trend {{report.stock_ex}} {{ report.date }}</a></td>
+            {% else %}
+            <td><a href="{% url 'reporting:rep' report.id %}">Decision {{report.stock_ex}} {{ report.date }} {{report.sector}}</a></td>
+            <td><a href="{% url 'reporting:trend' report.id %}">Trend {{report.stock_ex}} {{ report.date }} {{report.sector}}</a></td>
+            {% endif %}
         </tr>
         {% endif %}
     {% endfor %}

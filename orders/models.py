@@ -17,9 +17,56 @@ import traceback
 import numpy as np
 
 from trading_bot.settings import (PERFORM_ORDER, USE_IB_FOR_DATA,DIC_PERFORM_ORDER,
-                                  IB_LOCALHOST, IB_PORT)
+                                  IB_LOCALHOST, IB_PORT, IB_STOCKEX_NO_PERMISSION, 
+                                  IB_STOCK_NO_PERMISSION)
 
 ### Interactive brockers and data retrieval ###
+def stk(action):
+    if action.ib_ticker()=="AAA":
+        return None
+    else:
+        s_ex=action.stock_ex.ib_ticker 
+        if s_ex not in IB_STOCKEX_NO_PERMISSION:
+            if action.stock_ex.ib_ticker=='NASDAQ':
+                s_ex='SMART'
+                return Stock(action.ib_ticker(),s_ex, action.currency.symbol,primaryExchange='NASDAQ')
+            else:
+                return Stock(action.ib_ticker(),s_ex, action.currency.symbol)
+        else:
+            print("stock "+action.ib_ticker() + " not in authorized stock exchange")
+            return None
+
+def symbol_to_exchangeticker(symbol):
+    actions=Action.objects.filter(symbol=symbol)
+    if len(actions)==0:
+        action=Index.objects.get(symbol=symbol)
+    else:
+        action=actions[0]  
+    return action.stock_ex.ib_ticker
+
+def symbol_to_IBcontract(myIB,symbol):
+    try:
+        contract=None
+        actions=Action.objects.filter(symbol=symbol)
+        if len(actions)==0:
+            action=Index.objects.get(symbol=symbol)
+            t_contract = Contract(symbol=action.ib_ticker(),secType="IND") 
+            cds=myIB.ib.reqContractDetails(t_contract)
+            contracts = [cd.contract for cd in cds]
+            for c in contracts:
+                if (c.exchange not in IB_STOCKEX_NO_PERMISSION and 
+                action.ib_ticker() not in IB_STOCK_NO_PERMISSION):
+                    contract=c
+                    break
+            if contract is None: #fallback ETF
+                contract = stk(action.etf_long)
+        else:
+            action=actions[0]
+            contract = stk(action)
+        return contract
+    except:
+        print("error in symbol_to_IBcontract")
+        return None, None
 
 class IBData(RemoteData):
     @classmethod
@@ -34,6 +81,7 @@ class IBData(RemoteData):
         ) -> tp.Frame:
 
         try:
+            myIB=kwargs.get("myIB")
             fig= ''.join(x for x in period if x.isdigit())
             if period.find("d")!=-1:
                 period_ib=fig +" D"
@@ -54,21 +102,11 @@ class IBData(RemoteData):
             else:
                 interval='1 day'
                             
-            with MyIB() as myIB:
-                actions=Action.objects.filter(symbol=symbol)
-                if len(actions)==0:
-                    if symbol=="BZ=F":
-                        contract = Stock("BRNT","BVME.ETF", "EUR")
-                    else:
-                        action=Index.objects.get(symbol=symbol)
-                        contract = Contract(symbol=action.ib_ticker(),secType="IND") 
-                        cds=myIB.ib.reqContractDetails(contract)
-                        contracts = [cd.contract for cd in cds]
-                        contract=contracts[0]
-                else:
-                    action=actions[0]
-                    contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
-                    
+            contract=symbol_to_IBcontract(myIB,symbol)
+            
+            if contract is None:
+                return None
+            else:
                 bars = myIB.ib.reqHistoricalData(
                         contract,
                         endDateTime='',
@@ -78,7 +116,11 @@ class IBData(RemoteData):
                         useRTH=True,
                         formatDate=1)
                 t=util.df(bars)
-                t.columns = ['Date', 'Open', 'High', 'Low','Close','Volume','Average','BarCount']
+                
+                if t is not None:
+                    t.columns = ['Date', 'Open', 'High', 'Low','Close','Volume','Average','BarCount']
+                    t=t.set_index('Date')
+                
                 return t
             
         except Exception as msg:
@@ -92,14 +134,36 @@ class IBData(RemoteData):
 def retrieve_data(symbols,period,**kwargs):
     try:
         IBok=True
+        myIB=None
+        if USE_IB_FOR_DATA:
+            try:
+                myIB=MyIB()
+                clientID=1
+                while clientID<=10:
+                    try:
+                        myIB.ib.connect(host=IB_LOCALHOST, port=IB_PORT, clientId=clientID)
+                        break
+                    except:                    
+                        clientID+=1
+                        pass
+            except:
+                IBok=False
+                print("connection to IB failed")
+                pass
         
         for symbol in symbols:
+            if symbol in IB_STOCK_NO_PERMISSION:
+                print("symbol " + symbol + " has no permission for IB")
+                IBok=False
+                break
+            
             if kwargs.get("index",False):
                 action=Index.objects.get(symbol=symbol)
             else:
                 action=Action.objects.get(symbol=symbol)
             
-            if action.stock_ex.ib_ticker in ["BVME.ETF", "IBIS"]:
+            if action.stock_ex.ib_ticker in IB_STOCKEX_NO_PERMISSION:
+                print("stock ex " + action.stock_ex.ib_ticker + " has no permission for IB")
                 IBok=False
                 break
         
@@ -109,10 +173,10 @@ def retrieve_data(symbols,period,**kwargs):
         else:
             index_symbol=exchange_to_symbol(action)
             all_symbols=symbols+[index_symbol]
-            
+        
         if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False): 
             try:
-                cours=IBData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+                cours=IBData.fetch(all_symbols, period=period,missing_index='drop',myIB=myIB,**kwargs)
             except:
                 print("Error with IB for data retrieval, fallback with YF")
                 cours=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
@@ -126,7 +190,7 @@ def retrieve_data(symbols,period,**kwargs):
         cours_close=cours_action.get('Close')
         cours_volume=cours_action.get('Volume')
         print("number of days retrieved: " + str(np.shape(cours_close)[0]))
-            
+        
         cours_index=cours.select(index_symbol)
         cours_open_ind =cours_index.get('Open')
         cours_high_ind=cours_index.get('High')
@@ -138,7 +202,7 @@ def retrieve_data(symbols,period,**kwargs):
         if debug:
             for symbol in all_symbols:
                 if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False):    
-                    data=vbt.IBData.fetch(symbol, period=period,**kwargs)
+                    data=IBData.fetch([symbol], period=period,**kwargs)
                 else:
                     data=vbt.YFData.fetch(symbol, period=period,**kwargs)
             
@@ -148,13 +212,17 @@ def retrieve_data(symbols,period,**kwargs):
                     if math.isnan(close_debug.values[ii]):
                         print(symbol)
                         print("dropping at least " + str(close_debug.index[ii]))
-          
+        
+        if myIB is not None:
+            myIB.ib.disconnect()
+        
         return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
                cours_volume_ind
                    
     except Exception as msg:
         print(msg)
+        print("symbol faulty " + symbol)
         print("exception in " + __name__)
         _, e_, exc_tb = sys.exc_info()
         print("line " + str(exc_tb.tb_lineno))
@@ -195,6 +263,8 @@ def get_exchange_actions(exchange,**kwargs):
         
 def retrieve_ib_pf():
     print("myIB retrieve")
+    action=None
+    
     with MyIB() as myIB:
         pf=[]
         pf_short=[]
@@ -209,37 +279,33 @@ def retrieve_ib_pf():
                     if a.ib_ticker()==contract.localSymbol:
                         action=a
 
-            if pos.position>0:
-                pf.append(action.symbol)
-            else:
-                pf_short.append(action.symbol)
+            if action is not None:            
+                if pos.position>0:
+                    pf.append(action.symbol)
+                else:
+                    pf_short.append(action.symbol)
 
     return pf, pf_short
 
 #for SL check
 def get_last_price(symbol,**kwargs):
     try:
-        if kwargs.get("index",False):
-            action=Index.objects.get(symbol=symbol)
-        else:
-            action=Action.objects.get(symbol=symbol)   
+        #if symbol not in ["BZ=F"]: #buggy
+        s_ex=symbol_to_exchangeticker(symbol)
 
-        if USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in ["BVME.ETF", "IBIS"]:
+        if (USE_IB_FOR_DATA and s_ex not in IB_STOCKEX_NO_PERMISSION):
             with MyIB() as myIB:
-                if kwargs.get("index",False):
-                    contract = Contract(symbol=action.ib_ticker(),secType="IND")
-                    cds=myIB.ib.reqContractDetails(contract)
-                    contracts = [cd.contract for cd in cds]
-                    contract=contracts[0]
-                else:
-                    contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
-                cours_pres=myIB.get_last_price(contract)
+                contract =symbol_to_IBcontract(myIB,symbol)
+                if contract is not None:
+                    cours_pres=myIB.get_last_price(contract)
         else: #YF
             cours=vbt.YFData.fetch([symbol], period="2d")
             cours_close=cours.get("Close")
             cours_pres=cours_close[symbol].iloc[-1]
     
         return cours_pres
+        #else:
+        #    return 0
     except Exception as msg:
         print(symbol)
         print("exception in " + __name__)
@@ -247,30 +313,24 @@ def get_last_price(symbol,**kwargs):
 
 def get_ratio(symbol,**kwargs):
     try:
-        if kwargs.get("index",False):
-            action=Index.objects.get(symbol=symbol)
-        else:
-            action=Action.objects.get(symbol=symbol)
-        
-        if USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in ["BVME.ETF","Index"]:
+        #if symbol not in ["BZ=F"]: #buggy
+        cours_pres=0
+        cours_ref=0
+        s_ex=symbol_to_exchangeticker(symbol)
+            
+        if (USE_IB_FOR_DATA and s_ex not in IB_STOCKEX_NO_PERMISSION):
             with MyIB() as myIB:
-                if kwargs.get("index",False):
-                    contract = Contract(symbol=action.ib_ticker(),secType="IND")
-                    cds=myIB.ib.reqContractDetails(contract)
-                    contracts = [cd.contract for cd in cds]
-                    contract=contracts[0]
-                else:
-                    contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
-
-                cours_pres=myIB.get_last_price(contract)
-                cours_ref, cours_open=myIB.get_past_closing_price(contract)
-                
-                if kwargs.get("opening",False):
-                    cours_pres=cours_open
+                contract =symbol_to_IBcontract(myIB,symbol)
+                if contract is not None:
+                    cours_ref, cours_open=myIB.get_past_closing_price(contract) #dif between closing yesterday and opening today
+                    if kwargs.get("opening",False):
+                        cours_pres=cours_open
+                    else:
+                        cours_pres=myIB.get_last_price(contract)
+   
         else: #YF
             cours=vbt.YFData.fetch([symbol], period="2d")
             cours_close=cours.get("Close")
-
             cours_ref=cours_close[symbol].iloc[0]
                     
             if kwargs.get("opening",False):
@@ -278,10 +338,13 @@ def get_ratio(symbol,**kwargs):
                 cours_pres=cours_open[symbol].iloc[-1]
             else:
                 cours_pres=cours_close[symbol].iloc[-1]
-
-        return rel_dif(cours_pres,
-                           cours_ref
-                           )*100
+                
+        if cours_pres!=0 and cours_ref!=0:
+            return rel_dif(cours_pres,cours_ref)*100
+        else:
+            return 0
+        #else:
+        #    return 0
     except Exception as msg:
         print(symbol)
         print("exception in " + __name__)
@@ -317,7 +380,7 @@ class MyIB():
         
     def test(self,symbol):
         action=Action.objects.get(symbol=symbol)
-        contract = Stock(action.ib_ticker(),action.stock_ex.ib_ticker, action.currency.symbol)
+        contract = stk(action)
         print(self.ib.qualifyContracts(contract))  
         
     def retrieve(self,contract,period):
@@ -364,12 +427,11 @@ class MyIB():
         except:
             return 0, 0
     
-    def place(self,buy,ticker,currency,exchange,**kwargs): #quantity in euros
-        if ticker=="AAA":
-            print("ticker not found")
-            return "", 0
+    def place(self,buy,action,**kwargs): #quantity in euros
+        contract =stk(action)
+        if contract is None:
+            return "", 0, 0
         else:
-            contract = Stock(ticker, exchange, currency)
             self.ib.qualifyContracts(contract)
             
             if buy:
@@ -413,9 +475,7 @@ class MyIB():
                 #profit
                 if len(order)>0:
                     txt, order[0].exiting_price, quantity= self.place(False,
-                                           action.ib_ticker(),
-                                           action.currency.symbol, 
-                                           action.stock_ex.ib_ticker,
+                                           action,
                                            quantity=order[0].quantity)
                     order[0].exiting_date=timezone.now()
                     
@@ -470,9 +530,7 @@ class MyIB():
                     
                 order=Order(action=action, pf=pf)
                 txt, order.entering_price, order.quantity=  self.place(True,
-                                        action.ib_ticker(),
-                                        action.currency.symbol,
-                                        action.stock_ex.ib_ticker,
+                                        action,
                                         order_size=order_size)
                 
                 if kwargs.get("sl",False):

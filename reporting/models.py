@@ -17,7 +17,8 @@ from core.constants import INTRO
 from orders.models import Action, entry_order,\
                           exit_order, Index, get_pf, get_candidates,\
                           get_exchange_actions,\
-                          StratCandidates, StockEx, Strategy
+                          StratCandidates, StockEx, Strategy, ActionSector
+                     
 
 #which strategy to use for which stockexchange
 
@@ -35,6 +36,7 @@ class Report(models.Model):
 
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
     it_is_index=models.BooleanField(blank=False,default=False)
+    sector=models.ForeignKey('orders.ActionSector',on_delete=models.CASCADE,blank=True,default=10)
     
     def __str__(self):
         return str(self.date)
@@ -57,7 +59,7 @@ class Report(models.Model):
         
     def daily_report_action(self,exchange,**kwargs):
         symbols=get_exchange_actions(exchange,**kwargs)
-        return self.daily_report(symbols,exchange)   
+        return self.daily_report(symbols,exchange,**kwargs) 
 
 ### Logic for buying and selling actions preselected with retard strategy
     def retard(self,presel,exchange,**kwargs):
@@ -282,6 +284,12 @@ class Report(models.Model):
                 self.stock_ex=StockEx.objects.get(name=exchange)
                 if exchange=="NYSE":
                     DICS=DIC_PRESEL_SECTOR
+                    if kwargs.get("sector"):
+                        try:
+                            self.sector=ActionSector.objects.get(name=kwargs.get("sector")) 
+                        except:
+                            print("sector not found")
+                            pass
                 else:
                     DICS=[DIC_PRESEL[exchange]]
             else:
@@ -307,6 +315,7 @@ class Report(models.Model):
                 
                 st=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",**kwargs)
                 st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
+                
                 #calculates everything used afterwards
                 #also used for "normal strat"
                 stnormal=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",
@@ -322,7 +331,7 @@ class Report(models.Model):
                 if self.it_is_index:
                     stnormal.stratIndex()
                 else:
-                    stnormal.stratD()
+                    stnormal.stratF()
                 
                 sk=ic.VBTSTOCHKAMA.run(st.high,st.low,st.close)
                 sma=ic.VBTMA.run(st.close)

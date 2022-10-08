@@ -99,6 +99,10 @@ class Opt(VBTfunc):
         self.arrs=[]
         self.tested_arrs={}
         
+        self.macd={}
+        for ind in self.indexes:
+            self.macd[ind]=vbt.MACD.run(self.close_dic[ind])
+            
         if self.nb_macro_modes==3:
             self.macro_trend_bull={}
             self.macro_trend_bear={}
@@ -112,6 +116,7 @@ class Opt(VBTfunc):
             for ind in self.indexes:
                 t=VBTMACROTREND.run(self.close_dic[ind])
                 self.macro_trend[ind]=t.macro_trend
+                
         
         #all entries and exits for all patterns and signals are calculated once and for all here
         self.defi_i()
@@ -328,7 +333,8 @@ class Opt(VBTfunc):
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
             self.bti[ind].overwrite_strat11(self.ents[ind],self.exs[ind])
-            self.bti[ind].preselect_realmadrid()
+            self.bti[ind].preselect_macd_vol_macro(macro_trend=self.macro_trend[ind],macd=self.macd[ind])
+            
             pf=vbt.Portfolio.from_signals(self.bti[ind].close, 
                                           self.bti[ind].entries,
                                           self.bti[ind].exits,
@@ -339,6 +345,7 @@ class Opt(VBTfunc):
             
             ret_arr.append(self.calculate_eq_ret(pf))
         ret=self.summarize_eq_ret(ret_arr)
+        print(ret)
         trades =len(pf.get_trades().records_arr)
         del pf
         

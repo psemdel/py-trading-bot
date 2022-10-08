@@ -11,10 +11,10 @@ IB_PORT=7496
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
 DIC_PRESEL={
-    "Paris":["retard_manual","wq7","wq54"],
-    "XETRA":["retard_manual","wq7","wq53"], 
-    "Nasdaq":["retard","wq31","wq53"],
-    #"NYSE":["retard"]
+    "Paris":["retard_manual"],
+    "XETRA":["retard_manual"], 
+    "Nasdaq":["retard"],
+    "NYSE":[]
     }
 
 DIC_PRESEL_SECTOR={
@@ -43,7 +43,12 @@ ALARM_THRESHOLD=5 #in %
 ALERT_HYST=1 #margin to avoid alert/recovery at high frequency
 
 ## Order settings ##
-USE_IB_FOR_DATA=False #use IB for Data or YF
+USE_IB_FOR_DATA=True #use IB for Data or YF
+IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"] #"BVME.ETF"
+IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME"]
+IB_STOCK_NO_PERMISSION=["NDX"]
+
+
 TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
 
 PERFORM_ORDER=False #test or use IB to perform orders

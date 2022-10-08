@@ -5,7 +5,11 @@
 {% if report.it_is_index %}
     <h1>Daily trend report {{report.date}}</h1>
 {% else %}
+    {% if report.sector == "undefined" %}
     <h1>Daily trend report {{report.stock_ex}} {{report.date}}</h1>
+    {% else %}
+    <h1>Daily trend report {{report.stock_ex}} {{report.date}}, sector {{report.sector}}</h1>
+    {% endif %}
 {% endif %}
 
 <p>{{report.text|linebreaks }}</p>
