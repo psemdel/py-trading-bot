@@ -42,14 +42,13 @@ ALERT_THRESHOLD=3 #in %
 ALARM_THRESHOLD=5 #in %
 ALERT_HYST=1 #margin to avoid alert/recovery at high frequency
 
+TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
+
 ## Order settings ##
 USE_IB_FOR_DATA=True #use IB for Data or YF
 IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"] #"BVME.ETF"
-IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME"]
+IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME.ETF"]
 IB_STOCK_NO_PERMISSION=["NDX"]
-
-
-TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
 
 PERFORM_ORDER=False #test or use IB to perform orders
 ## Can be configured for each strategy separately (depending on how often the strategy will trade)
@@ -95,7 +94,7 @@ STOCH_LU=80
 BBAND_THRESHOLD=0.15
 
 #for some major events, that cannot be detected only with technical analysis
-FORCE_MACRO_TO="bear" #"bull"/"uncertain"/""
+FORCE_MACRO_TO="" #"bull"/"uncertain"/""
 
 
 """

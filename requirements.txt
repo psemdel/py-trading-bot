@@ -1,6 +1,7 @@
 #### Appserver
 django
 whitenoise
+celery[redis]
 
 #### trading
 TA-Lib

@@ -1,9 +1,9 @@
 # Introduction
-This trader bot automatizes orders on all kind of financial products, and is not targetting crypto. Objective is that it can run in autonomy. It is primarily a personal project, it must be seen as an example, not as a general framework.
+This trader bot automatizes orders on all kind of financial products, and is not targetting crypto. Objective is that it can run in autonomy. It is primarily a personal project, it must be seen as an example, not as a general framework or a bot ready to go.
 
 Features implemented:
 
-- Backstaging of complex strategies (including 101 Formulaic Alphas) using vectorbtpro
+- Backstaging of complex strategies (including 101 Formulaic Alphas) using [vectorbtpro](https://vectorbt.pro/)
 - Performing live automatically orders using the tested strategies and interactive brockers, thanks to ib_insync
 - Send Telegram messages when performing an order
 - Send Telegram alerts when the action price variation exceeds a certain threshold
@@ -22,10 +22,17 @@ There are many similar tools out there, that have similar purposes that are cert
 - trading_bot contains Django configuration
 
 # Get started
-Configuration:
+For details, especially relative to pre-requisites, see [installation guide](https://github.com/psemdel/py-trading-bot/blob/main/installation_guide.md)
+In short:
 
 - Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software), useIB_for_data to the correct value depending if you use Interactive brokers or not. Look at the settings, for instance for Telegram.
-- In trading_bot/etc/ put your Django key (whatever you want), your telegram token and your database credentials. I used postgresQL but it does not matter (read https://docs.djangoproject.com/en/4.0/ref/databases/)
+- In trading_bot/etc/ adapt the values in files (never commit those files!! Uncomment **/trading_bot/etc/ in .gitignore to avoid this drama):
+
+    - DB_USER contains your database user
+    - DB_SECRET contains your database password
+    - DJANGO_SECRET contains your Django secret
+    - TELEGRAM_TOKEN contains your Telegram bot token
+    
 - (optional) reimport the dump file using "python manage.py loaddata dump.rdb" to fill your database with some financial products: CAC40, DAX, Nasdaq100 and S&P 500.
 
 When you are done:
