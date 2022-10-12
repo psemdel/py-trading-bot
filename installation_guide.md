@@ -6,19 +6,35 @@ For this installation, it is assumed that python with a version >3.8, git and pi
 * [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
 # Vectorbt
-I recommend using [vectorbt](https://vectorbt.dev/) in its [pro version](https://vectorbt.pro/) (requires fee), but basically vectorbt "dev" is the same with less features. Install it with:
+I recommend using [vectorbt](https://vectorbt.dev/) in its [pro version](https://vectorbt.pro/) (requires fee), but basically vectorbt "dev" is the same with less features (I will create a branch for the bot using vectorbt normal). Install it with:
+
+- Vectorbt "normal"
 
 ```sh
 pip install -U "vectorbt[full]"
 ```
 
-It will install some other dependencies needed for the bot, for instance: pandas, numpy, python-telegram-bot and TA-Lib. 
-
-# Django
-Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker.
+- Vectorbtpro
 
 ```sh
-pip install django celery[redis]
+pip install -U "vectorbtpro"
+```
+
+It will install some other dependencies needed for the bot, for instance: pandas, numpy, python-telegram-bot and TA-Lib. 
+Note: you have to choose between the pro and the dev versions. You can have both installed at the same time.
+
+# Django
+Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. asyncio is used for asynchronous tasks. ib_insync is a library to communicate with interactive brokers.
+
+```sh
+pip install django celery[redis] asyncio ib_insync whitenoise
+```
+
+# Clone from git
+Pull the project from git:
+
+```
+git clone https://github.com/psemdel/py-trading-bot.git
 ```
 
 # Database
@@ -55,6 +71,8 @@ pgtradingbotdb is the name of the database in postgres (but you can use whatever
 # Telegram
 If you want to use Telegram to receive alert, you first need to create a bot in Telegram with BotFather. Internet is full of explanation on the topic. Note your token.
 
+# Jupyter (optional)
+It is optional, but you Jupyter to read the Jupyter notebooks. Vectorbt is very good to visualize strategies in Jupyter, it would be too bad not to use this possibility.
 
 # Configuration
 Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software).
@@ -87,7 +105,7 @@ Set USE_IB_FOR_DATA to the correct value depending if you use Interactive broker
 
     ## Order settings ##
     USE_IB_FOR_DATA=True #use IB for Data or YF
-    IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"] #"BVME.ETF"
+    IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"]
     IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME"]
     IB_STOCK_NO_PERMISSION=["NDX"]
 

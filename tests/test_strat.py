@@ -12,7 +12,8 @@ from core import strat, macro
 import vectorbtpro as vbt
 
 class TestStrat(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):  
         self.st=strat.Strat("CAC40","2007_2022_08","test")  
         
     def test_ext_major(self):

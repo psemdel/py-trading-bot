@@ -45,7 +45,7 @@ ALERT_HYST=1 #margin to avoid alert/recovery at high frequency
 TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
 
 ## Order settings ##
-USE_IB_FOR_DATA=True #use IB for Data or YF
+USE_IB_FOR_DATA=False #use IB for Data or YF
 IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"] #"BVME.ETF"
 IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME.ETF"]
 IB_STOCK_NO_PERMISSION=["NDX"]
@@ -120,7 +120,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG',True)
 
 if DEBUG:
     with open('trading_bot/etc/DJANGO_SECRET') as f:
@@ -131,7 +131,9 @@ if DEBUG:
         DB_USER = f.read().strip()
 else:
     SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') 
-
+    DB_SECRET_KEY = os.environ.get('DB_SECRET_KEY') 
+    DB_USER=os.environ.get('DB_USER') 
+        
 ALLOWED_HOSTS = []
 
 # Application definition

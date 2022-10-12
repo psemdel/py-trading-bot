@@ -30,7 +30,21 @@ from trading_bot.settings import (DIVERGENCE_THRESHOLD, VOL_SLOW_FREQUENCY, VOL_
 
 class BT(VBTfunc):
     def __init__(self,symbol_index,period,suffix,longshort,**kwargs):
-        super().__init__(symbol_index,period)
+        self.period=period
+        self.symbol_index=symbol_index
+        self.st=Strat(symbol_index,period,suffix)
+        
+        self.high=self.st.high
+        self.low=self.st.low
+        self.close=self.st.close
+        self.open=self.st.open
+        self.volume=self.st.volume
+        self.high_ind=self.st.high_ind
+        self.low_ind=self.st.low_ind
+        self.close_ind=self.st.close_ind
+        self.open_ind=self.st.open_ind
+        self.volume_ind=self.st.volume_ind
+        
         self.suffix="_" + suffix
         
         self.start_capital=10000
@@ -49,7 +63,6 @@ class BT(VBTfunc):
         self.pf_short=[]
         
         #Underlying strategy to decide when to enter/exit for a group of candidates
-        self.st=Strat(symbol_index,period,suffix)
         #self.st.strat_kama_stoch_matrend_bbands()
         #self.st.strat_kama_stoch()
         #self.st.stratD()
@@ -79,6 +92,8 @@ class BT(VBTfunc):
         self.pf_short=[]
         self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        self.entries_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
     
     def overwrite_strat11(self,ent,ex):
         self.reinit()
@@ -448,11 +463,13 @@ class BT(VBTfunc):
              self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend
          else:
              self.macro_trend=VBTMACROTREND.run(self.close).macro_trend
-
+         #self.macro_trend=kwargs.get("macro_trend")
+         
          if kwargs.get("PRD",False):
              res=self.preselect_macd_vol_macro_sub(len(self.close.index)-1,**kwargs)
          else:
              self.macd_tot=vbt.MACD.run(self.close)
+             #self.macd_tot=kwargs.get("macd") 
              for ii in range(len(self.close.index)):
                   res=self.preselect_macd_vol_macro_sub(ii,**kwargs)
          

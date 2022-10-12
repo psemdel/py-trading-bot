@@ -111,7 +111,7 @@ class TestReporting(TestCase):
         OrderCapital.objects.create(capital=1,name="wq53",strategy=strategy7,stock_ex=e,sector=s)
         OrderCapital.objects.create(capital=1,name="wq54",strategy=strategy8,stock_ex=e,sector=s)
         
-        self.report1=m.Report()
+        self.report1=m.Report(sector=s)
         self.report1.save()
 
     def test_concat(self):
