@@ -213,12 +213,12 @@ def stoch_kama(high, low, close):
     _, direction, top_ext, bot_ext=kama_f(close)
 
     stoch = vbt.STOCH.run(high,low,close)
-    ent_stoch =  stoch.percent_d_crossed_below(STOCH_LL)
-    ex_stoch  =stoch.percent_d_crossed_below(STOCH_LU)
-
+    ent_stoch =  stoch.slow_k_crossed_below(STOCH_LL)
+    ex_stoch  =stoch.slow_k_crossed_below(STOCH_LU)
+    
     entries, exits=stoch_kama_sub(close, top_ext, ex_stoch.values, bot_ext, ent_stoch.values)
 
-    return entries, exits, ent_stoch, ex_stoch, bot_ext, top_ext, stoch.percent_d, direction  
+    return entries, exits, ent_stoch, ex_stoch, bot_ext, top_ext, stoch.slow_k, direction  
 
 VBTSTOCHKAMA = vbt.IF(
      class_name='StochKama',
@@ -520,7 +520,7 @@ def macdbb_trend(close):
     lim1=1/factor
     lim2=2*lim1
     
-    macd=vbt.MACD.run(close)
+    macd=vbt.MACD.run(close, macd_wtype='simple',signal_wtype='simple')
     kama, direction, _, _=kama_f(close)
     bbands=vbt.BBANDS.run(close)
     #norming

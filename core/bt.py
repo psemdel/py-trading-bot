@@ -358,9 +358,10 @@ class BT(VBTfunc):
         for e in res:
             if len(self.candidates[ii])<self.max_candidates_nb:
                 symbol=e[0]
-                if short and macd[symbol].values[ii]<0:
+                
+                if short and macd[('simple','simple',symbol)].values[ii]<0:
                    self.candidates_short[ii].append(symbol)
-                elif not short and macd[symbol].values[ii]>0:
+                elif not short and macd[('simple','simple',symbol)].values[ii]>0:
                    self.candidates[ii].append(symbol)
         return res
     
@@ -375,7 +376,7 @@ class BT(VBTfunc):
          if kwargs.get("PRD",False):
              res=self.preselect_macd_vol_sub(len(self.close.index)-1,short)
          else:
-             self.macd_tot=vbt.MACD.run(self.close)
+             self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
 
              for ii in range(len(self.close.index)):
                  res=self.preselect_macd_vol_sub(ii,short)
@@ -398,9 +399,9 @@ class BT(VBTfunc):
         for e in res:
             if len(self.candidates[ii])<self.max_candidates_nb:
                 symbol=e[0]
-                if short and hist[symbol].values[ii]<0:
+                if short and hist[('simple','simple',symbol)].values[ii]<0:
                    self.candidates_short[ii].append(symbol)
-                elif not short and hist[symbol].values[ii]>0:
+                elif not short and hist[('simple','simple',symbol)].values[ii]>0:
                    self.candidates[ii].append(symbol)
         return res   
       
@@ -414,7 +415,7 @@ class BT(VBTfunc):
          if kwargs.get("PRD",False):
              res=self.preselect_hist_vol_sub(len(self.close.index)-1,short)
          else:
-             self.macd_tot=vbt.MACD.run(self.close)
+             self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
              
              for ii in range(len(self.close.index)):
                  res=self.preselect_hist_vol_sub(ii,short)
@@ -445,7 +446,7 @@ class BT(VBTfunc):
             else:
                 short=(self.macro_trend[symbol].values[ii]==1)
                 
-            if short and macd[symbol].values[ii]<0:
+            if short and macd[('simple','simple',symbol)].values[ii]<0:
                self.candidates_short[ii].append(symbol)
                break              
             else:
@@ -468,7 +469,7 @@ class BT(VBTfunc):
          if kwargs.get("PRD",False):
              res=self.preselect_macd_vol_macro_sub(len(self.close.index)-1,**kwargs)
          else:
-             self.macd_tot=vbt.MACD.run(self.close)
+             self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
              #self.macd_tot=kwargs.get("macd") 
              for ii in range(len(self.close.index)):
                   res=self.preselect_macd_vol_macro_sub(ii,**kwargs)
@@ -603,7 +604,7 @@ class BT(VBTfunc):
          self.frequency=MACD_VOL_SLOW_FREQUENCY
          self.max_candidates_nb=MACD_VOL_SLOW_MAX_CANDIDATES_NB
          
-         macd_tot=vbt.MACD.run(self.close)
+         macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
          macd=macd_tot.macd
 
          for ii in range(len(self.close.index)):
@@ -616,9 +617,9 @@ class BT(VBTfunc):
                      if len(self.candidates[ii])<self.max_candidates_nb:
                          symbol=e[0]
                      
-                         if not kwargs.get("short",False) and macd[symbol].values[ii]>0:
+                         if not kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]>0:
                             self.candidates[ii].append(symbol)
-                         elif kwargs.get("short",False) and macd[symbol].values[ii]<0:
+                         elif kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]<0:
                             self.candidates_short[ii].append(symbol)
              elif ii!=0:
                  self.candidates[ii]=self.candidates[ii-1]                            
@@ -635,7 +636,7 @@ class BT(VBTfunc):
          self.frequency=HIST_VOL_SLOW_FREQUENCY  
          self.max_candidates_nb=HIST_VOL_SLOW_MAX_CANDIDATES_NB
          
-         macd_tot=vbt.MACD.run(self.close)
+         macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
          macd=macd_tot.hist
 
          for ii in range(len(self.close.index)):
@@ -648,9 +649,9 @@ class BT(VBTfunc):
                      if len(self.candidates[ii])<self.max_candidates_nb:
                          symbol=e[0]
                      
-                         if not kwargs.get("short",False) and macd[symbol].values[ii]>0:
+                         if not kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]>0:
                             self.candidates[ii].append(symbol)
-                         elif kwargs.get("short",False) and macd[symbol].values[ii]<0:
+                         elif kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]<0:
                             self.candidates_short[ii].append(symbol)
              elif ii!=0:
                  self.candidates[ii]=self.candidates[ii-1]
@@ -739,7 +740,7 @@ class BT(VBTfunc):
 
     def preselect_onlybull_hist(self,**kwargs):
         self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
-        macd_tot=vbt.MACD.run(self.close)
+        macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
         macd=macd_tot.macd
         
         for ii in range(len(self.close.index)):
@@ -757,7 +758,7 @@ class BT(VBTfunc):
                 v={}    
                 self.candidates[ii]=[]
                 for symbol in bull_symbols:
-                    v[symbol]=macd[symbol].values[ii]/self.close[symbol].values[ii]
+                    v[symbol]=macd[('simple','simple',symbol)].values[ii]/self.close[symbol].values[ii]
                 res=sorted(v.items(), key=lambda tup: tup[1], reverse=False)
                 for e in res:
                     symbol=e[0]

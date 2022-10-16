@@ -24,6 +24,19 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(ic.rel_dif(1.1,1),0.1)
         self.assertEqual(ic.rel_dif(1.01,1),0.01)
         self.assertEqual(ic.rel_dif(2.2,2),0.1)
+    
+    def test_MACD(self):
+        t=vbt.MACD.run(self.st.close, macd_wtype='simple',signal_wtype='simple')
+        
+        self.assertEqual(round(t.macd[t.macd.columns[0]].values[-1],2),1.08)
+        self.assertEqual(round(t.macd[t.macd.columns[1]].values[-1],2),0.17)
+        self.assertEqual(round(t.macd[t.macd.columns[2]].values[-1],2),-0.26)
+        #self.assertEqual(round(t.macd[t.macd.columns[1]].values[-1],2),-0.36)
+        
+        self.assertEqual(round(t.hist[t.macd.columns[0]].values[-1],2),-0.28)
+        self.assertEqual(round(t.hist[t.macd.columns[1]].values[-1],2),0.09)
+        #self.assertEqual(round(t.hist[t.macd.columns[1]].values[-1],2),-0.14)
+        self.assertEqual(round(t.hist[t.macd.columns[2]].values[-1],2),-0.11)
         
     def test_VBTSUPERTREND(self):
         t=ic.VBTSUPERTREND.run(self.st.high,self.st.low,self.st.close)
@@ -132,10 +145,13 @@ class TestIndicator(unittest.TestCase):
         
         self.assertTrue(math.isnan(t.kama['AC'].values[0]))
         
-        self.assertTrue(t.kama['AC'].values[-1]>16.84)
-        self.assertTrue(t.kama['AC'].values[-1]<16.85)
-        self.assertTrue(t.kama['BN'].values[-1]>27.41)
-        self.assertTrue(t.kama['BN'].values[-1]<27.42)
+        self.assertEqual(round(t.kama['AC'].values[-1],2),16.84)
+        self.assertEqual(round(t.kama['AC'].values[-2],2),16.68)
+        self.assertEqual(round(t.kama['AC'].values[-3],2),16.55)
+        self.assertEqual(round(t.kama['BN'].values[-1],2),27.42)
+        self.assertEqual(round(t.kama['MC'].values[-1],2),36.11)
+        self.assertEqual(round(t.kama['MC'].values[-2],2),36.11)
+        self.assertEqual(round(t.kama['MC'].values[-3],2),36.13)
         
     def test_VBTVERYBEAR(self):
         t=ic.VBTVERYBEAR.run(self.st.close)
@@ -198,7 +214,12 @@ class TestIndicator(unittest.TestCase):
         
         #kama should be same as with kama
         self.assertEqual(round(t.kama['AC'].values[-1],2),16.84)
+        self.assertEqual(round(t.kama['AC'].values[-2],2),16.68)
+        self.assertEqual(round(t.kama['AC'].values[-3],2),16.55)
         self.assertEqual(round(t.kama['BN'].values[-1],2),27.42)
+        self.assertEqual(round(t.kama['MC'].values[-1],2),36.11)
+        self.assertEqual(round(t.kama['MC'].values[-2],2),36.11)
+        self.assertEqual(round(t.kama['MC'].values[-3],2),36.13)
     
         self.assertEqual(t.trend['AC'].values[-1],-10)
         self.assertEqual(t.trend['AI'].values[-1],0)
@@ -215,18 +236,31 @@ class TestIndicator(unittest.TestCase):
         t=ic.VBTMACDBBTREND.run(self.st.close)
         
         self.assertEqual(round(t.kama['AC'].values[-1],2),16.84)
+        self.assertEqual(round(t.kama['AC'].values[-2],2),16.68)
+        self.assertEqual(round(t.kama['AC'].values[-3],2),16.55)
         self.assertEqual(round(t.kama['BN'].values[-1],2),27.42)
+        self.assertEqual(round(t.kama['MC'].values[-1],2),36.11)
+        self.assertEqual(round(t.kama['MC'].values[-2],2),36.11)
+        self.assertEqual(round(t.kama['MC'].values[-3],2),36.13)
         
         self.assertEqual(round(t.bb_bw['AC'].values[-1],2),0.22)
         self.assertEqual(round(t.bb_bw['AI'].values[-1],2),0.09)
         self.assertEqual(round(t.bb_bw['AIR'].values[-1],2),0.13)
         self.assertEqual(round(t.bb_bw['SLB'].values[-1],2),0.27)
+        self.assertEqual(round(t.bb_bw['MC'].values[-1],2),0.17)
+        self.assertEqual(round(t.bb_bw['MC'].values[-2],2),0.17)
+        self.assertEqual(round(t.bb_bw['MC'].values[-3],2),0.17)
 
         self.assertEqual(t.trend['AC'].values[-1],-1)
         self.assertEqual(t.trend['AI'].values[-1],-3)
         self.assertEqual(t.trend['AIR'].values[-1],3)
         self.assertEqual(t.trend['ATO'].values[-1],10)
         self.assertEqual(t.trend['BN'].values[-1],3)
+        self.assertEqual(t.trend['MC'].values[-1],-1)
+        self.assertEqual(t.trend['MC'].values[-2],-1)
+        self.assertEqual(t.trend['MC'].values[-3],-1)
+        self.assertEqual(t.trend['MC'].values[-4],-3)
+        self.assertEqual(t.trend['MC'].values[-5],10)
         
     def test_VBTGROW(self):
         t=ic.VBTGROW.run(self.st.close,distance=50, ma=True)

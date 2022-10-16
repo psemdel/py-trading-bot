@@ -89,7 +89,7 @@ def defi_i( open_,high, low, close):
         all_t_ent.append(t.lower_above(close))
         all_t_ex.append(t.upper_below(close))
     
-        t=vbt.RSI.run(close)
+        t=vbt.RSI.run(close,wtype='simple')
         all_t_ent.append(t.rsi_crossed_below(20))
         all_t_ex.append(t.rsi_crossed_above(80))
         
@@ -388,7 +388,7 @@ STRATWRAPPER = vbt.IF(
 class Strat(VBTfunc):
     def __init__(self,symbol_index,period,suffix,**kwargs):
         super().__init__(symbol_index,period)
-
+        
         if kwargs.get("index",False):
             #self.only_index=True
             self.close=self.close_ind

@@ -1,16 +1,15 @@
 #### Appserver
-django
-whitenoise
-celery[redis]
+django >= 4.1.2
+whitenoise >= 6.2.0
+celery[redis] >= 5.2.7
 
 #### trading
-TA-Lib
-vectorbtpro
-yfinance
-pandas
-numpy
-python-telegram-bot
-sklearn
+vectorbtpro >= 1.7.2
+#TA-Lib  # normally included in vectorbt
+#yfinance # normally included in vectorbt
+#pandas # normally included in vectorbt
+#numpy # normally included in vectorbt
+#python-telegram-bot # normally included in vectorbt
 joblib
-asyncio
-ib_insync
+asyncio >= 3.4.7
+ib_insync >= 0.9.70
