@@ -123,7 +123,7 @@ Reimport the dump file using "python manage.py loaddata dump.rdb" to fill your d
 
 # Start the bot
 Click on start_bot.sh
-Not the admin panel from Django that allows creating finance products.
+Note the admin panel from Django that allows creating finance products.
 
 
 

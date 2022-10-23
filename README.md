@@ -22,21 +22,7 @@ There are many similar tools out there, that have similar purposes that are cert
 - trading_bot contains Django configuration
 
 # Get started
-For details, especially relative to pre-requisites, see [installation guide](https://github.com/psemdel/py-trading-bot/blob/main/installation_guide.md)
-In short:
-
-- Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software), useIB_for_data to the correct value depending if you use Interactive brokers or not. Look at the settings, for instance for Telegram.
-- In trading_bot/etc/ adapt the values in files (never commit those files!! Uncomment **/trading_bot/etc/ in .gitignore to avoid this drama):
-
-    - DB_USER contains your database user
-    - DB_SECRET contains your database password
-    - DJANGO_SECRET contains your Django secret
-    - TELEGRAM_TOKEN contains your Telegram bot token
-    
-- (optional) reimport the dump file using "python manage.py loaddata dump.rdb" to fill your database with some financial products: CAC40, DAX, Nasdaq100 and S&P 500.
-
-When you are done:
-- Click on start_bot.sh
+For installation see [installation guide](https://github.com/psemdel/py-trading-bot/blob/main/docs/installation_guide.md), alternatively you can start the bot in Docker, see the [guide](https://github.com/psemdel/py-trading-bot/blob/main/docs/docker_readme.md).
 
 # To do
 Using USE_IB_FOR_DATA and PERFORM_ORDER on True is still in beta phase. For USE_IB_FOR_DATA, please note that you need the permission for all actions that you need to retrieve. One missing permission lead to the failure of the process.
