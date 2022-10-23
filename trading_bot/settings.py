@@ -122,7 +122,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG',True)
 
-if DEBUG:
+if DEBUG and DEBUG!="False":
     with open('trading_bot/etc/DJANGO_SECRET') as f:
         SECRET_KEY = f.read().strip()
     with open('trading_bot/etc/DB_SECRET') as f:
@@ -130,11 +130,12 @@ if DEBUG:
     with open('trading_bot/etc/DB_USER') as f:
         DB_USER = f.read().strip()
 else:
-    SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') 
-    DB_SECRET_KEY = os.environ.get('DB_SECRET_KEY') 
-    DB_USER=os.environ.get('DB_USER') 
-        
-ALLOWED_HOSTS = []
+    SECRET_KEY = os.environ.get('SECRET_KEY') 
+    DB_SECRET_KEY = os.environ.get('POSTGRES_PASSWORD') 
+    DB_USER=os.environ.get('POSTGRES_USER') 
+   
+
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -186,28 +187,24 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-#if DEBUG:
 DATABASES = {
-'default': {
-     'ENGINE': 'django.db.backends.postgresql',
-     'NAME': 'pgtradingbotdb',
-     'USER': DB_USER,
-     'PASSWORD': DB_SECRET_KEY,
-     'HOST': 'localhost',
-     'PORT': '',
- }
-}
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb'),
+        'USER': DB_USER,
+        'PASSWORD': DB_SECRET_KEY,
+        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+        'PORT': os.getenv('POSTGRES_PORT', '')
+    }
+}  
 
 REDIS_PASSWORD=""
-
-#if DEBUG:
-REDIS_HOST="localhost"
 REDIS_PORT="6379"
 REDIS_DB=0
 
 REDIS_URL = ':%s@%s:%s/%d' % (
         REDIS_PASSWORD,
-        REDIS_HOST,
+        os.getenv("REDIS_HOST","localhost"),
         REDIS_PORT,
         REDIS_DB)
 

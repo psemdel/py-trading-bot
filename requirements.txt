@@ -11,5 +11,8 @@ vectorbtpro >= 1.7.2
 #numpy # normally included in vectorbt
 #python-telegram-bot # normally included in vectorbt
 joblib
-asyncio >= 3.4.7
+asyncio == 3.4.7
 ib_insync >= 0.9.70
+django-filter >= 22.1
+psycopg2-binary
+

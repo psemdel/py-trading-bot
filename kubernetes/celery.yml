@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: py-trading-bot-worker
+  labels:
+    deployment: py-trading-bot-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      pod: py-trading-bot-worker
+  template:
+    metadata:
+      labels:
+        pod: py-trading-bot-worker
+    spec:
+      containers:
+        - name: py-trading-bot-worker
+          image: py-trading-bot
+          imagePullPolicy: Never
+          command: ['celery', '-A', 'trading_bot', 'worker', '-l', 'info'] 
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: py-trading-bot-secret
+                  key: postgres_user
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: py-trading-bot-secret
+                  key: postgres_password
+
+            - name: POSTGRES_HOST
+              value: py-trading-bot-postgres-service
+
+            - name: REDIS_HOST
+              value: py-trading-bot-redis-service
+              
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: py-trading-bot-configmap
+                  key: postgres_db 
