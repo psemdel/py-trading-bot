@@ -73,5 +73,6 @@ RUN pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polak
 
 COPY . $HOME/
 
+USER root
 WORKDIR $HOME/py-trading-bot/
 

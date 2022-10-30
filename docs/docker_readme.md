@@ -56,6 +56,13 @@ And also the permanent volumes (it will kill your DB, use it only the very first
     kubectl delete pvc py-trading-bot-postgres-pvc
     kubectl delete pv py-trading-bot-postgres-pv
     
+In addition, in kubernetes/postgres.yml, the hostPath
+
+    hostPath:
+      path: /data/py-trading-bot-postgres-pv
+      
+Needs to be changed, otherwise the same data will be loaded again when the permanent volumes are recreated.
+    
 ## Error auth_user_username_key
 In the logs of py-trading-bot pod (kubectl logs <name of py-trading-bot>) you find:
 

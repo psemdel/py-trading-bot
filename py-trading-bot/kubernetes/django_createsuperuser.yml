@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: django-migrations
+  name: django-createsuperuser
 spec:
   template:
     spec:
@@ -11,8 +11,7 @@ spec:
           imagePullPolicy: Never
           command: ["/bin/sh", "-c"]
           args: 
-            - python manage.py makemigrations;
-              python manage.py migrate;
+            - echo "from django.contrib.auth.models import User; User.objects.create_superuser('$DJANGO_SUPERUSER', 'admin@example.com', '$DJANGO_PASSWORD')" | python manage.py shell;
           env:
             - name: POSTGRES_USER
               valueFrom:

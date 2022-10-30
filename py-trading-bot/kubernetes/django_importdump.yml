@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: django-migrations
+  name: django-importdump
 spec:
   template:
     spec:
@@ -11,8 +11,7 @@ spec:
           imagePullPolicy: Never
           command: ["/bin/sh", "-c"]
           args: 
-            - python manage.py makemigrations;
-              python manage.py migrate;
+            - python manage.py loaddata dump.json;
           env:
             - name: POSTGRES_USER
               valueFrom:
