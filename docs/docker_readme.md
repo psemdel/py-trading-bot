@@ -29,10 +29,10 @@ It is just some kubectl command in a sequence, you can also run them manually.
 
 
     minikube service py-trading-bot-service --url
-
+    
 and click on the link to access the bot.
 
-9. Start the background scheduler, including Telegram, by clicking on "start bot". Your telegram should display you "I'm back online".
+9. Start the background scheduler, including Telegram, by clicking on "start bot". Your telegram should display you "I'm back online". To connect to the admin panel, use the user "admin2" with password "abc1234".
 
 Alternatively you can also start jupyter with:
 
@@ -41,6 +41,8 @@ Alternatively you can also start jupyter with:
 If you want to read the logs of the bot:
 
     kubectl logs <name of the worker pod>
+    
+Optional: Go in the admin panel and delete the user admin and testdb, that are completely unnecessary.
 
 #Troubleshooting 
 If for any reason the sequence_start_first_time.sh lead to an error, you need to clean properly Kubernetes before repeating the step. It means obviously removing the deployments with
