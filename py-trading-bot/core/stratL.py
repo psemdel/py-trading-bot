@@ -54,6 +54,7 @@ class StratLIVE(Strat):
 class btLIVE(BT):
     def __init__(self,longshort,**kwargs):
         st=kwargs.get("st")
+        self.st=st
         
         self.high=st.high
         self.low=st.low

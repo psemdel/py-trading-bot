@@ -9,6 +9,8 @@ import math
 import numpy as np
 
 from core.data_manager import retrieve
+from core.constants import INTRO
+from datetime import datetime
 
 class VBTfunc():
     def __init__(self,symbol_index,period):
@@ -24,6 +26,20 @@ class VBTfunc():
             return 0
         else:
             return round(n/d-1,4) 
+
+def filter_intro(input_symbols,y_period):
+    symbols=[]
+    td=datetime.today()
+    min_y=td.year-y_period
+    limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
+    
+    for s in input_symbols:
+        if s in INTRO: #should come from database
+            if INTRO[s]<limit_date:
+                symbols.append(s)
+        else:
+            symbols.append(s)   
+    return symbols
     
 def save(x_df,filename):
     x_df.to_csv('data/'+filename)

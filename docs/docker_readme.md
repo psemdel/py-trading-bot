@@ -58,7 +58,7 @@ And also the permanent volumes (it will kill your DB, use it only the very first
     kubectl delete pvc py-trading-bot-postgres-pvc
     kubectl delete pv py-trading-bot-postgres-pv
     
-In addition, in kubernetes/postgres.yml, the hostPath
+In addition, in kubernetes/postgres.yml, the hostPath under PersistentVolume
 
     hostPath:
       path: /data/py-trading-bot-postgres-pv

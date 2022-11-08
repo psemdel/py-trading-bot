@@ -7,12 +7,9 @@ import math
 from trading_bot.settings import (DIC_PRESEL, DIC_PRESEL_SECTOR, DIVERGENCE_MACRO, RETARD_MACRO,
                                  DAILY_REPORT_PERIOD)
 
-from core import stratP, btP
+from core import stratP, btP, common
 from core import indicators as ic
 import warnings
-from datetime import datetime
-
-from core.constants import INTRO
 
 from orders.models import Action, entry_order,\
                           exit_order, Index, get_pf, get_candidates,\
@@ -301,17 +298,7 @@ class Report(models.Model):
                     self.save()
                     
                 #clean the symbols
-                symbols=[]
-                td=datetime.today()
-                min_y=td.year-DAILY_REPORT_PERIOD
-                limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
-                
-                for s in input_symbols:
-                    if s in INTRO: #should come from database
-                        if INTRO[s]<limit_date:
-                            symbols.append(s)
-                    else:
-                        symbols.append(s)
+                symbols=common.filter_intro(input_symbols,DAILY_REPORT_PERIOD)
                 
                 st=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",**kwargs)
                 st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
