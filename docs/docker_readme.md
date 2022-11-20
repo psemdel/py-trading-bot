@@ -98,6 +98,7 @@ and click on the link to access the bot.
 
 5. Start the background scheduler, including Telegram, by clicking on "start bot". Your telegram should display you "I'm back online".
 
-
+# Distribution
+Obviously don't distribute this image anywhere as it would contain vectorbtpro which requires a appropriate license.
 
 

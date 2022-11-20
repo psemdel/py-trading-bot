@@ -177,65 +177,71 @@ class Report(models.Model):
             print("Presel wq done for "+exchange)  
             
 ### Preselected actions strategy    
+    def presel_sub(self,l,st, exchange,**kwargs):
+        if len([v for v in ["retard","macd_vol","divergence","retard_manual"] if v in l])!=0:
+            presel=btP.Presel(st=st,exchange=exchange)
+            #hist slow does not need code here
+            if "retard" in l:  
+                print("retard in presel found")
+                self.retard(presel,exchange)
+            if "retard_manual" in l:
+                self.retard(presel,exchange,auto=False)
+            if "divergence" in l:     
+                if DIVERGENCE_MACRO:
+                    presel.call_strat("preselect_divergence_blocked")
+                else:
+                    presel.call_strat("preselect_divergence")
+                
+                candidates, _=presel.get_candidates()
+                self.order_only_exit_strat11(candidates, exchange, "divergence", False,**kwargs)
+            if "macd_vol" in l:
+                presel.call_strat("preselect_macd_vol_macro")
+                candidates, candidates_short=presel.get_candidates()
+                
+                if len(candidates)==0:
+                    short=True
+                    cand=candidates_short
+                else:
+                    short=False
+                    cand=candidates
+                    
+                for symbol in cand:
+                    symbol_complex=st.symbols_simple_to_complex(symbol)
+                    if short:
+                        #only entries and exits is populated
+                        self.define_ent_ex(
+                            st.exits_short[symbol_complex].values[-1],
+                            st.entries_short[symbol_complex].values[-1],
+                            st.exits[symbol_complex].values[-1],
+                            st.entries[symbol_complex].values[-1],
+                            symbol, 
+                            "macd_vol",
+                            exchange,
+                            )
+                    else:
+                        self.define_ent_ex(
+                            st.entries[symbol_complex].values[-1],
+                            st.exits[symbol_complex].values[-1],
+                            st.entries_short[symbol_complex].values[-1],
+                            st.exits_short[symbol_complex].values[-1],
+                            symbol, 
+                            "macd_vol",
+                            exchange,
+                            ) 
+  
+            print("Presel done for "+exchange)    
+        
+
     def presel(self,st,exchange,**kwargs): #comes after daily report
         #NYSE needs to be subdivided
         if exchange=="NYSE":
             DICS=DIC_PRESEL_SECTOR
+            for e in DICS: #try for each sector
+                self.presel_sub(DICS[e],st,exchange,**kwargs)
         else:
             DICS=[DIC_PRESEL[exchange]]
-            
-        for DIC in DICS:
-            if len([v for v in ["retard","macd_vol","divergence","retard_manual"] if v in DIC])!=0:
-                presel=btP.Presel(st=st,exchange=exchange)
-                #hist slow does not need code here
-                if "retard" in DIC:  
-                    self.retard(presel,exchange)
-                if "retard_manual" in DIC:
-                    self.retard(presel,exchange,auto=False)
-                if "divergence" in DIC:     
-                    if DIVERGENCE_MACRO:
-                        presel.call_strat("preselect_divergence_blocked")
-                    else:
-                        presel.call_strat("preselect_divergence")
-                    
-                    candidates, _=presel.get_candidates()
-                    self.order_only_exit_strat11(candidates, exchange, "divergence", False,**kwargs)
-                if "macd_vol" in DIC:
-                    presel.call_strat("preselect_macd_vol_macro")
-                    candidates, candidates_short=presel.get_candidates()
-                    
-                    if len(candidates)==0:
-                        short=True
-                        cand=candidates_short
-                    else:
-                        short=False
-                        cand=candidates
-                        
-                    for symbol in cand:
-                        symbol_complex=st.symbols_simple_to_complex(symbol)
-                        if short:
-                            #only entries and exits is populated
-                            self.define_ent_ex(
-                                st.exits_short[symbol_complex].values[-1],
-                                st.entries_short[symbol_complex].values[-1],
-                                st.exits[symbol_complex].values[-1],
-                                st.entries[symbol_complex].values[-1],
-                                symbol, 
-                                "macd_vol",
-                                exchange,
-                                )
-                        else:
-                            self.define_ent_ex(
-                                st.entries[symbol_complex].values[-1],
-                                st.exits[symbol_complex].values[-1],
-                                st.entries_short[symbol_complex].values[-1],
-                                st.exits_short[symbol_complex].values[-1],
-                                symbol, 
-                                "macd_vol",
-                                exchange,
-                                ) 
-      
-                print("Presel done for "+exchange)                    
+            for l in DICS:
+                self.presel_sub(l,st,exchange,**kwargs)                   
                     
 #all symbols should be from same stock exchange
     def define_ent_ex(self,entries,exits,entries_short,exits_short,symbol, 
@@ -280,10 +286,10 @@ class Report(models.Model):
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)
                 if exchange=="NYSE":
-                    DICS=DIC_PRESEL_SECTOR
                     if kwargs.get("sector"):
                         try:
                             self.sector=ActionSector.objects.get(name=kwargs.get("sector")) 
+                            DICS=DIC_PRESEL_SECTOR[kwargs.get("sector")]
                         except:
                             print("sector not found")
                             pass
