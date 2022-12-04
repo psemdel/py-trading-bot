@@ -135,6 +135,8 @@ def retrieve_data(symbols,period,**kwargs):
     try:
         IBok=True
         myIB=None
+        symbol=None
+        
         if USE_IB_FOR_DATA:
             try:
                 myIB=MyIB()
@@ -222,7 +224,7 @@ def retrieve_data(symbols,period,**kwargs):
                    
     except Exception as msg:
         print(msg)
-        print("symbol faulty " + symbol)
+        print("symbol faulty " +(symbol or ""))
         print("exception in " + __name__)
         _, e_, exc_tb = sys.exc_info()
         print("line " + str(exc_tb.tb_lineno))
@@ -862,7 +864,7 @@ def get_pf(strategy, exchange,short,**kwargs):
             if sector:
                 action_sector=ActionSector.objects.get(name=sector)
                 c4 = Q(sector=action_sector)
-                return PF.objects.filter(c1 & c2 & c3 & c4)
+                return PF.objects.get(c1 & c2 & c3 & c4)
         return PF.objects.get(c1 & c2 & c3)
     except:
         name=strategy+"_"+exchange
@@ -1033,7 +1035,12 @@ class StratCandidates(models.Model):
         arr=[]
         for action in self.actions.all():
             arr.append(action.symbol)
-        return arr    
+        return arr  
     
+    def retrieve_index(self):
+        arr=[]
+        for action in self.indexes.all():
+            arr.append(action.symbol)
+        return arr      
     def __str__(self):
         return self.name     
