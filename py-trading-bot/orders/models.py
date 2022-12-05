@@ -429,8 +429,9 @@ class MyIB():
         except:
             return 0, 0
     
-    def place(self,buy,action,**kwargs): #quantity in euros
+    def place(self,buy,action,short,**kwargs): #quantity in euros
         contract =stk(action)
+        
         if contract is None:
             return "", 0, 0
         else:
@@ -440,12 +441,20 @@ class MyIB():
                 order_size=kwargs.get("order_size",0)
                 last_price=self.get_last_price(contract)
                 quantity=math.floor(order_size/last_price)
-                order = MarketOrder('BUY', quantity)
+                
+                if short:
+                    order = MarketOrder('SELL', quantity)
+                else:
+                    order = MarketOrder('BUY', quantity)
             else:
                 quantity=kwargs.get("quantity",0)
-                order = MarketOrder('SELL', quantity)
+                
+                if short:
+                    order = MarketOrder('BUY', quantity)
+                else:
+                    order = MarketOrder('SELL', quantity)
             trade = self.ib.placeOrder(contract, order)
-            
+
             self.ib.sleep(1.0)
             if trade.orderStatus.status == 'Filled':
                 fill = trade.fills[-1]
@@ -478,6 +487,7 @@ class MyIB():
                 if len(order)>0:
                     txt, order[0].exiting_price, quantity= self.place(False,
                                            action,
+                                           short,
                                            quantity=order[0].quantity)
                     order[0].exiting_date=timezone.now()
                     
@@ -511,8 +521,11 @@ class MyIB():
             #type check necessary for indexes
             pf= get_pf(strategy, exchange,short,**kwargs)
             order_size=10000
+            balance=self.cash_balance()
+            if balance<order_size and balance>0.9*order_size: #tolerance on order side
+                order_size=balance
+            
             ocap=get_order_capital(strategy, exchange,**kwargs)
-            #accountSummary
             
             if kwargs.get("index",False):
                 index=Index.objects.get(symbol=symbol)
@@ -524,15 +537,17 @@ class MyIB():
                 action=Action.objects.get(symbol=symbol)
                 
             excluded=Excluded.objects.get(name="all") #list of actions completely excluded from entries
-
+            
             if (symbol not in pf.retrieve() and 
                 symbol not in excluded.retrieve() and  
                 ocap.capital>0 and
-                order_size<=self.cash_balance()):
+                order_size<=balance):
                     
                 order=Order(action=action, pf=pf)
-                txt, order.entering_price, order.quantity=  self.place(True,
+
+                txt, order.entering_price, order.quantity= self.place(True,
                                         action,
+                                        short,
                                         order_size=order_size)
                 
                 if kwargs.get("sl",False):
@@ -586,11 +601,12 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
          print(msg)
          return 0
 
-def entry_order(symbol,strategy, exchange,short,auto,**kwargs): 
+def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
     if (PERFORM_ORDER and DIC_PERFORM_ORDER[strategy] and not kwargs.get("index",False)
         and not exchange=="XETRA" and not auto==False): #ETF trading requires too high permissions on IB, XETRA data too expansive
         print("myIB")
         with MyIB() as myIB:
+            print("automatic order execution")
             return myIB.entry_order(symbol,strategy, exchange,short,**kwargs), True
     else:   
         return entry_order_test(symbol,strategy, exchange,short,**kwargs), False
@@ -867,6 +883,11 @@ def get_pf(strategy, exchange,short,**kwargs):
                 return PF.objects.get(c1 & c2 & c3 & c4)
         return PF.objects.get(c1 & c2 & c3)
     except:
+        print("get_pf failed")
+        print("strategy: " + strategy)
+        print("exchange: " +exchange)
+        print("short: " + short)       
+
         name=strategy+"_"+exchange
         if short:
             name+="_short"
@@ -933,19 +954,24 @@ class OrderCapital(models.Model):
         return self.name 
 
 def get_order_capital(strategy, exchange,**kwargs):
-    s=Strategy.objects.get(name=strategy)
-    e=StockEx.objects.get(name=exchange)
-
-    c1 = Q(stock_ex=e)
-    c2 = Q(strategy=s) 
+    try:
+        s=Strategy.objects.get(name=strategy)
+        e=StockEx.objects.get(name=exchange)
     
-    if exchange=="NYSE":
-        sector=kwargs.get("sector")
-        if sector:
-            action_sector=ActionSector.objects.get(name=sector)
-            c3 = Q(sector=action_sector)
-            return OrderCapital.objects.get(c1 & c2 & c3)
-    return OrderCapital.objects.get(c1 & c2)
+        c1 = Q(stock_ex=e)
+        c2 = Q(strategy=s) 
+        
+        if exchange=="NYSE":
+            sector=kwargs.get("sector")
+            if sector:
+                action_sector=ActionSector.objects.get(name=sector)
+                c3 = Q(sector=action_sector)
+                return OrderCapital.objects.get(c1 & c2 & c3)
+        return OrderCapital.objects.get(c1 & c2)
+    except:
+        print("get_order_capital failed for")
+        print("strategy: "+ strategy)
+        print("exchange: "+ exchange)
 
 ###For strategy using two time frame, in the slow one (10 days) candidates are defined
 ###And on daily basis the other strategy decides which of the candidate is really bought or sold

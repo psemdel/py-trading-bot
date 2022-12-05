@@ -69,7 +69,7 @@ class Report(models.Model):
         else:
             presel.call_strat("preselect_retard")
             
-        auto=kwargs.get("auto",True)
+        
         candidates, candidates_short=presel.get_candidates()
         
         if presel.last_short:
@@ -84,11 +84,12 @@ class Report(models.Model):
         if len(candidates)==0:
             short=True
             candidates=candidates_short
-        
+            
+        auto=True
         self.order_nostrat11(candidates, exchange, "retard", short, auto,**kwargs) #retard can be automatized
 
     def order_only_exit_strat11(self,candidates, exchange, key, short,**kwargs):
-        auto=kwargs.get("auto",True)
+        auto=True
         if len(candidates)==0:
             self.concat(key +" no candidates")        
         
@@ -126,7 +127,7 @@ class Report(models.Model):
     def order_nostrat11(self,candidates, exchange, key, short,auto,**kwargs):
         #if there is a reversal the opposite pf needs to emptied
         pf_inv=get_pf(key,exchange,not short,**kwargs)
-        print(pf_inv)
+
         for symbol in pf_inv.retrieve():
             if symbol not in candidates:
                 ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs)
@@ -162,7 +163,7 @@ class Report(models.Model):
 ### Preselected actions strategy, using 101 Formulaic Alphas
     def presel_wq(self,st,exchange,**kwargs):
         to_calculate=False
-        auto=kwargs.get("auto",True)
+        auto=True
         for nb in range(102):
             key="wq"+str(nb)
             if key in DIC_PRESEL[exchange]:
@@ -185,10 +186,8 @@ class Report(models.Model):
         if len([v for v in ["retard","macd_vol","divergence","retard_manual"] if v in l])!=0:
             presel=btP.Presel(st=st,exchange=exchange)
             #hist slow does not need code here
-            if "retard" in l:  
+            if "retard" in l or "retard_manual" in l:   #auto is handled by DIC_PERFORM_ORDER in settings
                 self.retard(presel,exchange,**kwargs)
-            if "retard_manual" in l:
-                self.retard(presel,exchange,auto=False,**kwargs)
             if "divergence" in l:     
                 if DIVERGENCE_MACRO:
                     presel.call_strat("preselect_divergence_blocked")
@@ -366,88 +365,91 @@ class Report(models.Model):
                     pf_div=get_pf("divergence",exchange,False,sector=sector)
                 
                 for symbol in symbols:
-                    symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")
-                    #symbol_complex_ex=st.symbols_simple_to_complex(symbol,"ex")
-                    
-                    with warnings.catch_warnings():
-                        #Necessary because of the presence of NaN
-                        warnings.simplefilter("ignore", category=RuntimeWarning)
+                    if math.isnan(st.vol[symbol].values[-1]):
+                        self.concat("symbol " + symbol + " no data")
+                    else:
+                        symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")
+                        #symbol_complex_ex=st.symbols_simple_to_complex(symbol,"ex")
                         
-                        if self.it_is_index:
-                            action=Index.objects.get(symbol=symbol)
-                            ar=ActionReport(index=action, 
-                                                   report=Report.objects.get(pk=self.pk))
-                        else:
-                            action=Action.objects.get(symbol=symbol)
-                            ar=ActionReport(action=action, 
-                                                   report=Report.objects.get(pk=self.pk))
-                        
-                        ar.date=st.date()
-                        ar.vol=st.vol[symbol].values[-1]
-                        
-                        ar.bbands_bandwith=st.bb_bw[symbol_complex_ent].values[-1]
-                        
-                        ar.three_mo_evol=grow_past50_raw[(50,False,symbol)].values[-1]
-                        ar.three_mo_evol_sm=grow_past50_ma[(50,True,symbol)].values[-1]
-                        ar.one_mo_evol=grow_past20_raw[(20,False,symbol)].values[-1]
-                        ar.one_mo_evol_sm=grow_past20_ma[(20,True,symbol)].values[-1]
-                        ar.trend=float(st.trend[symbol_complex_ent].values[-1])
-                        ar.macro_trend=float(st.macro_trend[symbol_complex_ent].values[-1])
-                        
-                        ar.kama_ent=sk.entries_kama[symbol].values[-1]
-                        ar.kama_ex=sk.exits_kama[symbol].values[-1]
-                        ar.kama_dir=float(sk.direction[symbol].values[-1])
-
-                        ar.stoch_ent=sk.entries_stoch[symbol].values[-1]
-                        ar.stoch_ex=sk.exits_stoch[symbol].values[-1]
-                        
-                        if math.isnan(sk.stoch[symbol].values[-1]):
-                            ar.stoch=0
-                        else:
-                            ar.stoch=sk.stoch[symbol].values[-1]
-                        
-                        ar.ma_ent=sma.entries[symbol].values[-1]
-                        ar.ma_ex=sma.exits[symbol].values[-1]
-
-                        ar.pattern_light_ent=sp.entries[(True, symbol)].values[-1] or\
-                                             sp.entries[(True, symbol)].values[-2]
-                                             
-                        ar.pattern_light_ex=sp.exits[(True, symbol)].values[-1] or\
-                                            sp.exits[(True, symbol)].values[-2]
-
-                        if self.it_is_index:
-                            if ar.kama_ent:
-                                self.concat(" Index " + symbol + " KAMA bottom detected!")
-                            if ar.kama_ex:
-                                self.concat(" Index " + symbol + " KAMA top detected!")
-                            if st.max_ind[symbol_complex_ent][-1]!=0:
-                                self.concat(" Index " + symbol + " V maximum detected!")
-                            if st.min_ind[symbol_complex_ent][-1]!=0:
-                                self.concat(" Index " + symbol + " V minimum detected!")                            
-
-                        ar.save()  
-                        
-                        if symbol in normal_strat_symbols:
-                            symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
-                            symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+                        with warnings.catch_warnings():
+                            #Necessary because of the presence of NaN
+                            warnings.simplefilter("ignore", category=RuntimeWarning)
                             
-                            #list present status
+                            if self.it_is_index:
+                                action=Index.objects.get(symbol=symbol)
+                                ar=ActionReport(index=action, 
+                                                       report=Report.objects.get(pk=self.pk))
+                            else:
+                                action=Action.objects.get(symbol=symbol)
+                                ar=ActionReport(action=action, 
+                                                       report=Report.objects.get(pk=self.pk))
                             
-                            self.define_ent_ex(
-                                stnormal.entries[symbol_complex_ent_normal].values[-1],
-                                stnormal.exits[symbol_complex_ex_normal].values[-1],
-                                stnormal.entries_short[symbol_complex_ex_normal].values[-1],
-                                stnormal.exits_short[symbol_complex_ent_normal].values[-1],
-                                symbol, 
-                                "normal",
-                                exchange,
-                                sector=sector,
-                                **kwargs)
-                            decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
-                            if decision==1:
-                                self.concat(symbol + " present decision : sell")
-                            elif decision==-1:
-                                self.concat(symbol + " present decision : buy")
+                            ar.date=st.date()
+                            ar.vol=st.vol[symbol].values[-1]
+                            
+                            ar.bbands_bandwith=st.bb_bw[symbol_complex_ent].values[-1]
+                            
+                            ar.three_mo_evol=grow_past50_raw[(50,False,symbol)].values[-1]
+                            ar.three_mo_evol_sm=grow_past50_ma[(50,True,symbol)].values[-1]
+                            ar.one_mo_evol=grow_past20_raw[(20,False,symbol)].values[-1]
+                            ar.one_mo_evol_sm=grow_past20_ma[(20,True,symbol)].values[-1]
+                            ar.trend=float(st.trend[symbol_complex_ent].values[-1])
+                            ar.macro_trend=float(st.macro_trend[symbol_complex_ent].values[-1])
+                            
+                            ar.kama_ent=sk.entries_kama[symbol].values[-1]
+                            ar.kama_ex=sk.exits_kama[symbol].values[-1]
+                            ar.kama_dir=float(sk.direction[symbol].values[-1])
+    
+                            ar.stoch_ent=sk.entries_stoch[symbol].values[-1]
+                            ar.stoch_ex=sk.exits_stoch[symbol].values[-1]
+                            
+                            if math.isnan(sk.stoch[symbol].values[-1]):
+                                ar.stoch=0
+                            else:
+                                ar.stoch=sk.stoch[symbol].values[-1]
+                            
+                            ar.ma_ent=sma.entries[symbol].values[-1]
+                            ar.ma_ex=sma.exits[symbol].values[-1]
+    
+                            ar.pattern_light_ent=sp.entries[(True, symbol)].values[-1] or\
+                                                 sp.entries[(True, symbol)].values[-2]
+                                                 
+                            ar.pattern_light_ex=sp.exits[(True, symbol)].values[-1] or\
+                                                sp.exits[(True, symbol)].values[-2]
+    
+                            if self.it_is_index:
+                                if ar.kama_ent:
+                                    self.concat(" Index " + symbol + " KAMA bottom detected!")
+                                if ar.kama_ex:
+                                    self.concat(" Index " + symbol + " KAMA top detected!")
+                                if st.max_ind[symbol_complex_ent][-1]!=0:
+                                    self.concat(" Index " + symbol + " V maximum detected!")
+                                if st.min_ind[symbol_complex_ent][-1]!=0:
+                                    self.concat(" Index " + symbol + " V minimum detected!")                            
+                            
+                            ar.save()  
+                            
+                            if symbol in normal_strat_symbols:
+                                symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
+                                symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+                                
+                                #list present status
+                                
+                                self.define_ent_ex(
+                                    stnormal.entries[symbol_complex_ent_normal].values[-1],
+                                    stnormal.exits[symbol_complex_ex_normal].values[-1],
+                                    stnormal.entries_short[symbol_complex_ex_normal].values[-1],
+                                    stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                                    symbol, 
+                                    "normal",
+                                    exchange,
+                                    sector=sector,
+                                    **kwargs)
+                                decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
+                                if decision==1:
+                                    self.concat(symbol + " present decision : sell")
+                                elif decision==-1:
+                                    self.concat(symbol + " present decision : buy")
                 print("Strat daily report written " +(exchange or ""))
                             
                 ##Change underlying strategy
