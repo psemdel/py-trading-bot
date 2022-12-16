@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.postgres.fields import ArrayField
 
 import sys
 import math
@@ -11,43 +10,37 @@ from core import stratP, btP, common
 from core import indicators as ic
 import warnings
 from datetime import datetime
+from django.utils import timezone
 
 from core.constants import INTRO
 
 from orders.models import Action, entry_order,\
-                          exit_order, Index, get_pf, get_candidates,\
+                          exit_order, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector
                      
 
 #which strategy to use for which stockexchange
 
-class Report(models.Model):
-    date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #default=timezone.now())
-    text=models.TextField(blank=True)
-    ent_symbols=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
-    ex_symbols=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
-    ent_symbols_short=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
-    ex_symbols_short=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
-    ent_symbols_manual=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
-    ex_symbols_manual=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
-    ent_symbols_short_manual=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
-    ex_symbols_short_manual=ArrayField(models.CharField(max_length=200), blank=True, null=True,default=list)
+class ListOfActions(models.Model):
+    report=models.ForeignKey('Report',on_delete=models.CASCADE)
+    entry=models.BooleanField(blank=False,default=False) #otherwise exit
+    short=models.BooleanField(blank=False,default=False)
+    auto=models.BooleanField(blank=False,default=False)
+    actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
 
+class Report(models.Model):
+    date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   # default=datetime.now
+    text=models.TextField(blank=True)
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
     it_is_index=models.BooleanField(blank=False,default=False)
-    sector=models.ForeignKey('orders.ActionSector',on_delete=models.CASCADE,blank=True,default=10)
+    sector=models.ForeignKey('orders.ActionSector',on_delete=models.CASCADE,blank=True,default=1)
     
     def __str__(self):
         return str(self.date)
     
     class Meta:
         ordering = ['-date', 'stock_ex']
-    
-    def get_ent_ex_symbols(self):
-        return self.ent_symbols, self.ex_symbols, self.ent_symbols_short, self.ex_symbols_short,\
-               self.ent_symbols_manual, self.ex_symbols_manual, self.ent_symbols_short_manual,\
-                   self.ex_symbols_short_manual
     
     def concat(self,text):
         print(text)     
@@ -92,36 +85,55 @@ class Report(models.Model):
         auto=True
         if len(candidates)==0:
             self.concat(key +" no candidates")        
-        
-        #buy without condition
-        for symbol in candidates:
-            self.concat(key +" candidates " + symbol)
-            ent, auto=entry_order(symbol,key, exchange,short, auto,**kwargs)
-
-            if ent:
-                if auto:
-                    if short:
-                        self.ent_symbols_short.append(symbol)
-                    else:
-                        self.ent_symbols.append(symbol)
-                else:
-                    if short:
-                        self.ent_symbols_short_manual.append(symbol)
-                    else:
-                        self.ent_symbols_manual.append(symbol)          
+        else:
+            #buy without condition
+            for symbol in candidates:
+                self.concat(key +" candidates " + symbol)
+                ent, auto=entry_order(symbol,key, exchange,short, auto,**kwargs)
+                
+                if ent:
+                    action=Action.objects.get(symbol=symbol)
+                    ent_symbols=ListOfActions.objects.get_or_create(
+                        report=self,
+                        entry=True,
+                        short=short,
+                        auto=auto
+                        )
+                    ent_symbols.actions.add(action)
+                
+        #        if ent:
+           #         if auto:
+           #             if short:
+           #                 self.ent_symbols_short.append(symbol)
+           #             else:
+           #                 self.ent_symbols.append(symbol)
+           #         else:
+            #            if short:
+           #                 self.ent_symbols_short_manual.append(symbol)
+            #            else:
+             #               self.ent_symbols_manual.append(symbol)          
 
     def order_nostrat11_sub(self,symbol, short, ex, auto):
         if ex:
-            if auto:
-                if short:
-                    self.ex_symbols_short.append(symbol)
-                else:
-                    self.ex_symbols.append(symbol)
-            else:
-                if short:
-                    self.ex_symbols_short_manual.append(symbol)
-                else:
-                    self.ex_symbols_manual.append(symbol)         
+            action=Action.objects.get(symbol=symbol)
+            ex_symbols=ListOfActions.objects.get_or_create(
+                report=self,
+                entry=False,
+                short=short,
+                auto=auto
+                )
+            ex_symbols.actions.add(action)
+            
+           # if auto:
+          #      if short:
+          #          self.ex_symbols_short.append(symbol)
+          #      else:
+         #           self.ex_symbols.append(symbol)
+         #   else:
+          #      if short:
+          #          self.ex_symbols_short_manual.append(symbol)
+          #      else:
+          #          self.ex_symbols_manual.append(symbol)         
         
 
     def order_nostrat11(self,candidates, exchange, key, short,auto,**kwargs):
@@ -149,21 +161,30 @@ class Report(models.Model):
             
             ent, auto=entry_order(symbol,key, exchange,short,auto, **kwargs)
             if ent:
-                if auto:
-                    if short:
-                        self.ent_symbols_short.append(symbol)
-                    else:
-                        self.ent_symbols.append(symbol)
-                else:
-                    if short:
-                        self.ent_symbols_short_manual.append(symbol)
-                    else:
-                        self.ent_symbols_manual.append(symbol)                    
+                action=Action.objects.get(symbol=symbol)
+                ent_symbols=ListOfActions.objects.get_or_create(
+                    report=self,
+                    entry=True,
+                    short=short,
+                    auto=auto
+                    )
+                ent_symbols.actions.add(action)
+                
+               # if auto:
+               #     if short:
+               #         self.ent_symbols_short.append(symbol)
+               #     else:
+              #          self.ent_symbols.append(symbol)
+              #  else:
+              #      if short:
+               #         self.ent_symbols_short_manual.append(symbol)
+               #     else:
+               #         self.ent_symbols_manual.append(symbol)                    
          
 ### Preselected actions strategy, using 101 Formulaic Alphas
     def presel_wq(self,st,exchange,**kwargs):
         to_calculate=False
-        auto=True
+        auto=kwargs.get("autok",True)
         for nb in range(102):
             key="wq"+str(nb)
             if key in DIC_PRESEL[exchange]:
@@ -250,6 +271,7 @@ class Report(models.Model):
                 self.presel_sub(l,st,exchange,**kwargs)
                            
 #all symbols should be from same stock exchange
+
     def define_ent_ex(self,entries,exits,entries_short,exits_short,symbol, 
                       strategy, exchange, **kwargs):
         ent=False
@@ -257,7 +279,8 @@ class Report(models.Model):
         ent_short=False
         ex_short=False
         auto=False
-       
+        
+        #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
         if entries and not exits:
             ent, auto=entry_order(symbol,strategy, exchange,False,True,**kwargs)
         if exits and not entries:
@@ -266,25 +289,38 @@ class Report(models.Model):
             ent_short, auto=entry_order(symbol,strategy, exchange,True,True,**kwargs)
         if exits_short and not entries_short:
             ex_short, auto=exit_order(symbol,strategy, exchange,True,True,**kwargs)
+        
+        if ent_short or ex_short:
+            short=True
             
-        if auto:
-            if ent:
-                self.ent_symbols.append(symbol)
-            if ex:
-                self.ex_symbols.append(symbol) 
-            if ent_short:
-                self.ent_symbols_short.append(symbol)
-            if ex_short:
-                self.ex_symbols_short.append(symbol) 
-        else:
-            if ent:
-                self.ent_symbols_manual.append(symbol)
-            if ex:
-                self.ex_symbols_manual.append(symbol) 
-            if ent_short:
-                self.ent_symbols_short_manual.append(symbol)
-            if ex_short:
-                self.ex_symbols_short_manual.append(symbol) 
+        action=Action.objects.get(symbol=symbol)
+        if ent or ent_short or ex or ex_short:
+            ent_ex_symbols=ListOfActions.objects.get_or_create(
+                report=self,
+                entry=(ent or ent_short),
+                short=short,
+                auto=auto
+                )
+            ent_ex_symbols.actions.add(action)
+        
+     #   if auto:
+     #       if ent:
+     #           self.ent_symbols.append(symbol)
+     #       if ex:
+    #            self.ex_symbols.append(symbol) 
+    #        if ent_short:
+   #             self.ent_symbols_short.append(symbol)
+   #         if ex_short:
+   #             self.ex_symbols_short.append(symbol) 
+   #     else:
+    #        if ent:
+    #            self.ent_symbols_manual.append(symbol)
+    #        if ex:
+    #            self.ex_symbols_manual.append(symbol) 
+   #         if ent_short:
+   #             self.ent_symbols_short_manual.append(symbol)
+    #        if ex_short:
+        #        self.ex_symbols_short_manual.append(symbol) 
                 
     def daily_report(self,input_symbols,exchange,**kwargs): #for one exchange and one sector
         try: 
@@ -341,12 +377,10 @@ class Report(models.Model):
                 grow_past50_ma=st.grow_past(50, True)
                 grow_past20_raw=st.grow_past(20, False)
                 grow_past20_ma=st.grow_past(20, True)
-                normal_strat_act=StratCandidates.objects.get(strategy=Strategy.objects.get(name="normal")) 
                 
-                if self.it_is_index:
-                    normal_strat_symbols=normal_strat_act.retrieve_index()
-                else:
-                    normal_strat_symbols=normal_strat_act.retrieve()
+                normal_strat, _=Strategy.objects.get_or_create(name="normal")
+                normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat.id) 
+                normal_strat_symbols=normal_strat_act.retrieve()
                 
                 # Slow candidates
                 slow_strats=["hist_slow", "realmadrid"] #only those in use
@@ -374,16 +408,10 @@ class Report(models.Model):
                         with warnings.catch_warnings():
                             #Necessary because of the presence of NaN
                             warnings.simplefilter("ignore", category=RuntimeWarning)
-                            
-                            if self.it_is_index:
-                                action=Index.objects.get(symbol=symbol)
-                                ar=ActionReport(index=action, 
-                                                       report=Report.objects.get(pk=self.pk))
-                            else:
-                                action=Action.objects.get(symbol=symbol)
-                                ar=ActionReport(action=action, 
-                                                       report=Report.objects.get(pk=self.pk))
-                            
+                            action=Action.objects.get(symbol=symbol)
+                            ar=ActionReport(action=action, 
+                                                   report=Report.objects.get(pk=self.pk))
+
                             ar.date=st.date()
                             ar.vol=st.vol[symbol].values[-1]
                             
@@ -451,7 +479,6 @@ class Report(models.Model):
                                 elif decision==-1:
                                     self.concat(symbol + " present decision : buy")
                 print("Strat daily report written " +(exchange or ""))
-                            
                 ##Change underlying strategy
                 st.call_strat("strat_kama_stoch_matrend_bbands")             
                 for symbol in symbols:
@@ -495,7 +522,9 @@ class Report(models.Model):
                     self.sector=sector
                 self.save()
                 return st
-                
+
+        except ValueError as msg:
+            print(msg)            
         except Exception as msg:
             print("exception in " + __name__)
             print(msg)
@@ -506,7 +535,6 @@ class Report(models.Model):
 class ActionReport(models.Model):
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     action=models.ForeignKey('orders.Action',on_delete=models.CASCADE, null=True,default=None)
-    index=models.ForeignKey('orders.Index',on_delete=models.CASCADE, null=True,default=None)
     
     date=models.CharField(max_length=100, blank=True)
  
@@ -540,8 +568,6 @@ class ActionReport(models.Model):
     def __str__(self):
         if self.action is not None:
             return self.action.name + " " + str(self.report.date)
-        elif self.index is not None:
-            return self.index.name + " " + str(self.report.date)
         else:
             return "none" + " " + str(self.report.date)
     
@@ -555,13 +581,10 @@ class Alert(models.Model):
     trigger_date=models.DateTimeField(null=False, blank=False)
     recovery_date=models.DateTimeField(null=True, blank=True)
     action=models.ForeignKey('orders.Action',on_delete=models.CASCADE,null=True)
-    index=models.ForeignKey('orders.Index',on_delete=models.CASCADE,null=True,default=None)
 
     def __str__(self):
         if self.action is not None:
             return self.action.name   + " " + str(self.trigger_date)
-        elif self.index is not None:
-            return self.index.name  + " " + str(self.trigger_date)
         else:
             return "none" + " " + str(self.trigger_date)
 

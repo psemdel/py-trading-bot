@@ -38,18 +38,14 @@ def stk(action):
 
 def symbol_to_exchangeticker(symbol):
     actions=Action.objects.filter(symbol=symbol)
-    if len(actions)==0:
-        action=Index.objects.get(symbol=symbol)
-    else:
-        action=actions[0]  
-    return action.stock_ex.ib_ticker
+    return actions[0].stock_ex.ib_ticker
 
 def symbol_to_IBcontract(myIB,symbol):
     try:
         contract=None
         actions=Action.objects.filter(symbol=symbol)
-        if len(actions)==0:
-            action=Index.objects.get(symbol=symbol)
+        action=actions[0]
+        if action.category==ActionCategory.objects.get(short="IND"):
             t_contract = Contract(symbol=action.ib_ticker(),secType="IND") 
             cds=myIB.ib.reqContractDetails(t_contract)
             contracts = [cd.contract for cd in cds]
@@ -61,12 +57,20 @@ def symbol_to_IBcontract(myIB,symbol):
             if contract is None: #fallback ETF
                 contract = stk(action.etf_long)
         else:
-            action=actions[0]
             contract = stk(action)
         return contract
     except:
         print("error in symbol_to_IBcontract")
         return None, None
+
+def action_to_etf(symbol,short,**kwargs):
+    action=Action.objects.get(symbol=symbol)
+    if kwargs.get("index",False):
+        if short:
+            action=action.etf_short
+        else:
+            action=action.etf_long
+    return action
 
 class IBData(RemoteData):
     @classmethod
@@ -152,21 +156,17 @@ def retrieve_data(symbols,period,**kwargs):
                 IBok=False
                 print("connection to IB failed")
                 pass
-            
+        
         if symbols is None or len(symbols)==0:
             raise ValueError("List of symbols empty")
-        else:        
+        else:
             for symbol in symbols:
                 if symbol in IB_STOCK_NO_PERMISSION:
                     print("symbol " + symbol + " has no permission for IB")
                     IBok=False
                     break
                 
-                if kwargs.get("index",False):
-                    action=Index.objects.get(symbol=symbol)
-                else:
-                    action=Action.objects.get(symbol=symbol)
-                
+                action=Action.objects.get(symbol=symbol)
                 if action.stock_ex.ib_ticker in IB_STOCKEX_NO_PERMISSION:
                     print("stock ex " + action.stock_ex.ib_ticker + " has no permission for IB")
                     IBok=False
@@ -224,9 +224,10 @@ def retrieve_data(symbols,period,**kwargs):
             return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                    cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
                    cours_volume_ind
+            
                    
     except ValueError as msg:
-        print(msg)                   
+        print(msg)
     except Exception as msg:
         print(msg)
         print("symbol faulty " +(symbol or ""))
@@ -350,8 +351,7 @@ def get_ratio(symbol,**kwargs):
             return rel_dif(cours_pres,cours_ref)*100
         else:
             return 0
-        #else:
-        #    return 0
+
     except Exception as msg:
         print(symbol)
         print("exception in " + __name__)
@@ -472,15 +472,7 @@ class MyIB():
         try:
             pf= get_pf(strategy, exchange,short,**kwargs)
             ocap=get_order_capital(strategy, exchange,**kwargs)
-            
-            if kwargs.get("index",False):
-                index=Index.objects.get(symbol=symbol) #actually should be more complex
-                if short:
-                    action=index.etf_short
-                else:
-                    action=index.etf_long
-            else:
-                action=Action.objects.get(symbol=symbol)
+            action=action_to_etf(symbol, short,**kwargs)
             
             if symbol in pf.retrieve():
                 c1 = Q(action=action)
@@ -532,16 +524,10 @@ class MyIB():
             
             ocap=get_order_capital(strategy, exchange,**kwargs)
             
-            if kwargs.get("index",False):
-                index=Index.objects.get(symbol=symbol)
-                if short:
-                    action=index.etf_short
-                else:
-                    action=index.etf_long
-            else:
-                action=Action.objects.get(symbol=symbol)
-                
-            excluded=Excluded.objects.get(name="all") #list of actions completely excluded from entries
+            action=action_to_etf(symbol, short,**kwargs)
+            
+            strategy_none, _ = Strategy.objects.get_or_create(name="none")
+            excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
             
             if (symbol not in pf.retrieve() and 
                 symbol not in excluded.retrieve() and  
@@ -567,6 +553,9 @@ class MyIB():
                 
                 return True
             return False
+        
+        except ValueError as msg:
+            print(msg)
         except Exception as msg:
             print("exception in " + __name__)
             print(msg)
@@ -581,17 +570,8 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
         #type check necessary for indexes
     try:
         pf= get_pf(strategy, exchange,short,**kwargs)
-        
+        action=action_to_etf(symbol, short,**kwargs)
         #accountSummary
-        if kwargs.get("index",False):
-            index=Index.objects.get(symbol=symbol)
-            if short:
-                action=index.etf_short
-            else:
-                action=index.etf_long
-        else:
-            action=Action.objects.get(symbol=symbol)
-
         if symbol in pf.retrieve():
             c1 = Q(action=action)
             c2 = Q(active=True)
@@ -629,28 +609,18 @@ def entry_order_test(symbol,strategy, exchange,short,**kwargs):
         #type check necessary for indexes
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
-        
-        if kwargs.get("index",False):
-            index=Index.objects.get(symbol=symbol)
-            if short:
-                action=index.etf_short
-            else:
-                action=index.etf_long
-        else:
-            action=Action.objects.get(symbol=symbol)
-        symbol2=action.symbol
-        
+        action=action_to_etf(symbol, short,**kwargs)
         excluded=Excluded.objects.get(name="all") #list of actions completely excluded from entries
         
-        if (symbol2 not in pf.retrieve() and 
-            symbol2 not in excluded.retrieve() and
+        if (action.symbol not in pf.retrieve() and 
+            action.symbol not in excluded.retrieve() and
             ocap.capital>0):
             order=Order(action=action, pf=pf)
             order.entering_price=1.0
             
             order.save()
             #post telegram
-            pf.append(symbol2)
+            pf.append(action.symbol)
             
             pf.save()
             ocap.capital-=1 #also for short
@@ -669,18 +639,9 @@ def exit_order_test(symbol,strategy, exchange,short,**kwargs):
     try:
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
+        action=action_to_etf(symbol, short,**kwargs)
         
-        if kwargs.get("index",False):
-            index=Index.objects.get(symbol=symbol) #actually should be more complex
-            if short:
-                action=index.etf_short
-            else:
-                action=index.etf_long
-        else:
-            action=Action.objects.get(symbol=symbol)
-        symbol2=action.symbol
-        
-        if symbol2 in pf.retrieve():
+        if action.symbol in pf.retrieve():
             c1 = Q(action=action)
             c2 = Q(active=True)
             
@@ -695,7 +656,7 @@ def exit_order_test(symbol,strategy, exchange,short,**kwargs):
 
             ocap.capital+=1 #also for short
             ocap.save()
-            pf.remove(symbol2)
+            pf.remove(action.symbol)
             pf.save()
 
             return True
@@ -733,7 +694,6 @@ class StockEx(models.Model):
     def __str__(self):
         return self.name    
 
-
 class Strategy(models.Model):
     name=models.CharField(max_length=100, blank=False)
     
@@ -741,35 +701,19 @@ class Strategy(models.Model):
         return self.name
 
 ### Index is like action, but it had to be separated, as an index cannot be bought directly
-class Index(models.Model):
-    symbol=models.CharField(max_length=15, blank=False, primary_key=True)
-    ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
-    ibticker=models.CharField(max_length=15, blank=True,default="AAA")
-    name=models.CharField(max_length=100, blank=False)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
-    currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
-    etf_long=models.ForeignKey('Action',on_delete=models.PROTECT,default=0,related_name='etf_long')
-    etf_short=models.ForeignKey('Action',on_delete=models.PROTECT, default=0,related_name='etf_short')
-    
-    class Meta:
-        ordering = ["name"]
-
-    def ib_ticker(self):
-        return self.ibticker
-        
-    def __str__(self):
-        return self.name  
-
 class Action(models.Model):
     symbol=models.CharField(max_length=15, blank=False, primary_key=True)
-    #ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
+    ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
     name=models.CharField(max_length=100, blank=False)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
     category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
     sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=10)
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
+    #strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
     delisted=models.BooleanField(blank=False,default=False)
+    etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
+    etf_short=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_short2',blank=True,null=True)
+    
     #introduction_date=models.DateTimeField(null=True, blank=True, auto_now_add=True)
     
     class Meta:
@@ -777,7 +721,8 @@ class Action(models.Model):
         
     def ib_ticker(self):
         t=self.symbol.split(".")
-        return t[0]        
+        return t[0]      
+       # return self.ibticker
         
     def __str__(self):
         return self.name
@@ -829,10 +774,10 @@ class PF(models.Model):
     # can be replaced with ib.positions() or ib.portfolio()
     name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=10)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
     short=models.BooleanField(blank=False,default=False)
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
+    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=0)
     
     def __str__(self):
         return self.name
@@ -961,7 +906,7 @@ def get_order_capital(strategy, exchange,**kwargs):
         
         return res
     except Exception as msg:
-        print(msg) 
+        print(msg)        
 
 ###For strategy using two time frame, in the slow one (10 days) candidates are defined
 ###And on daily basis the other strategy decides which of the candidate is really bought or sold
@@ -1043,7 +988,6 @@ class Excluded(models.Model):
 class StratCandidates(models.Model):
     name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)    
-    indexes=models.ManyToManyField(Index,blank=True)   
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
     
     def retrieve(self):
@@ -1052,10 +996,5 @@ class StratCandidates(models.Model):
             arr.append(action.symbol)
         return arr  
     
-    def retrieve_index(self):
-        arr=[]
-        for action in self.indexes.all():
-            arr.append(action.symbol)
-        return arr      
     def __str__(self):
         return self.name     

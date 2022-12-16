@@ -2,10 +2,9 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from reporting.telegram import start
 # Create your views here.
-from reporting.models import Report, ActionReport, Alert
+from reporting.models import Report, ActionReport, Alert, ListOfActions
 from core import bt, btP
 from orders.models import ActionCategory, StockEx, Action, get_exchange_actions, MyIB
-
 
 from .filter import ReportFilter
 
@@ -53,9 +52,10 @@ def trigger_17h(request):
         report1.save()
     
         st=report1.daily_report_action("Paris")
+        
         if st is None:
-            raise ValueError("The creation of the strategy failed, report creation interrupted")    
-            
+            raise ValueError("The creation of the strategy failed, report creation interrupted")
+        
         report1.presel(st,"Paris")
         report1.presel_wq(st,"Paris")
         send_order_test(report1)
@@ -64,8 +64,9 @@ def trigger_17h(request):
         report2.save()            
     
         st=report2.daily_report_action("XETRA")
+        
         if st is None:
-            raise ValueError("The creation of the strategy failed, report creation interrupted")    
+            raise ValueError("The creation of the strategy failed, report creation interrupted")
             
         report2.presel(st,"XETRA")
         report2.presel_wq(st,"XETRA")
@@ -80,6 +81,7 @@ def trigger_17h(request):
         return HttpResponse("report written")
     except ValueError as msg:
         print(msg)
+
 #For testing purpose
 def trigger_22h(request):
     try:
@@ -87,8 +89,9 @@ def trigger_22h(request):
         report1.save()
     
         st=report1.daily_report_action("Nasdaq") 
+        
         if st is None:
-            raise ValueError("The creation of the strategy failed, report creation interrupted")    
+            raise ValueError("The creation of the strategy failed, report creation interrupted")
             
         report1.presel(st,"Nasdaq")
         report1.presel_wq(st,"Nasdaq")
@@ -101,6 +104,9 @@ def trigger_22h(request):
             report.save()
         
             st=report.daily_report_action("NYSE",sector=s) 
+            if st is None:
+                raise ValueError("The creation of the strategy failed, report creation interrupted")
+            
             report.presel(st,"NYSE",sector=s)
             report.presel_wq(st,"NYSE",sector=s)
             send_order_test(report)
@@ -111,38 +117,43 @@ def trigger_22h(request):
         send_order_test(report2)
         
         return HttpResponse("report written")
+    
     except ValueError as msg:
         print(msg)
-        
+
 def send_order_test(report):
-    ent_symbols, ex_symbols, ent_symbols_short, ex_symbols_short,\
-    ent_symbols_manual, ex_symbols_manual, ent_symbols_short_manual, ex_symbols_short_manual\
-    =report.get_ent_ex_symbols()
+    for auto in [False, True]:
+        for entry in [False, True]:
+            for short in [False, True]:
+                try:
+                    ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
+                    for a in ent_ex_symbols.actions.all():
+                        send_entry_exit_msg_test(a.symbol,entry,short,auto) 
+                except:
+                    pass
+
+    if report.text:
+         print(report.text)      
     
-    if ent_symbols is not None:
-        for s in ent_symbols:
-            print("entry " + str(s))
-    if ex_symbols is not None:
-        for s in ex_symbols:
-            print("exit " + str(s))
-    if ent_symbols_short is not None:
-        for s in ent_symbols_short:
-            print("entry_short " + str(s))
-    if ex_symbols_short is not None:
-        for s in ex_symbols_short:
-            print("exit_short " + str(s))
-    if ent_symbols_manual is not None:
-        for s in ent_symbols_manual:
-            print("entry " + str(s))
-    if ex_symbols_manual is not None:
-        for s in ex_symbols_manual:
-            print("exit " + str(s))
-    if ent_symbols_short_manual is not None:
-        for s in ent_symbols_short_manual:
-            print("entry_short " + str(s))
-    if ex_symbols_short_manual is not None:
-        for s in ex_symbols_short_manual:
-            print("exit_short " + str(s))
+def send_entry_exit_msg_test(symbol,entry,short, auto)      :
+    if auto:
+        part1=""
+        part2=""
+    else:
+        part1="Manual "
+        part2="requested for "
+    
+    if entry:
+        part1+="entry "
+    else:
+        part1+="exit "
+        
+    if short:
+        part3=" short"
+    else:
+        part3=""
+        
+    print(part1+part2+symbol + " "+ part3) 
             
 def actualize_hist_paris(request):
     symbols=get_exchange_actions("Paris")

@@ -19,9 +19,9 @@ import vectorbtpro as vbt
 
 from celery import shared_task
 
-from reporting.models import Report, Alert, Index
+from reporting.models import Report, Alert, ListOfActions
 from orders.models import Action, StockEx, pf_retrieve_all, retrieve_ib_pf, get_ratio, get_last_price,\
-                          exit_order, Order
+                          exit_order, Order, ActionCategory
 from core import constants
 
 from trading_bot.settings import (PF_CHECK, INDEX_CHECK, REPORT_17h, REPORT_22h, HEARTBEAT, 
@@ -152,54 +152,38 @@ class MyScheduler():
         try:
             symbols_opportunity=constants.INDEXES+constants.RAW
             now=timezone.now().time()
-            
-            threshold=ALERT_THRESHOLD
-            threshold_alarm=ALARM_THRESHOLD
-            hyst=ALERT_HYST
+
             alerting_reco=False
             alerting=False
             alarming=False
             opportunity=False
             opening=bool(kwargs.get("opening",False))
-            index=kwargs.get("index",False)
-            #update=kwargs.get("update")
-            
-            if index:
-                tindex=Index.objects.get(symbol=symbol) 
-                n= tindex.name
-                stock_open=(now >tindex.stock_ex.opening_time and\
-                            now <tindex.stock_ex.closing_time)
-            else:
-                action=Action.objects.get(symbol=symbol)
-                n= action.name
-                stock_open=(now >action.stock_ex.opening_time and\
-                            now <action.stock_ex.closing_time)
-            
+            action=Action.objects.get(symbol=symbol)
+            stock_open=(now >action.stock_ex.opening_time and\
+                        now <action.stock_ex.closing_time)
             
             if stock_open:
-                if (short and ratio>threshold) or (not short and ratio < -threshold):
+                if (short and ratio>ALERT_THRESHOLD) or (not short and ratio < -ALERT_THRESHOLD):
                     alerting=True
-                    if (short and ratio>threshold_alarm) or (not short and ratio<-threshold_alarm):
+                    if (short and ratio>ALARM_THRESHOLD) or (not short and ratio<-ALARM_THRESHOLD):
                         alarming=True     
                     
-                if (short and ratio>(threshold-hyst)) or (not short and ratio < -(threshold-hyst)):
+                if (short and ratio>(ALERT_THRESHOLD-ALERT_HYST)) or (not short and ratio < -(ALERT_THRESHOLD-ALERT_HYST)):
                     alerting_reco=True    
                     
-                if (symbol in symbols_opportunity and not short and ratio>threshold):
+                if (symbol in symbols_opportunity and not short and ratio>ALERT_THRESHOLD):
                     alerting=True
                     opportunity=True
-                    if ratio>threshold_alarm:
+                    if ratio>ALARM_THRESHOLD:
                         alarming=True     
                 
+                c1 = Q(action=action)
                 c2 = Q(active=True)
                 #must be the same direction otherwise as the criterium depends on it
                 c3 = Q(short=short) 
                 c4 = Q(opportunity=opportunity)
                 c5 = Q(opening=opening)
-                if index:
-                    c1 = Q(index=tindex)
-                else:
-                    c1 = Q(action=action)
+                
                 alerts=Alert.objects.filter(c1 & c2 & c3 & c4 & c5)
                 
                 op_text=""
@@ -213,19 +197,14 @@ class MyScheduler():
                
                 if alerting:
                     if this_alert is None:
-                        if index:
-                            alert=Alert(index=tindex,alarm=alarming, short=short,\
-                                        trigger_date=timezone.now(),\
-                                        opportunity=opportunity    )
-                        else:
-                            alert=Alert(action=action,alarm=alarming, short=short,\
-                                        trigger_date=timezone.now(),\
-                                        opportunity=opportunity    )
+                        alert=Alert(action=action,alarm=alarming, short=short,\
+                                    trigger_date=timezone.now(),\
+                                    opportunity=opportunity    )
                         alert.save()
                         
                         if opening:
                             op_text+="Opening "
-                        self.telegram_bot.send_message_to_all(op_text+"Alert, action: "+ n +"\npresent variation: " + str(round(ratio,2)) + " %")
+                        self.telegram_bot.send_message_to_all(op_text+"Alert, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                         
                         if opening: #immediately recover
                             this_alert.active=False
@@ -238,7 +217,7 @@ class MyScheduler():
                             this_alert.save()
                            
                             self.telegram_bot.send_message_to_all(
-                                op_text+"Alarm, action: "+ n +"\npresent variation: " + str(round(ratio,2)) + " %")
+                                op_text+"Alarm, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                 else:
                     if this_alert is not None and alerting_reco==False:
                         this_alert.active=False
@@ -248,7 +227,7 @@ class MyScheduler():
                         
                         this_alert.save()
                         self.telegram_bot.send_message_to_all( 
-                                op_text+"Recovery, action: "+ n +"\npresent variation: " + str(round(ratio,2)) + " %")
+                                op_text+"Recovery, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                 
         except Exception as msg:
             print("exception in check change")
@@ -267,11 +246,11 @@ class MyScheduler():
                     if not kwargs.get("index",False):
                         action=Action.objects.get(symbol=symbol)
                         if action.category=="ETF":
-                            indexes=Index.objects.filter(etf_long=action)
+                            indexes=Action.objects.filter(etf_long=action)
                             if len(indexes)>0:
                                 ETF_index=indexes[0]
                             else:
-                                indexes=Index.objects.filter(etf_short=action)
+                                indexes=Action.objects.filter(etf_short=action)
                                 if len(indexes)>0:
                                     ETF_index=indexes[0]
                                 else:
@@ -295,18 +274,22 @@ class MyScheduler():
     def check_index(self,**kwargs):
         try:
             print("check index")
+            cat=ActionCategory.objects.get(short="IND")
+            c3=Q(category=cat)
             if kwargs.get("opening")=="9h":
-                stockEx1=StockEx.objects.filter(name="Paris")
-                stockEx2=StockEx.objects.filter(name="XETRA")
-                c1 = Q(stock_ex=stockEx1[0])
-                c2 = Q(stock_ex=stockEx2[0])
+                stockEx1=StockEx.objects.get(name="Paris")
+                stockEx2=StockEx.objects.get(name="XETRA")
                 
-                indexes = Index.objects.filter(c1|c2)
+                c1 = Q(stock_ex=stockEx1)
+                c2 = Q(stock_ex=stockEx2)
+                
+                indexes = Action.objects.filter((c1|c2)&c3)
             elif kwargs.get("opening")=="15h":
-                stockEx1=StockEx.objects.filter(name="Nasdaq")
-                indexes = Index.objects.filter(stock_ex=stockEx1[0])
+                stockEx1=StockEx.objects.get(name="Nasdaq")
+                c1 = Q(stock_ex=stockEx1)
+                indexes = Action.objects.filter(c1&c3)
             else:
-                indexes = Index.objects.all()
+                indexes = Action.objects.filter(c3)
             
             symbols=[x.symbol for x in indexes]
 
@@ -367,39 +350,19 @@ class MyScheduler():
                         self.send_exit_msg(symbol,suffix="stop loss")
 
     def send_order(self,report):
-        ent_symbols, ex_symbols, ent_symbols_short, ex_symbols_short,\
-        ent_symbols_manual, ex_symbols_manual, ent_symbols_short_manual, ex_symbols_short_manual\
-        =report.get_ent_ex_symbols()
-        
-        if ent_symbols is not None:
-            for s in ent_symbols:
-                self.send_entry_msg(s)
-        if ex_symbols is not None:
-            for s in ex_symbols:
-                self.send_exit_msg(s)
-        if ent_symbols_short is not None:
-            for s in ent_symbols_short:
-                self.send_entry_msg(s,suffix="short")
-        if ex_symbols_short is not None:
-            for s in ex_symbols_short:
-                self.send_exit_msg(s,suffix="short")
-
-        if ent_symbols_manual is not None:
-            for s in ent_symbols_manual:
-                self.send_manual_entry_msg(s)
-        if ex_symbols_manual is not None:
-            for s in ex_symbols_manual:
-                self.send_manual_exit_msg(s)
-        if ent_symbols_short_manual is not None:
-            for s in ent_symbols_short_manual:
-                self.send_manual_entry_msg(s,suffix="short")
-        if ex_symbols_short_manual is not None:
-            for s in ex_symbols_short_manual:
-                self.send_manual_exit_msg(s,suffix="short")
+        for auto in [False, True]:
+            for entry in [False, True]:
+                for short in [False, True]:
+                    try:
+                        ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
+                        for a in ent_ex_symbols.actions.all():
+                            self.send_entry_exit_msg(a.symbol,entry,short,auto) 
+                    except:
+                        pass
 
         if report.text:
-            self.telegram_bot.send_message_to_all(report.text)
-
+             self.telegram_bot.send_message_to_all(report.text)       
+        
     def daily_report_17h(self):
         try:
             print("writting daily report 17h")
@@ -407,6 +370,9 @@ class MyScheduler():
             report1.save()
 
             st=report1.daily_report_action("Paris")
+            if st is None:
+                raise ValueError("The creation of the strategy failed, report creation interrupted")
+                
             report1.presel(st,"Paris")
             report1.presel_wq(st,"Paris")
             self.send_order(report1)
@@ -415,6 +381,9 @@ class MyScheduler():
             report2.save()            
 
             st=report2.daily_report_action("XETRA")
+            if st is None:
+                raise ValueError("The creation of the strategy failed, report creation interrupted")
+                
             report2.presel(st,"XETRA")
             report2.presel_wq(st,"XETRA")
             self.send_order(report2)
@@ -427,6 +396,8 @@ class MyScheduler():
 
             self.telegram_bot.send_message_to_all("Daily report 17h ready")
             
+        except ValueError as msg:
+            print(msg)            
         except Exception as msg:
             _, _, exc_tb = sys.exc_info()
             print("line " + str(exc_tb.tb_lineno))
@@ -440,6 +411,9 @@ class MyScheduler():
             report1.save()
 
             st=report1.daily_report_action("Nasdaq") 
+            if st is None:
+                raise ValueError("The creation of the strategy failed, report creation interrupted")
+            
             report1.presel(st,"Nasdaq")
             report1.presel_wq(st,"Nasdaq")
             self.send_order(report1)
@@ -461,29 +435,36 @@ class MyScheduler():
             self.send_order(report2)
              
             self.telegram_bot.send_message_to_all( 
-                              "Daily report 22h ready")   
+                             "Daily report 22h ready")  
+            
+        except ValueError as msg:
+            print(msg)            
         except Exception as msg:
             _, _, exc_tb = sys.exc_info()
             print("line " + str(exc_tb.tb_lineno))
             print(msg)
             pass
+
+    def send_entry_exit_msg(self,symbol,entry,short, auto)      :
+        if auto:
+            part1=""
+            part2=""
+        else:
+            part1="Manual "
+            part2="requested for "
         
-    def send_entry_msg(self,symbol,suffix=""):
-        self.telegram_bot.send_message_to_all(
-                          "Entry signal " + symbol + " "+ suffix)
-
-    def send_manual_entry_msg(self,symbol,suffix=""):
-        self.telegram_bot.send_message_to_all(
-                          "Manual entry requested for " + symbol + " "+ suffix)
-
-    def send_exit_msg(self,symbol,suffix=""):
-        self.telegram_bot.send_message_to_all( 
-                          "Exit signal " + symbol + " "+ suffix) 
+        if entry:
+            part1+="entry "
+        else:
+            part1+="exit "
+            
+        if short:
+            part3=" short"
+        else:
+            part3=""
+            
+        self.telegram_bot.send_message_to_all(part1+part2+symbol + " "+ part3)
  
-    def send_manual_exit_msg(self,symbol,suffix=""):
-        self.telegram_bot.send_message_to_all( 
-                          "Manual exit requested for " + symbol + " "+ suffix)    
-    
     #just check that bot is running
     def heartbeat_f(self):
         self.telegram_bot.send_message_to_all("Heart beat")
