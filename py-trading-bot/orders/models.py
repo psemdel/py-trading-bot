@@ -152,76 +152,81 @@ def retrieve_data(symbols,period,**kwargs):
                 IBok=False
                 print("connection to IB failed")
                 pass
-        
-        for symbol in symbols:
-            if symbol in IB_STOCK_NO_PERMISSION:
-                print("symbol " + symbol + " has no permission for IB")
-                IBok=False
-                break
+            
+        if symbols is None or len(symbols)==0:
+            raise ValueError("List of symbols empty")
+        else:        
+            for symbol in symbols:
+                if symbol in IB_STOCK_NO_PERMISSION:
+                    print("symbol " + symbol + " has no permission for IB")
+                    IBok=False
+                    break
+                
+                if kwargs.get("index",False):
+                    action=Index.objects.get(symbol=symbol)
+                else:
+                    action=Action.objects.get(symbol=symbol)
+                
+                if action.stock_ex.ib_ticker in IB_STOCKEX_NO_PERMISSION:
+                    print("stock ex " + action.stock_ex.ib_ticker + " has no permission for IB")
+                    IBok=False
+                    break
             
             if kwargs.get("index",False):
-                action=Index.objects.get(symbol=symbol)
+                index_symbol=symbols[0]
+                all_symbols=symbols
             else:
-                action=Action.objects.get(symbol=symbol)
+                index_symbol=exchange_to_symbol(action)
+                all_symbols=symbols+[index_symbol]
             
-            if action.stock_ex.ib_ticker in IB_STOCKEX_NO_PERMISSION:
-                print("stock ex " + action.stock_ex.ib_ticker + " has no permission for IB")
-                IBok=False
-                break
-        
-        if kwargs.get("index",False):
-            index_symbol=symbols[0]
-            all_symbols=symbols
-        else:
-            index_symbol=exchange_to_symbol(action)
-            all_symbols=symbols+[index_symbol]
-        
-        if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False): 
-            try:
-                cours=IBData.fetch(all_symbols, period=period,missing_index='drop',myIB=myIB,**kwargs)
-            except:
-                print("Error with IB for data retrieval, fallback with YF")
+            if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False): 
+                try:
+                    cours=IBData.fetch(all_symbols, period=period,missing_index='drop',myIB=myIB,**kwargs)
+                except:
+                    print("Error with IB for data retrieval, fallback with YF")
+                    cours=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            else:
                 cours=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
-        else:
-            cours=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
-
-        cours_action=cours.select(symbols)
-        cours_open =cours_action.get('Open')
-        cours_high=cours_action.get('High')
-        cours_low=cours_action.get('Low')
-        cours_close=cours_action.get('Close')
-        cours_volume=cours_action.get('Volume')
-        print("number of days retrieved: " + str(np.shape(cours_close)[0]))
-        
-        cours_index=cours.select(index_symbol)
-        cours_open_ind =cours_index.get('Open')
-        cours_high_ind=cours_index.get('High')
-        cours_low_ind=cours_index.get('Low')
-        cours_close_ind=cours_index.get('Close')
-        cours_volume_ind=cours_index.get('Volume')
-
-        debug=False
-        if debug:
-            for symbol in all_symbols:
-                if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False):    
-                    data=IBData.fetch([symbol], period=period,**kwargs)
-                else:
-                    data=vbt.YFData.fetch(symbol, period=period,**kwargs)
+    
+            cours_action=cours.select(symbols)
+            cours_open =cours_action.get('Open')
+            cours_high=cours_action.get('High')
+            cours_low=cours_action.get('Low')
+            cours_close=cours_action.get('Close')
+            cours_volume=cours_action.get('Volume')
+            print("number of days retrieved: " + str(np.shape(cours_close)[0]))
             
-                #knowing what we drop
-                close_debug=data.get("Close")
-                for ii in range(len(close_debug)):
-                    if math.isnan(close_debug.values[ii]):
-                        print(symbol)
-                        print("dropping at least " + str(close_debug.index[ii]))
-        
-        if myIB is not None:
-            myIB.ib.disconnect()
-        
-        return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
-               cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind
+            cours_index=cours.select(index_symbol)
+            cours_open_ind =cours_index.get('Open')
+            cours_high_ind=cours_index.get('High')
+            cours_low_ind=cours_index.get('Low')
+            cours_close_ind=cours_index.get('Close')
+            cours_volume_ind=cours_index.get('Volume')
+    
+            debug=False
+            if debug:
+                for symbol in all_symbols:
+                    if (USE_IB_FOR_DATA and IBok) or kwargs.get("useIB",False):    
+                        data=IBData.fetch([symbol], period=period,**kwargs)
+                    else:
+                        data=vbt.YFData.fetch(symbol, period=period,**kwargs)
+                
+                    #knowing what we drop
+                    close_debug=data.get("Close")
+                    for ii in range(len(close_debug)):
+                        if math.isnan(close_debug.values[ii]):
+                            print(symbol)
+                            print("dropping at least " + str(close_debug.index[ii]))
+            
+            if myIB is not None:
+                myIB.ib.disconnect()
+            
+            return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
+                   cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
+                   cours_volume_ind
                    
+    except ValueError as msg:
+        print(msg)                   
     except Exception as msg:
         print(msg)
         print("symbol faulty " +(symbol or ""))
@@ -865,35 +870,31 @@ class PF(models.Model):
             print("line " + str(exc_tb.tb_lineno))
             pass    
 
+def get_sub(strategy, exchange,short,**kwargs):
+    sector="undefined"
+    name=strategy + " " + exchange
+    if short:
+        name+="_short"
+        
+    if exchange=="NYSE":
+        if kwargs.get("sector"):
+            sector=kwargs.get("sector") 
+            
+    return name, sector
+
 def get_pf(strategy, exchange,short,**kwargs):
-    
-    s=Strategy.objects.get(name=strategy)
-    e=StockEx.objects.get(name=exchange)
-
-    c1 = Q(stock_ex=e)
-    c2 = Q(strategy=s) 
-    c3 = Q(short=short)
-    
     try:
-        if exchange=="NYSE":
-            sector=kwargs.get("sector")
-            if sector:
-                action_sector=ActionSector.objects.get(name=sector)
-                c4 = Q(sector=action_sector)
-                return PF.objects.get(c1 & c2 & c3 & c4)
-        return PF.objects.get(c1 & c2 & c3)
-    except:
-        print("get_pf failed")
-        print("strategy: " + strategy)
-        print("exchange: " +exchange)
-        print("short: " + short)       
+        name, sector=get_sub(strategy, exchange,short,**kwargs)
+        res, _ = PF.objects.get_or_create(
+                stock_ex=StockEx.objects.get(name=exchange),
+                strategy=Strategy.objects.get(name=strategy),
+                short=short,
+                sector=ActionSector.objects.get(name=sector),
+                name=name)
 
-        name=strategy+"_"+exchange
-        if short:
-            name+="_short"
-        pf=PF(stock_ex=e,strategy=s,short=short,name=name)
-        pf.save() #create the pf
-        return pf
+        return res
+    except Exception as msg:
+        print(msg)
 
 ### To distinguish between ETF, actions, indexes...
 class ActionCategory(models.Model):
@@ -924,21 +925,14 @@ class Capital(models.Model):
         return self.name 
 
 def get_capital(strategy, exchange,short,**kwargs):
-    s=Strategy.objects.get(name=strategy)
-    e=StockEx.objects.get(name=exchange)
-
-    c1 = Q(stock_ex=e)
-    c2 = Q(strategy=s) 
-    c3 = Q(short=short)
-
-    if exchange=="NYSE":
-        sector=kwargs.get("sector")
-        if sector:
-            action_sector=ActionSector.objects.get(name=sector)
-            c4 = Q(sector=action_sector)
-            return Capital.objects.get(c1 & c2 & c3 & c4)
-
-    return Capital.objects.get(c1 & c2 & c3)
+    name, sector=get_sub(strategy, exchange,short,**kwargs)
+    res, _= Capital.objects.get_or_create(
+        stock_ex=StockEx.objects.get(name=exchange),
+        strategy=Strategy.objects.get(name=strategy),
+        short=short,    
+        sector=ActionSector.objects.get(name=sector),
+        name=name)
+    return res
 
 ###To define the number of orders assigned to one strategy
 ###1 means that only one action can be owned at a time using this strategy
@@ -955,23 +949,19 @@ class OrderCapital(models.Model):
 
 def get_order_capital(strategy, exchange,**kwargs):
     try:
-        s=Strategy.objects.get(name=strategy)
-        e=StockEx.objects.get(name=exchange)
-    
-        c1 = Q(stock_ex=e)
-        c2 = Q(strategy=s) 
+        name, sector=get_sub(strategy, exchange,False,**kwargs)
+        res, created = OrderCapital.objects.get_or_create(
+            stock_ex=StockEx.objects.get(name=exchange),
+            strategy=Strategy.objects.get(name=strategy),
+            sector=ActionSector.objects.get(name=sector),
+            name=name
+            )
+        if created:
+            res.capital=0
         
-        if exchange=="NYSE":
-            sector=kwargs.get("sector")
-            if sector:
-                action_sector=ActionSector.objects.get(name=sector)
-                c3 = Q(sector=action_sector)
-                return OrderCapital.objects.get(c1 & c2 & c3)
-        return OrderCapital.objects.get(c1 & c2)
-    except:
-        print("get_order_capital failed for")
-        print("strategy: "+ strategy)
-        print("exchange: "+ exchange)
+        return res
+    except Exception as msg:
+        print(msg) 
 
 ###For strategy using two time frame, in the slow one (10 days) candidates are defined
 ###And on daily basis the other strategy decides which of the candidate is really bought or sold
@@ -1002,13 +992,12 @@ class Candidates(models.Model):
         return self.name     
 
 def get_candidates(strategy, exchange):
-    s=Strategy.objects.get(name=strategy)
-    e=StockEx.objects.get(name=exchange)
-
-    c1 = Q(stock_ex=e)
-    c2 = Q(strategy=s) 
-
-    return Candidates.objects.get(c1 & c2)
+    res, _ = Candidates.objects.get_or_create(
+        stock_ex=StockEx.objects.get(name=exchange),
+        strategy=Strategy.objects.get(name=strategy),
+        name=strategy + "_" + exchange
+        )
+    return res
     
 ### List of actions provisory excluded for a strategy as it risks to perform bad
     

@@ -48,59 +48,72 @@ def start_bot(request):
 
 #For testing purpose
 def trigger_17h(request):
-    report1=Report()
-    report1.save()
-
-    st=report1.daily_report_action("Paris")
+    try:
+        report1=Report()
+        report1.save()
     
-    report1.presel(st,"Paris")
-    report1.presel_wq(st,"Paris")
-    send_order_test(report1)
+        st=report1.daily_report_action("Paris")
+        if st is None:
+            raise ValueError("The creation of the strategy failed, report creation interrupted")    
+            
+        report1.presel(st,"Paris")
+        report1.presel_wq(st,"Paris")
+        send_order_test(report1)
+        
+        report2=Report()
+        report2.save()            
     
-    report2=Report()
-    report2.save()            
-
-    st=report2.daily_report_action("XETRA")
-    report2.presel(st,"XETRA")
-    report2.presel_wq(st,"XETRA")
-    send_order_test(report2)
+        st=report2.daily_report_action("XETRA")
+        if st is None:
+            raise ValueError("The creation of the strategy failed, report creation interrupted")    
+            
+        report2.presel(st,"XETRA")
+        report2.presel_wq(st,"XETRA")
+        send_order_test(report2)
+        
+        report3=Report()
+        report3.save()    
     
-    report3=Report()
-    report3.save()    
-
-    report3.daily_report_index(["^FCHI","^GDAXI"]) #"CL=F",
-    send_order_test(report3)
-
-    return HttpResponse("report written")
-
+        report3.daily_report_index(["^FCHI","^GDAXI"]) #"CL=F",
+        send_order_test(report3)
+    
+        return HttpResponse("report written")
+    except ValueError as msg:
+        print(msg)
 #For testing purpose
 def trigger_22h(request):
-    report1=Report()
-    report1.save()
-
-    st=report1.daily_report_action("Nasdaq") 
-    report1.presel(st,"Nasdaq")
-    report1.presel_wq(st,"Nasdaq")
-    send_order_test(report1)
+    try:
+        report1=Report()
+        report1.save()
     
-    for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
-              "fin","materials","healthcare"]: 
-        print("starting report " + s)      
-        report=Report()
-        report.save()
+        st=report1.daily_report_action("Nasdaq") 
+        if st is None:
+            raise ValueError("The creation of the strategy failed, report creation interrupted")    
+            
+        report1.presel(st,"Nasdaq")
+        report1.presel_wq(st,"Nasdaq")
+        send_order_test(report1)
+        
+        for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
+                  "fin","materials","healthcare"]: 
+            print("starting report " + s)      
+            report=Report()
+            report.save()
+        
+            st=report.daily_report_action("NYSE",sector=s) 
+            report.presel(st,"NYSE",sector=s)
+            report.presel_wq(st,"NYSE",sector=s)
+            send_order_test(report)
     
-        st=report.daily_report_action("NYSE",sector=s) 
-        report.presel(st,"NYSE",sector=s)
-        report.presel_wq(st,"NYSE",sector=s)
-        send_order_test(report)
-
-    report2=Report()
-    report2.save()            
-    report2.daily_report_index(["^DJI","^IXIC"])
-    send_order_test(report2)
-    
-    return HttpResponse("report written")
-
+        report2=Report()
+        report2.save()            
+        report2.daily_report_index(["^DJI","^IXIC"])
+        send_order_test(report2)
+        
+        return HttpResponse("report written")
+    except ValueError as msg:
+        print(msg)
+        
 def send_order_test(report):
     ent_symbols, ex_symbols, ent_symbols_short, ex_symbols_short,\
     ent_symbols_manual, ex_symbols_manual, ent_symbols_short_manual, ex_symbols_short_manual\
