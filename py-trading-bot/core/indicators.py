@@ -273,7 +273,7 @@ VBTKAMA = vbt.IF(
 #Forbid any entry if the trend is bear
 def false_1d(close):
     ent= np.full(close.shape, False)
-    return ent, ex
+    return ent
         
 VBTFALSE = vbt.IF(
       class_name='VBTFalse',
@@ -281,8 +281,8 @@ VBTFALSE = vbt.IF(
       input_names=['close'],
       output_names=["entries"]
  ).with_apply_func(
-      very_bear_1d, 
-      false_1d=True,  
+      false_1d, 
+      takes_1d=True,  
  )  
 
 def very_bear_1d(close):

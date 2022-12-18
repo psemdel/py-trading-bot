@@ -446,10 +446,10 @@ class Strat(VBTfunc):
 ########## Strats ##############
 # Example of simple strategy for pedagogic purposes
     def stratRSI(self,**kwargs):
-        t=vbt.RSI.run(close,wtype='simple')
+        t=vbt.RSI.run(self.close,wtype='simple')
         self.entries=t.rsi_crossed_below(20)
         self.exits=t.rsi_crossed_above(80)
-        t2=ic.VBTFALSE.run(close)
+        t2=ic.VBTFALSE.run(self.close)
         self.entries_short=t2.entries
         self.exits_short=t2.entries
         
