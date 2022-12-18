@@ -14,14 +14,14 @@ One of the most important features of the bot is the possibility to perform orde
     
     To perform the orders automatically in trading_bot/settings two parameters must be set. PERFORM_ORDER must be true, in addition you need DIC_PERFORM_ORDER={ "normal":True} 
     
-    The strategy used for this is defined in reporting/models.py in the function perform_normal_strat. 
+    The strategy used for this is defined in reporting/models.py in the function perform_normal_strat(). 
     
     if self.it_is_index:
        stnormal.stratIndex()
     else:
        stnormal.stratF()
      
-    If you want other strategy, you need to create it in the file core/strat.py Look at the function stratRSI for an example.
+    If you want other strategy, you need to create it in the file core/strat.py Look at the function stratRSI() for an example.
      
     To make the combination of simple strategies easier, and make their optimisation easier, an array form is also used. [1, 0 ...] is for instance to use MA as signals for the entry. Look at the function defi_i.
     
@@ -37,7 +37,7 @@ One of the most important features of the bot is the possibility to perform orde
    The other preselection algorithms can be set the same way. The preselection algorithms can be found in core/bt.py (for backtesting) and in core/btP.py (for production, when differing).
    
    
-    
+5. Every time an order is performed, a Telegram message is sent. Generally, the order creation is handled in orders/models.py. The messaging in reporting/telegram.py. As the bot and django are asynchronous, the database is used for the communication between both. Concretelly, the order is performed and a note is left in the Report which order was done. After the report creation is finished, another script read those notes and send the Telegram messages.
 
 
 
