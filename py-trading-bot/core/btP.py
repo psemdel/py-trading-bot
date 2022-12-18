@@ -18,7 +18,7 @@ from core.stratP import StratPRD
 import core.indicators as ic
 from core.bt import BT, WQ
 
-from orders.models import retrieve_data, get_candidates, Excluded, check_hold_duration
+from orders.models import retrieve_data, get_candidates, Excluded, check_hold_duration, Strategy
 
 from trading_bot.settings import (RETARD_MAX_HOLD_DURATION, HIST_VOL_SLOW_MAX_CANDIDATES_NB,
                                  REALMADRID_MAX_CANDIDATES_NB, REALMADRID_DISTANCE)
@@ -155,7 +155,9 @@ class Presel(BT):
 
     def preselect_retard_sub(self,ii,short,**kwargs):
         if self.excluded is None:
-            self.excluded=Excluded.objects.get(name="retard") #can be the same for all exchange, no need for excluded short, as action cannot be in both
+            retard_strat, _=Strategy.objects.get_or_create(name="retard")
+            self.excluded, _=Excluded.objects.get_or_create(name="retard",strategy=retard_strat) 
+            #can be the same for all exchange, no need for excluded short, as action cannot be in both
             # categories at the same time
         
         v={}       

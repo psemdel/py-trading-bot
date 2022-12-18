@@ -29,10 +29,12 @@ class StratPRD(Strat):
             self.high=kwargs.get("high")
             self.low=kwargs.get("low")
             self.close=kwargs.get("close")
+            self.volume=kwargs.get("volume")
             self.open_ind=kwargs.get("open_ind")
             self.high_ind=kwargs.get("high_ind")
             self.low_ind=kwargs.get("low_ind")
             self.close_ind=kwargs.get("close_ind")
+            self.volume_ind=kwargs.get("volume_ind")
         else:
             self.high, self.low, self.close, self.open,self.volume,\
             self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind\

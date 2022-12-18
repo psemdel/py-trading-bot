@@ -12,13 +12,11 @@ import warnings
 from datetime import datetime
 from django.utils import timezone
 
-from core.constants import INTRO
-
 from orders.models import Action, entry_order,\
                           exit_order, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector
-                     
+      
 
 #which strategy to use for which stockexchange
 
@@ -30,7 +28,7 @@ class ListOfActions(models.Model):
     actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
 
 class Report(models.Model):
-    date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   # default=datetime.now
+    date=models.DateTimeField(null=False, blank=False, default=datetime.now)   #)auto_now_add=True
     text=models.TextField(blank=True)
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
     it_is_index=models.BooleanField(blank=False,default=False)
@@ -61,7 +59,6 @@ class Report(models.Model):
             presel.call_strat("preselect_retard_macro")
         else:
             presel.call_strat("preselect_retard")
-            
         
         candidates, candidates_short=presel.get_candidates()
         
@@ -100,18 +97,6 @@ class Report(models.Model):
                         auto=auto
                         )
                     ent_symbols.actions.add(action)
-                
-        #        if ent:
-           #         if auto:
-           #             if short:
-           #                 self.ent_symbols_short.append(symbol)
-           #             else:
-           #                 self.ent_symbols.append(symbol)
-           #         else:
-            #            if short:
-           #                 self.ent_symbols_short_manual.append(symbol)
-            #            else:
-             #               self.ent_symbols_manual.append(symbol)          
 
     def order_nostrat11_sub(self,symbol, short, ex, auto):
         if ex:
@@ -123,19 +108,7 @@ class Report(models.Model):
                 auto=auto
                 )
             ex_symbols.actions.add(action)
-            
-           # if auto:
-          #      if short:
-          #          self.ex_symbols_short.append(symbol)
-          #      else:
-         #           self.ex_symbols.append(symbol)
-         #   else:
-          #      if short:
-          #          self.ex_symbols_short_manual.append(symbol)
-          #      else:
-          #          self.ex_symbols_manual.append(symbol)         
         
-
     def order_nostrat11(self,candidates, exchange, key, short,auto,**kwargs):
         #if there is a reversal the opposite pf needs to emptied
         pf_inv=get_pf(key,exchange,not short,**kwargs)
@@ -169,18 +142,7 @@ class Report(models.Model):
                     auto=auto
                     )
                 ent_symbols.actions.add(action)
-                
-               # if auto:
-               #     if short:
-               #         self.ent_symbols_short.append(symbol)
-               #     else:
-              #          self.ent_symbols.append(symbol)
-              #  else:
-              #      if short:
-               #         self.ent_symbols_short_manual.append(symbol)
-               #     else:
-               #         self.ent_symbols_manual.append(symbol)                    
-         
+      
 ### Preselected actions strategy, using 101 Formulaic Alphas
     def presel_wq(self,st,exchange,**kwargs):
         to_calculate=False
@@ -302,25 +264,161 @@ class Report(models.Model):
                 auto=auto
                 )
             ent_ex_symbols.actions.add(action)
+            
+    def populate_report(self, symbols, st, sk, sma, sp):
+        for symbol in symbols:
+            if math.isnan(st.vol[symbol].values[-1]):
+                self.concat("symbol " + symbol + " no data")
+            else:
+                symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")
+                
+                with warnings.catch_warnings():
+                    #Necessary because of the presence of NaN
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    ar=ActionReport(
+                        action=Action.objects.get(symbol=symbol), 
+                        report=Report.objects.get(pk=self.pk))
         
-     #   if auto:
-     #       if ent:
-     #           self.ent_symbols.append(symbol)
-     #       if ex:
-    #            self.ex_symbols.append(symbol) 
-    #        if ent_short:
-   #             self.ent_symbols_short.append(symbol)
-   #         if ex_short:
-   #             self.ex_symbols_short.append(symbol) 
-   #     else:
-    #        if ent:
-    #            self.ent_symbols_manual.append(symbol)
-    #        if ex:
-    #            self.ex_symbols_manual.append(symbol) 
-   #         if ent_short:
-   #             self.ent_symbols_short_manual.append(symbol)
-    #        if ex_short:
-        #        self.ex_symbols_short_manual.append(symbol) 
+                    grow_past50_raw=st.grow_past(50, False)
+                    grow_past50_ma=st.grow_past(50, True)
+                    grow_past20_raw=st.grow_past(20, False)
+                    grow_past20_ma=st.grow_past(20, True)
+                    ar.date=st.date()
+                    ar.vol=st.vol[symbol].values[-1]
+                    
+                    ar.bbands_bandwith=st.bb_bw[symbol_complex_ent].values[-1]
+                    
+                    ar.three_mo_evol=grow_past50_raw[(50,False,symbol)].values[-1]
+                    ar.three_mo_evol_sm=grow_past50_ma[(50,True,symbol)].values[-1]
+                    ar.one_mo_evol=grow_past20_raw[(20,False,symbol)].values[-1]
+                    ar.one_mo_evol_sm=grow_past20_ma[(20,True,symbol)].values[-1]
+                    ar.trend=float(st.trend[symbol_complex_ent].values[-1])
+                    ar.macro_trend=float(st.macro_trend[symbol_complex_ent].values[-1])
+                    
+                    ar.kama_ent=sk.entries_kama[symbol].values[-1]
+                    ar.kama_ex=sk.exits_kama[symbol].values[-1]
+                    ar.kama_dir=float(sk.direction[symbol].values[-1])
+            
+                    ar.stoch_ent=sk.entries_stoch[symbol].values[-1]
+                    ar.stoch_ex=sk.exits_stoch[symbol].values[-1]
+                    
+                    if math.isnan(sk.stoch[symbol].values[-1]):
+                        ar.stoch=0
+                    else:
+                        ar.stoch=sk.stoch[symbol].values[-1]
+                    
+                    ar.ma_ent=sma.entries[symbol].values[-1]
+                    ar.ma_ex=sma.exits[symbol].values[-1]
+            
+                    ar.pattern_light_ent=sp.entries[(True, symbol)].values[-1] or\
+                                         sp.entries[(True, symbol)].values[-2]
+                                         
+                    ar.pattern_light_ex=sp.exits[(True, symbol)].values[-1] or\
+                                        sp.exits[(True, symbol)].values[-2]
+            
+                    if self.it_is_index:
+                        if ar.kama_ent:
+                            self.concat(" Index " + symbol + " KAMA bottom detected!")
+                        if ar.kama_ex:
+                            self.concat(" Index " + symbol + " KAMA top detected!")
+                        if st.max_ind[symbol_complex_ent][-1]!=0:
+                            self.concat(" Index " + symbol + " V maximum detected!")
+                        if st.min_ind[symbol_complex_ent][-1]!=0:
+                            self.concat(" Index " + symbol + " V minimum detected!")                            
+                    ar.save()  
+        
+    #for a group of predefined actions, determine the signals    
+    def perform_normal_strat(self,symbols, stnormal, exchange, sector, **kwargs):
+        if self.it_is_index:
+            stnormal.stratIndex()
+        else:
+            stnormal.stratF()
+        
+        normal_strat, _=Strategy.objects.get_or_create(name="normal")
+        normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat.id) 
+        normal_strat_symbols=normal_strat_act.retrieve()
+        
+        for symbol in symbols:
+            if symbol in normal_strat_symbols:
+                if math.isnan(stnormal.vol[symbol].values[-1]):
+                    self.concat("symbol " + symbol + " no data")
+                else:
+                    symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
+                    symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+                    
+                    #list present status
+                    self.define_ent_ex(
+                        stnormal.entries[symbol_complex_ent_normal].values[-1],
+                        stnormal.exits[symbol_complex_ex_normal].values[-1],
+                        stnormal.entries_short[symbol_complex_ex_normal].values[-1],
+                        stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                        symbol, 
+                        "normal",
+                        exchange,
+                        sector=sector,
+                        **kwargs)
+                    decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
+                    if decision==1:
+                        self.concat(symbol + " present decision : sell")
+                    elif decision==-1:
+                        self.concat(symbol + " present decision : buy")
+                        
+    def perform_slow_strats(self, symbols, DICS, exchange, sector, st, **kwargs):   
+        # Slow candidates
+        slow_strats=["hist_slow", "realmadrid"] #only those in use
+        slow_strats_active=[]
+        slow_cands={}
+        
+        #=intersection(DICS,slow_strats) 
+        for DIC in DICS:
+            if DIC in slow_strats:
+                slow_strats_active.append(DIC)
+                if not self.it_is_index and exchange is not None: 
+                    cand=get_candidates(DIC,exchange)
+                    slow_cands[DIC]=cand.retrieve()
+                else:
+                    slow_cands[DIC]=[]   
+                 
+        ##Change underlying strategy
+        st.call_strat("strat_kama_stoch_matrend_bbands")             
+        for symbol in symbols:
+            symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
+            
+            for DIC in slow_strats_active:
+                if symbol in slow_cands[DIC]: #list of candidates
+                    self.define_ent_ex(
+                        st.entries[symbol_complex_ent].values[-1],
+                        st.exits[symbol_complex_ent].values[-1],
+                        st.entries_short[symbol_complex_ent].values[-1],
+                        st.exits_short[symbol_complex_ent].values[-1],
+                        symbol, 
+                        DIC,
+                        exchange,
+                        sector=sector,
+                        **kwargs)
+                        
+    def perform_divergence(self,symbols,exchange,sector, st, DIC_PRESEL, DICS, **kwargs):
+        
+        if exchange is not None and "divergence" in DIC_PRESEL[exchange]: 
+            pf_div=get_pf("divergence",exchange,False,sector=sector)
+        ##Change underlying strategy
+        st.call_strat("stratDiv")
+        ##only_exit_strat11
+        for symbol in symbols:
+            symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
+
+            if "divergence" in DICS and exchange is not None and\
+                    symbol in pf_div.retrieve(): 
+                    self.define_ent_ex(
+                        False,
+                        st.exits[symbol_complex_ent].values[-1],
+                        False,
+                        st.exits_short[symbol_complex_ent].values[-1],
+                        symbol, 
+                        "divergence",
+                        exchange,
+                        sector=sector,
+                        **kwargs)
                 
     def daily_report(self,input_symbols,exchange,**kwargs): #for one exchange and one sector
         try: 
@@ -348,175 +446,43 @@ class Report(models.Model):
                     
                 #clean the symbols
                 symbols=common.filter_intro(input_symbols,DAILY_REPORT_PERIOD)
+
+                #load the data and
+                #calculats everything used afterwards
+                #also used for "normal strat"
+                stnormal=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",**kwargs)
                 
-                st=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",**kwargs)
+                ##Perform a single strategy on predefined actions
+                self.perform_normal_strat(symbols, stnormal, exchange, sector, **kwargs)
+                
+                ##Populate a report with different statistics
+                sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
+                sma=ic.VBTMA.run(stnormal.close)
+                sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
+                
+                st=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",
+                                        open_=stnormal.open,
+                                        high=stnormal.high,
+                                        low=stnormal.low,
+                                        close=stnormal.close,
+                                        volume=stnormal.volume,
+                                        open_ind=stnormal.open_ind,
+                                        high_ind=stnormal.high_ind,
+                                        low_ind=stnormal.low_ind,
+                                        close_ind=stnormal.close_ind, 
+                                        volume_ind=stnormal.volume_ind,
+                                       **kwargs)
                 st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
                 
-                #calculates everything used afterwards
-                #also used for "normal strat"
-                stnormal=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",
-                                        open_=st.open,
-                                        high=st.high,
-                                        low=st.low,
-                                        close=st.close,
-                                        open_ind=st.open_ind,
-                                        high_ind=st.high_ind,
-                                        low_ind=st.low_ind,
-                                        close_ind=st.close_ind,                                        
-                                         **kwargs)
-                if self.it_is_index:
-                    stnormal.stratIndex()
-                else:
-                    stnormal.stratF()
-                
-                sk=ic.VBTSTOCHKAMA.run(st.high,st.low,st.close)
-                sma=ic.VBTMA.run(st.close)
-                sp=ic.VBTPATTERN.run(st.open,st.high,st.low,st.close,light=True)
-                
-                grow_past50_raw=st.grow_past(50, False)
-                grow_past50_ma=st.grow_past(50, True)
-                grow_past20_raw=st.grow_past(20, False)
-                grow_past20_ma=st.grow_past(20, True)
-                
-                normal_strat, _=Strategy.objects.get_or_create(name="normal")
-                normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat.id) 
-                normal_strat_symbols=normal_strat_act.retrieve()
-                
-                # Slow candidates
-                slow_strats=["hist_slow", "realmadrid"] #only those in use
-                slow_cands={}
-                
-                #=intersection(DICS,slow_strats) 
-                for DIC in DICS:
-                    if DIC in slow_strats:
-                        if not self.it_is_index and exchange is not None: 
-                            cand=get_candidates(DIC,exchange)
-                            slow_cands[DIC]=cand.retrieve()
-                        else:
-                            slow_cands[DIC]=[]   
-
-                if exchange is not None and "divergence" in DIC_PRESEL[exchange]: 
-                    pf_div=get_pf("divergence",exchange,False,sector=sector)
-                
-                for symbol in symbols:
-                    if math.isnan(st.vol[symbol].values[-1]):
-                        self.concat("symbol " + symbol + " no data")
-                    else:
-                        symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")
-                        #symbol_complex_ex=st.symbols_simple_to_complex(symbol,"ex")
-                        
-                        with warnings.catch_warnings():
-                            #Necessary because of the presence of NaN
-                            warnings.simplefilter("ignore", category=RuntimeWarning)
-                            action=Action.objects.get(symbol=symbol)
-                            ar=ActionReport(action=action, 
-                                                   report=Report.objects.get(pk=self.pk))
-
-                            ar.date=st.date()
-                            ar.vol=st.vol[symbol].values[-1]
-                            
-                            ar.bbands_bandwith=st.bb_bw[symbol_complex_ent].values[-1]
-                            
-                            ar.three_mo_evol=grow_past50_raw[(50,False,symbol)].values[-1]
-                            ar.three_mo_evol_sm=grow_past50_ma[(50,True,symbol)].values[-1]
-                            ar.one_mo_evol=grow_past20_raw[(20,False,symbol)].values[-1]
-                            ar.one_mo_evol_sm=grow_past20_ma[(20,True,symbol)].values[-1]
-                            ar.trend=float(st.trend[symbol_complex_ent].values[-1])
-                            ar.macro_trend=float(st.macro_trend[symbol_complex_ent].values[-1])
-                            
-                            ar.kama_ent=sk.entries_kama[symbol].values[-1]
-                            ar.kama_ex=sk.exits_kama[symbol].values[-1]
-                            ar.kama_dir=float(sk.direction[symbol].values[-1])
-    
-                            ar.stoch_ent=sk.entries_stoch[symbol].values[-1]
-                            ar.stoch_ex=sk.exits_stoch[symbol].values[-1]
-                            
-                            if math.isnan(sk.stoch[symbol].values[-1]):
-                                ar.stoch=0
-                            else:
-                                ar.stoch=sk.stoch[symbol].values[-1]
-                            
-                            ar.ma_ent=sma.entries[symbol].values[-1]
-                            ar.ma_ex=sma.exits[symbol].values[-1]
-    
-                            ar.pattern_light_ent=sp.entries[(True, symbol)].values[-1] or\
-                                                 sp.entries[(True, symbol)].values[-2]
-                                                 
-                            ar.pattern_light_ex=sp.exits[(True, symbol)].values[-1] or\
-                                                sp.exits[(True, symbol)].values[-2]
-    
-                            if self.it_is_index:
-                                if ar.kama_ent:
-                                    self.concat(" Index " + symbol + " KAMA bottom detected!")
-                                if ar.kama_ex:
-                                    self.concat(" Index " + symbol + " KAMA top detected!")
-                                if st.max_ind[symbol_complex_ent][-1]!=0:
-                                    self.concat(" Index " + symbol + " V maximum detected!")
-                                if st.min_ind[symbol_complex_ent][-1]!=0:
-                                    self.concat(" Index " + symbol + " V minimum detected!")                            
-                            
-                            ar.save()  
-                            
-                            if symbol in normal_strat_symbols:
-                                symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
-                                symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
-                                
-                                #list present status
-                                
-                                self.define_ent_ex(
-                                    stnormal.entries[symbol_complex_ent_normal].values[-1],
-                                    stnormal.exits[symbol_complex_ex_normal].values[-1],
-                                    stnormal.entries_short[symbol_complex_ex_normal].values[-1],
-                                    stnormal.exits_short[symbol_complex_ent_normal].values[-1],
-                                    symbol, 
-                                    "normal",
-                                    exchange,
-                                    sector=sector,
-                                    **kwargs)
-                                decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
-                                if decision==1:
-                                    self.concat(symbol + " present decision : sell")
-                                elif decision==-1:
-                                    self.concat(symbol + " present decision : buy")
+                self.populate_report(symbols, st, sk, sma, sp)
                 print("Strat daily report written " +(exchange or ""))
-                ##Change underlying strategy
-                st.call_strat("strat_kama_stoch_matrend_bbands")             
-                for symbol in symbols:
-                    symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
-                    
-                    #intersection(DICS,slow_strats)
-                    for DIC in DICS:
-                        if DIC in slow_strats:
-                            if symbol in slow_cands[DIC]: #list of candidates
-                                self.define_ent_ex(
-                                    st.entries[symbol_complex_ent].values[-1],
-                                    st.exits[symbol_complex_ent].values[-1],
-                                    st.entries_short[symbol_complex_ent].values[-1],
-                                    st.exits_short[symbol_complex_ent].values[-1],
-                                    symbol, 
-                                    DIC,
-                                    exchange,
-                                    sector=sector,
-                                    **kwargs)
-                                
-                ##Change underlying strategy
-                st.call_strat("stratDiv")
-                ##only_exit_strat11
-                for symbol in symbols:
-                    symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
 
-                    if "divergence" in DICS and exchange is not None and\
-                            symbol in pf_div.retrieve(): 
-                            self.define_ent_ex(
-                                False,
-                                st.exits[symbol_complex_ent].values[-1],
-                                False,
-                                st.exits_short[symbol_complex_ent].values[-1],
-                                symbol, 
-                                "divergence",
-                                exchange,
-                                sector=sector,
-                                **kwargs)
+                ##Perform strategies that rely on the regular preselection of a candidate
+                self.perform_slow_strats(symbols, DICS, exchange, sector, st, **kwargs)
+                
+                ##Perform the strategy divergence
+                self.perform_divergence(symbols,exchange,sector, st, DIC_PRESEL, DICS, **kwargs)
+
                 print("Slow strategy proceeded") 
                 if sector is not None:
                     self.sector=sector
