@@ -444,6 +444,31 @@ class Strat(VBTfunc):
         return delta
 
 ########## Strats ##############
+# Example of simple strategy for pedagogic purposes
+    def stratRSI(self,**kwargs):
+        t=vbt.RSI.run(close,wtype='simple')
+        self.entries=t.rsi_crossed_below(20)
+        self.exits=t.rsi_crossed_above(80)
+        t2=ic.VBTFALSE.run(close)
+        self.entries_short=t2.entries
+        self.exits_short=t2.entries
+        
+    def stratRSIeq(self,**kwargs):
+        a=[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 
+           0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 
+       0., 0., 0., 0., 0.]
+
+        self.entries, self.exits, self.entries_short, self.exits_short= \
+        strat_wrapper_simple(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a)     
+        
+
 # The best strategy without macro is hold, here strat D bear is acceptable and provides some signals
 # to define pattern light
     def stratDbear(self,**kwargs):

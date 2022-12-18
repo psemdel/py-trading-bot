@@ -55,7 +55,6 @@ PERFORM_ORDER=False #test or use IB to perform orders
 ## relation is PERFORM_ORDER and DIC_PERFORM_ORDER
 DIC_PERFORM_ORDER={
     "normal":True,
-    "normal_index":False,
     "macd_vol":True,
     "retard":True,
     "retard_manual":False,
