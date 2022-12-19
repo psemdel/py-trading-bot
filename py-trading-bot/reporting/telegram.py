@@ -240,22 +240,19 @@ class MyScheduler():
       #  if symbols!=[]:
         try:
             for symbol in symbols: #otherwise issue with NaN
-                #check ETF --> better to check the underlying
                 
                 try:
+                    #check ETF --> better to check the underlying
                     if not kwargs.get("index",False):
                         action=Action.objects.get(symbol=symbol)
-                        if action.category=="ETF":
+                        indexes=None
+                        if action.category==ActionCategory.objects.get(short="ETFLONG"):
                             indexes=Action.objects.filter(etf_long=action)
-                            if len(indexes)>0:
-                                ETF_index=indexes[0]
-                            else:
-                                indexes=Action.objects.filter(etf_short=action)
-                                if len(indexes)>0:
-                                    ETF_index=indexes[0]
-                                else:
-                                    print("underlying not found for "+action.symbol)
-                            symbol=ETF_index.symbol
+                        elif action.category==ActionCategory.objects.get(short="ETFSHORT"):
+                            indexes=Action.objects.filter(etf_short=action)
+                       
+                        if indexes is not None and len(indexes)>0:
+                            symbol=indexes[0].symbol
                 except Exception as msg:
                      print("exception in check change ETF")
                      print(msg)
@@ -445,7 +442,7 @@ class MyScheduler():
             print(msg)
             pass
 
-    def send_entry_exit_msg(self,symbol,entry,short, auto)      :
+    def send_entry_exit_msg(self,symbol,entry,short, auto):
         if auto:
             part1=""
             part2=""
