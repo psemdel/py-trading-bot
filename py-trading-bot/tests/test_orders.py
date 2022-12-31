@@ -11,65 +11,74 @@ import numpy as np
 from django.test import TestCase
 from orders import models as m
 
+class TestIBData(TestCase):
+    def test_period_YF_to_ib(self):
+        self.assertEqual(m.period_YF_to_ib("10"),None)
+        self.assertEqual(m.period_YF_to_ib("10 d"),"10 D")
+        self.assertEqual(m.period_YF_to_ib("10 mo"),"10 M")
+        self.assertEqual(m.period_YF_to_ib("10 y"),"10 Y")
+
+    def test_interval_YF_to_ib(self):
+        self.assertEqual(m.interval_YF_to_ib(None),"1 day")
+        self.assertEqual(m.interval_YF_to_ib("10"),"1 day")
+        self.assertEqual(m.interval_YF_to_ib("10 m"),"10 mins")
+        self.assertEqual(m.interval_YF_to_ib("10 h"),"10 hours")
+        self.assertEqual(m.interval_YF_to_ib("10 d"),"10 day")
+
 class TestOrders(TestCase):
     def setUp(self):
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
         
-        e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
-        self.e=e
-        e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
+        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
+        self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
         c=m.Currency.objects.create(name="euro")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
-        strategy=m.Strategy.objects.create(name="none")
-        s=m.ActionSector.objects.create(name="sec")
-        self.s=s
+        self.strategy=m.Strategy.objects.create(name="none")
+        self.s=m.ActionSector.objects.create(name="undefined")
         
-        self.strategy=strategy
         m.Action.objects.create(
             symbol='AC.PA',
             #ib_ticker='AC',
             name="Accor",
-            stock_ex=e,
+            stock_ex=self.e,
             currency=c,
             category=cat,
-            strategy=strategy,
-            sector=s,
+            #strategy=strategy,
+            sector=self.s,
             )
-        a=m.Action.objects.create(
+        self.a=m.Action.objects.create(
             symbol='AI.PA',
             #ib_ticker='AC',
             name="Air liquide",
-            stock_ex=e,
+            stock_ex=self.e,
             currency=c,
             category=cat,
-            strategy=strategy,
-            sector=s,
+            #strategy=strategy,
+            sector=self.s,
             )
-        self.a=a
-        a2=m.Action.objects.create(
+        self.a2=m.Action.objects.create(
             symbol='AIR.PA',
             #ib_ticker='AC',
             name="Airbus",
-            stock_ex=e,
+            stock_ex=self.e,
             currency=c,
             category=cat,
-            strategy=strategy,
-            sector=s,
+            #strategy=strategy,
+            sector=self.s,
             )
-        self.a2=a2
-        m.Action.objects.create(
+        self.a3=m.Action.objects.create(
             symbol='SIE.DE',
             #ib_ticker='AC',
             name="Siemens",
-            stock_ex=e2,
+            stock_ex=self.e2,
             currency=c,
             category=cat,
-            strategy=strategy,
-            sector=s,
+            #strategy=strategy,
+            sector=self.s,
             )
         symbols=['AC.PA','AI.PA','AIR.PA'] 
-        m.Excluded.objects.create(name="all",strategy=strategy)
-        
+        m.Excluded.objects.create(name="all",strategy=self.strategy)
+
     def test_retrieve(self):
         cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
@@ -98,47 +107,50 @@ class TestOrders(TestCase):
         self.assertTrue(t!=0)
         
     def test_get_pf(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf2= m.get_pf("none", "Paris",False)
         
         self.assertEqual(pf,pf2)
+        #test auto creation
+        pf3= m.get_pf("none", "XETRA",False)
+        m.PF.objects.get(name="none_XETRA",short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
         
     def test_pf_retrieve(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         self.assertEqual(pf.retrieve(),[])      
         pf.actions.add(self.a)
         self.assertEqual(pf.retrieve(),["AI.PA"])        
         
     def test_pf_retrieve_all(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.actions.add(self.a)
-        pf2=m.PF.objects.create(name="abc2",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        pf2.actions.add(self.a2)        
+        pf2=m.PF.objects.create(name="none_XETRA",short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
+        pf2.actions.add(self.a3)        
         
-        self.assertEqual(m.pf_retrieve_all(),["AI.PA","AIR.PA"])      
+        self.assertEqual(m.pf_retrieve_all(),["AI.PA","SIE.DE"])      
 
     def test_pf_append(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append("AI.PA")
         
         self.assertEqual(pf.retrieve(),["AI.PA"])  
         
     def test_pf_remove(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append("AI.PA")
         pf.remove("AI.PA")
         
         self.assertEqual(pf.retrieve(),[])          
         
     def test_get_order_capital(self):
-        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
         ocap2=m.get_order_capital("none","Paris")
         
         self.assertEqual(ocap,ocap2)
         
     def test_entry_order_test(self):
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
                 
         t=m.entry_order_test("AIR.PA","none","Paris",False)
 
@@ -153,8 +165,8 @@ class TestOrders(TestCase):
         self.assertFalse(t)
         
     def test_exit_order_test(self):        
-        pf=m.PF.objects.create(name="abc",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,name="abc",strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
                 
         m.entry_order_test("AIR.PA","none","Paris",False)   
         t=m.exit_order_test("AIR.PA","none","Paris",False)   

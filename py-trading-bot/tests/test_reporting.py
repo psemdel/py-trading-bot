@@ -11,7 +11,7 @@ import numpy as np
 from django.test import TestCase
 import reporting.models as m
 from reporting.models import Alert
-from orders.models import (Fees, StockEx, Action, Index, ActionCategory, ActionSector, Strategy, 
+from orders.models import (Fees, StockEx, Action, ActionCategory, ActionSector, Strategy, 
                           Currency, StratCandidates, PF, Excluded, OrderCapital)
 import vectorbtpro as vbt
 
@@ -24,7 +24,8 @@ class TestReporting(TestCase):
         e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
         c=Currency.objects.create(name="euro")
         cat=ActionCategory.objects.create(name="actions",short="ACT")
-        cat2=ActionCategory.objects.create(name="actions",short="ETF")
+        cat2=ActionCategory.objects.create(name="ETF",short="ETF")
+        cat3=ActionCategory.objects.create(name="index",short="IND")
         strategy=Strategy.objects.create(name="none")
         strategy2=Strategy.objects.create(name="normal")
         strategy3=Strategy.objects.create(name="divergence")
@@ -34,7 +35,7 @@ class TestReporting(TestCase):
         strategy7=Strategy.objects.create(name="wq53")
         strategy8=Strategy.objects.create(name="wq54")
         StratCandidates.objects.create(name="normal",strategy=strategy2)
-        s=ActionSector.objects.create(name="sec")
+        s=ActionSector.objects.create(name="undefined")
         
         self.strategy=strategy
         a=Action.objects.create(
@@ -44,7 +45,7 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         self.a=a
@@ -55,7 +56,7 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         a=Action.objects.create(
@@ -65,7 +66,7 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )   
         
@@ -76,27 +77,31 @@ class TestReporting(TestCase):
             stock_ex=e,
             currency=c,
             category=cat2,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )   
 
-        Index.objects.create(
+        Action.objects.create(
             symbol='^FCHI',
             #ib_ticker='AC',
             name='Cac40',
             stock_ex=e,
             currency=c,
+            category=cat3,
             etf_long=etf1,
-            etf_short=etf1
+            etf_short=etf1,
+            sector=s
             ) 
-        Index.objects.create(
+        Action.objects.create(
             symbol='^GDAXI',
             #ib_ticker='AC',
             name='DAX',
             stock_ex=e,
             currency=c,
+            category=cat3,
             etf_long=etf1,
-            etf_short=etf1
+            etf_short=etf1,
+            sector=s,
             )           
         PF.objects.create(name="divergence",short=False,strategy= strategy3,stock_ex=e,sector=s)
         PF.objects.create(name="retard",short=False,strategy= strategy4,stock_ex=e,sector=s)

@@ -31,7 +31,7 @@ class TestStratP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         Action.objects.create(
@@ -41,7 +41,7 @@ class TestStratP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         Action.objects.create(
@@ -51,7 +51,7 @@ class TestStratP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         symbols=['AC.PA','AI.PA','AIR.PA'] 

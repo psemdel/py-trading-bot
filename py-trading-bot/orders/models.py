@@ -72,6 +72,37 @@ def action_to_etf(symbol,short,**kwargs):
             action=action.etf_long
     return action
 
+def period_YF_to_ib(period): #see also split_freq_str in vbt
+    #transform "10 d" in "10 D"
+    period_ib=None
+    if period is not None:
+        fig= ''.join(x for x in period if x.isdigit())
+        if period.find("d")!=-1:
+            period_ib=fig +" D"
+        elif period.find("mo")!=-1:
+            period_ib=fig +" M"
+        elif period.find("y")!=-1:
+            period_ib=fig +" Y"  
+    
+    return period_ib
+
+def interval_YF_to_ib(interval):
+    #Time period of one bar. Must be one of: ‘1 secs’, ‘5 secs’, ‘10 secs’ 15 secs’, ‘30 secs’, ‘1 min’, ‘2 mins’, ‘3 mins’, ‘5 mins’, ‘10 mins’, ‘15 mins’, ‘20 mins’, ‘30 mins’, ‘1 hour’, ‘2 hours’, ‘3 hours’, ‘4 hours’, ‘8 hours’, ‘1 day’, ‘1 week’, ‘1 month’.
+    if interval is None:
+        res='1 day'
+    else:
+        fig= ''.join(x for x in interval if x.isdigit())
+        if interval.find("m")!=-1:
+            res=fig +" mins"
+        elif interval.find("h")!=-1:
+            res=fig +" hours"
+        elif interval.find("d")!=-1:
+            res=fig +" day"
+        else:
+            res='1 day'
+            
+    return res
+
 class IBData(RemoteData):
     @classmethod
     def fetch_symbol(
@@ -86,26 +117,9 @@ class IBData(RemoteData):
 
         try:
             myIB=kwargs.get("myIB")
-            fig= ''.join(x for x in period if x.isdigit())
-            if period.find("d")!=-1:
-                period_ib=fig +" D"
-            elif period.find("mo")!=-1:
-                period_ib=fig +" M"
-            elif period.find("y")!=-1:
-                period_ib=fig +" Y"  
             
-            #Time period of one bar. Must be one of: ‘1 secs’, ‘5 secs’, ‘10 secs’ 15 secs’, ‘30 secs’, ‘1 min’, ‘2 mins’, ‘3 mins’, ‘5 mins’, ‘10 mins’, ‘15 mins’, ‘20 mins’, ‘30 mins’, ‘1 hour’, ‘2 hours’, ‘3 hours’, ‘4 hours’, ‘8 hours’, ‘1 day’, ‘1 week’, ‘1 month’.
-            if kwargs.get("interval",False):
-                fig= ''.join(x for x in  kwargs.get("interval") if x.isdigit())
-                if period.find("m")!=-1:
-                    interval=fig +" mins"
-                elif period.find("h")!=-1:
-                    interval=fig +" hours"
-                elif period.find("d")!=-1:
-                    interval=fig +" day"
-            else:
-                interval='1 day'
-                            
+            period=period_YF_to_ib(period)
+            timeframe=interval_YF_to_ib(timeframe)
             contract=symbol_to_IBcontract(myIB,symbol)
             
             if contract is None:
@@ -114,8 +128,8 @@ class IBData(RemoteData):
                 bars = myIB.ib.reqHistoricalData(
                         contract,
                         endDateTime='',
-                        durationStr=period_ib, #"10 D","1 M"
-                        barSizeSetting=interval, #"1 day", "1 min"
+                        durationStr=period, #"10 D","1 M"
+                        barSizeSetting=timeframe, #"1 day", "1 min"
                         whatToShow='TRADES',
                         useRTH=True,
                         formatDate=1)
@@ -365,11 +379,15 @@ class MyIB():
         self.ib = IB()
     
     def __enter__(self):
-        try:
-            self.ib.connect(host=IB_LOCALHOST, port=IB_PORT, clientId=1)
-            return self
-        except:
-            return self
+        clientID=1
+        while clientID<=10:
+            try:
+                self.ib.connect(host=IB_LOCALHOST, port=IB_PORT, clientId=clientID)
+                break
+            except:                    
+                clientID+=1
+                pass
+        return self
         
     def __exit__(self, exc_type, exc_value, tb):
         #print("disconnecting myIB")
@@ -708,7 +726,7 @@ class Action(models.Model):
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
     category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=10)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
     #strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
     delisted=models.BooleanField(blank=False,default=False)
     etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
@@ -817,7 +835,7 @@ class PF(models.Model):
 
 def get_sub(strategy, exchange,short,**kwargs):
     sector="undefined"
-    name=strategy + " " + exchange
+    name=strategy + "_" + exchange
     if short:
         name+="_short"
         
@@ -887,7 +905,7 @@ class OrderCapital(models.Model):
     name=models.CharField(max_length=100, blank=False,default="")
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=10)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
     
     def __str__(self):
         return self.name 

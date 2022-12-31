@@ -31,7 +31,7 @@ class TestbtP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         self.a=a
@@ -42,7 +42,7 @@ class TestbtP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         a=Action.objects.create(
@@ -52,7 +52,7 @@ class TestbtP(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )        
         self.st=stratP.StratPRD(["AC.PA", "AI.PA","AIR.PA"],"1y")

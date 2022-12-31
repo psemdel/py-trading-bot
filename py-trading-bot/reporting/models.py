@@ -363,7 +363,7 @@ class Report(models.Model):
                     elif decision==-1:
                         self.concat(symbol + " present decision : buy")
                         
-    def perform_slow_strats(self, symbols, DICS, exchange, sector, st, **kwargs):   
+    def perform_slow_strats(self, symbols, DICS, exchange, sec, st, **kwargs):   
         # Slow candidates
         slow_strats=["hist_slow", "realmadrid"] #only those in use
         slow_strats_active=[]
@@ -394,7 +394,7 @@ class Report(models.Model):
                         symbol, 
                         DIC,
                         exchange,
-                        sector=sector,
+                        sector=sec,
                         **kwargs)
                         
     def perform_divergence(self,symbols,exchange,sector, st, DIC_PRESEL, DICS, **kwargs):

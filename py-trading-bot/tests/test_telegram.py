@@ -36,7 +36,7 @@ class TestTelegram(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
         self.a=a
@@ -47,7 +47,7 @@ class TestTelegram(TestCase):
             stock_ex=e,
             currency=c,
             category=cat,
-            strategy=strategy,
+            #strategy=strategy,
             sector=s,
             )
 
