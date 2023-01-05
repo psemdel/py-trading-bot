@@ -27,19 +27,31 @@ class VBTfunc():
         else:
             return round(n/d-1,4) 
 
-def filter_intro(input_symbols,y_period):
-    symbols=[]
+def filter_intro_sub(s,y_period):
     td=datetime.today()
     min_y=td.year-y_period
     limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
-    
+
+    if s in INTRO: #should come from database
+        if INTRO[s]<limit_date:
+            return True
+    else:
+        return True
+    return False
+
+def filter_intro(input_symbols,y_period):
+    symbols=[]
     for s in input_symbols:
-        if s in INTRO: #should come from database
-            if INTRO[s]<limit_date:
-                symbols.append(s)
-        else:
+        if filter_intro_sub(s,y_period):
             symbols.append(s)   
     return symbols
+
+def filter_intro_action(input_actions,y_period):
+    actions=[]
+    for a in input_actions:
+        if filter_intro_sub(a.symbol,y_period):
+            actions.append(a)   
+    return actions
     
 def save(x_df,filename):
     x_df.to_csv('data/'+filename)

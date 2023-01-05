@@ -12,7 +12,7 @@ import warnings
 from datetime import datetime
 from django.utils import timezone
 
-from orders.models import Action, entry_order,\
+from orders.models import Action, ActionCategory, entry_order,\
                           exit_order, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector
@@ -46,7 +46,7 @@ class Report(models.Model):
         self.save()
 
     def daily_report_index(self,symbols):
-        return self.daily_report(symbols,None,index=True)  #exchange is none
+        return self.daily_report(symbols,None)  #exchange is none
         
     def daily_report_action(self,exchange,**kwargs):
         symbols=get_exchange_actions(exchange,**kwargs)
@@ -238,28 +238,23 @@ class Report(models.Model):
                       strategy, exchange, **kwargs):
         ent=False
         ex=False
-        ent_short=False
-        ex_short=False
         auto=False
+        short=False
+        
+        if (entries_short and not exits_short) or (exits_short and not entries_short):
+            short=True
         
         #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
-        if entries and not exits:
-            ent, auto=entry_order(symbol,strategy, exchange,False,True,**kwargs)
-        if exits and not entries:
-            ex, auto=exit_order(symbol,strategy, exchange,False,True, **kwargs)  
-        if entries_short and not exits_short:
-            ent_short, auto=entry_order(symbol,strategy, exchange,True,True,**kwargs)
-        if exits_short and not entries_short:
-            ex_short, auto=exit_order(symbol,strategy, exchange,True,True,**kwargs)
-        
-        if ent_short or ex_short:
-            short=True
+        if (entries and not exits) or (entries_short and not exits_short):
+            ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs)
+        if (exits and not entries) or (exits_short and not entries_short):  
+            ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs)  
             
         action=Action.objects.get(symbol=symbol)
-        if ent or ent_short or ex or ex_short:
+        if ent or ex:
             ent_ex_symbols=ListOfActions.objects.get_or_create(
                 report=self,
-                entry=(ent or ent_short),
+                entry=ent,
                 short=short,
                 auto=auto
                 )
@@ -368,7 +363,7 @@ class Report(models.Model):
         slow_strats=["hist_slow", "realmadrid"] #only those in use
         slow_strats_active=[]
         slow_cands={}
-        
+
         #=intersection(DICS,slow_strats) 
         for DIC in DICS:
             if DIC in slow_strats:
@@ -423,7 +418,6 @@ class Report(models.Model):
     def daily_report(self,input_symbols,exchange,**kwargs): #for one exchange and one sector
         try: 
             sector=None
-            self.it_is_index=kwargs.get("index",False)
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)
                 if exchange=="NYSE":
@@ -444,6 +438,11 @@ class Report(models.Model):
                 if self.pk is None:
                     self.save()
                     
+                ind_cat=ActionCategory.objects.get(short="IND")     
+                self.it_is_index=False
+                if ind_cat == Action.objects.get(symbol=input_symbols[0]).category:
+                    self.it_is_index=True
+ 
                 #clean the symbols
                 symbols=common.filter_intro(input_symbols,DAILY_REPORT_PERIOD)
 

@@ -721,7 +721,7 @@ class Strategy(models.Model):
 ### Index is like action, but it had to be separated, as an index cannot be bought directly
 class Action(models.Model):
     symbol=models.CharField(max_length=15, blank=False, primary_key=True)
-    ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
+    ib_ticker_explicit=models.CharField(max_length=15, blank=True,default="AAA") #for index especially
     name=models.CharField(max_length=100, blank=False)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
@@ -738,9 +738,11 @@ class Action(models.Model):
         ordering = ["name"]
         
     def ib_ticker(self):
-        t=self.symbol.split(".")
-        return t[0]      
-       # return self.ibticker
+        if self.ib_ticker_explicit!="AAA" and self.ib_ticker_explicit is not None:
+            return self.ib_ticker_explicit
+        else:
+            t=self.symbol.split(".")
+            return t[0] 
         
     def __str__(self):
         return self.name

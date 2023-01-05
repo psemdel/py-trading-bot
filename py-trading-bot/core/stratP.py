@@ -47,14 +47,10 @@ class StratPRD(Strat):
         
     def get_last_decision(self, symbol_complex_ent, symbol_complex_ex):
         for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):
-            if self.entries[symbol_complex_ent].values[-ii]:
+            if self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]:
                 return -1
-            elif self.exits[symbol_complex_ex].values[-ii]:
+            elif self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]:
                 return 1
-            elif self.entries_short[symbol_complex_ex].values[-ii]:
-                return 1
-            elif self.exits_short[symbol_complex_ent].values[-ii]:
-                return -1
         return 0
     
     def grow_past(self,distance, ma):
