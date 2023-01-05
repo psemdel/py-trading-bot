@@ -12,10 +12,11 @@ import warnings
 from datetime import datetime
 from django.utils import timezone
 
-from orders.models import Action, ActionCategory, entry_order,\
+from orders.models import Action, entry_order,\
                           exit_order, get_pf, get_candidates,\
                           get_exchange_actions,\
-                          StratCandidates, StockEx, Strategy, ActionSector
+                          StratCandidates, StockEx, Strategy, ActionSector,\
+                          check_ib_permission
       
 
 #which strategy to use for which stockexchange
@@ -46,14 +47,26 @@ class Report(models.Model):
         self.save()
 
     def daily_report_index(self,symbols):
-        return self.daily_report(symbols,None)  #exchange is none
+        use_IB=check_ib_permission(symbols)
+        actions=[]
+        
+        for symbol in symbols:
+            actions.append(Action.objects.get(symbol=symbol))
+        
+        return self.daily_report(actions,None,use_IB,index=True)  #exchange is none
         
     def daily_report_action(self,exchange,**kwargs):
-        symbols=get_exchange_actions(exchange,**kwargs)
-        return self.daily_report(symbols,exchange,**kwargs) 
+        use_IB, actions=get_exchange_actions(exchange,**kwargs)
+        return self.daily_report(actions,exchange,use_IB,**kwargs) 
 
 ### Logic for buying and selling actions preselected with retard strategy
-    def retard(self,presel,exchange,**kwargs):
+    def candidates_to_YF(self,symbols_to_YF, candidates):
+        candidates_YF=[]
+        for c in candidates:
+            candidates_YF.append(symbols_to_YF[c])
+        return candidates_YF
+
+    def retard(self,presel,exchange,st,**kwargs):
         #key="retard"+"_"+exchange
         if RETARD_MACRO:
             presel.call_strat("preselect_retard_macro")
@@ -76,9 +89,10 @@ class Report(models.Model):
             candidates=candidates_short
             
         auto=True
-        self.order_nostrat11(candidates, exchange, "retard", short, auto,**kwargs) #retard can be automatized
+        self.order_nosubstrat(self.candidates_to_YF(st.symbols_to_YF,candidates), exchange, "retard", short, auto,**kwargs) #retard can be automatized
 
-    def order_only_exit_strat11(self,candidates, exchange, key, short,**kwargs):
+    #YF symbol expected here
+    def order_only_exit_substrat(self,candidates, exchange, key, short,**kwargs):
         auto=True
         if len(candidates)==0:
             self.concat(key +" no candidates")        
@@ -90,40 +104,43 @@ class Report(models.Model):
                 
                 if ent:
                     action=Action.objects.get(symbol=symbol)
-                    ent_symbols=ListOfActions.objects.get_or_create(
+                    ent_symbols, _=ListOfActions.objects.get_or_create(
                         report=self,
                         entry=True,
                         short=short,
                         auto=auto
                         )
                     ent_symbols.actions.add(action)
-
-    def order_nostrat11_sub(self,symbol, short, ex, auto):
+                    
+    #YF symbol expected here
+    def order_nosubstrat_sub(self,symbol, short, ex, auto):
         if ex:
             action=Action.objects.get(symbol=symbol)
-            ex_symbols=ListOfActions.objects.get_or_create(
+            ex_symbols, _=ListOfActions.objects.get_or_create(
                 report=self,
                 entry=False,
                 short=short,
                 auto=auto
                 )
+            
             ex_symbols.actions.add(action)
-        
-    def order_nostrat11(self,candidates, exchange, key, short,auto,**kwargs):
+            
+    #YF symbol expected here
+    def order_nosubstrat(self,candidates, exchange, key, short,auto,**kwargs):
         #if there is a reversal the opposite pf needs to emptied
         pf_inv=get_pf(key,exchange,not short,**kwargs)
 
-        for symbol in pf_inv.retrieve():
+        for symbol in pf_inv.retrieve(): 
             if symbol not in candidates:
                 ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs)
-                self.order_nostrat11_sub(symbol, short, ex, auto)
+                self.order_nosubstrat_sub(symbol, short, ex, auto)
         
         #sell
         pf=get_pf(key,exchange,short,**kwargs)
         for symbol in pf.retrieve():
             if symbol not in candidates:
                 ex, auto=exit_order(symbol,key, exchange,short,auto, **kwargs)
-                self.order_nostrat11_sub(symbol, short, ex, auto)
+                self.order_nosubstrat_sub(symbol, short, ex, auto)
         
         if len(candidates)==0:
             self.concat(key +" no candidates")
@@ -135,7 +152,7 @@ class Report(models.Model):
             ent, auto=entry_order(symbol,key, exchange,short,auto, **kwargs)
             if ent:
                 action=Action.objects.get(symbol=symbol)
-                ent_symbols=ListOfActions.objects.get_or_create(
+                ent_symbols, _=ListOfActions.objects.get_or_create(
                     report=self,
                     entry=True,
                     short=short,
@@ -153,7 +170,7 @@ class Report(models.Model):
                 to_calculate=True
          
         if to_calculate:
-            wq=btP.WQPRD(st=st,exchange=exchange)
+            wq=btP.WQPRD(st.use_IB,st=st,exchange=exchange)
             
             for nb in range(102):
                 key="wq"+str(nb)
@@ -161,16 +178,16 @@ class Report(models.Model):
                     wq.call_wqa(nb)
                     wq.def_cand()
                     candidates=wq.get_candidates()
-                    self.order_nostrat11(candidates, exchange, key,False,auto,**kwargs) #fees are too high on IB for wq strategy
+                    self.order_nosubstrat(st.symbols_to_YF[candidates], exchange, key,False,auto,**kwargs) #fees are too high on IB for wq strategy
             print("Presel wq done for "+exchange)  
             
 ### Preselected actions strategy    
-    def presel_sub(self,l,st, exchange,**kwargs):
+    def presel_sub(self,use_IB,l,st, exchange,**kwargs):
         if len([v for v in ["retard","macd_vol","divergence","retard_manual"] if v in l])!=0:
-            presel=btP.Presel(st=st,exchange=exchange)
+            presel=btP.Presel(use_IB,st=st,exchange=exchange)
             #hist slow does not need code here
             if "retard" in l or "retard_manual" in l:   #auto is handled by DIC_PERFORM_ORDER in settings
-                self.retard(presel,exchange,**kwargs)
+                self.retard(presel,exchange,st,**kwargs)
             if "divergence" in l:     
                 if DIVERGENCE_MACRO:
                     presel.call_strat("preselect_divergence_blocked")
@@ -178,7 +195,7 @@ class Report(models.Model):
                     presel.call_strat("preselect_divergence")
                 
                 candidates, _=presel.get_candidates()
-                self.order_only_exit_strat11(candidates, exchange, "divergence", False,**kwargs)
+                self.order_only_exit_substrat(self.candidates_to_YF(st.symbols_to_YF,candidates), exchange, "divergence", False,**kwargs)
             if "macd_vol" in l:
                 presel.call_strat("preselect_macd_vol_macro")
                 candidates, candidates_short=presel.get_candidates()
@@ -199,7 +216,7 @@ class Report(models.Model):
                             st.entries_short[symbol_complex].values[-1],
                             st.exits[symbol_complex].values[-1],
                             st.entries[symbol_complex].values[-1],
-                            symbol, 
+                            st.symbols_to_YF[symbol], 
                             "macd_vol",
                             exchange,
                             **kwargs
@@ -210,7 +227,7 @@ class Report(models.Model):
                             st.exits[symbol_complex].values[-1],
                             st.entries_short[symbol_complex].values[-1],
                             st.exits_short[symbol_complex].values[-1],
-                            symbol, 
+                            st.symbols_to_YF[symbol], 
                             "macd_vol",
                             exchange,
                             **kwargs
@@ -223,14 +240,14 @@ class Report(models.Model):
         #NYSE needs to be subdivided
         if exchange=="NYSE":
             if 'sector' in kwargs:
-                self.presel_sub(DIC_PRESEL_SECTOR[kwargs['sector']],st,exchange,**kwargs)
+                self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[kwargs['sector']],st,exchange,**kwargs)
             else:    
                 for e in DIC_PRESEL_SECTOR: #try for each sector
-                    self.presel_sub(DIC_PRESEL_SECTOR[e],st,exchange,sector=e,**kwargs)
+                    self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[e],st,exchange,sector=e,**kwargs)
         else:
             DICS=[DIC_PRESEL[exchange]]
             for l in DICS:
-                self.presel_sub(l,st,exchange,**kwargs)
+                self.presel_sub(st.use_IB,l,st,exchange,**kwargs)
                            
 #all symbols should be from same stock exchange
 
@@ -246,13 +263,13 @@ class Report(models.Model):
         
         #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
         if (entries and not exits) or (entries_short and not exits_short):
-            ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs)
+            ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs) #YF symbol expected here
         if (exits and not entries) or (exits_short and not entries_short):  
-            ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs)  
+            ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs) #YF symbol expected here
             
         action=Action.objects.get(symbol=symbol)
         if ent or ex:
-            ent_ex_symbols=ListOfActions.objects.get_or_create(
+            ent_ex_symbols, _=ListOfActions.objects.get_or_create(
                 report=self,
                 entry=ent,
                 short=short,
@@ -260,7 +277,7 @@ class Report(models.Model):
                 )
             ent_ex_symbols.actions.add(action)
             
-    def populate_report(self, symbols, st, sk, sma, sp):
+    def populate_report(self, symbols, symbols_to_YF, st, sk, sma, sp):
         for symbol in symbols:
             if math.isnan(st.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
@@ -271,7 +288,7 @@ class Report(models.Model):
                     #Necessary because of the presence of NaN
                     warnings.simplefilter("ignore", category=RuntimeWarning)
                     ar=ActionReport(
-                        action=Action.objects.get(symbol=symbol), 
+                        action=Action.objects.get(symbol=symbols_to_YF[symbol]), 
                         report=Report.objects.get(pk=self.pk))
         
                     grow_past50_raw=st.grow_past(50, False)
@@ -347,7 +364,7 @@ class Report(models.Model):
                         stnormal.exits[symbol_complex_ex_normal].values[-1],
                         stnormal.entries_short[symbol_complex_ex_normal].values[-1],
                         stnormal.exits_short[symbol_complex_ent_normal].values[-1],
-                        symbol, 
+                        stnormal.symbols_to_YF[symbol], 
                         "normal",
                         exchange,
                         sector=sector,
@@ -363,7 +380,7 @@ class Report(models.Model):
         slow_strats=["hist_slow", "realmadrid"] #only those in use
         slow_strats_active=[]
         slow_cands={}
-
+        
         #=intersection(DICS,slow_strats) 
         for DIC in DICS:
             if DIC in slow_strats:
@@ -380,13 +397,13 @@ class Report(models.Model):
             symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
             
             for DIC in slow_strats_active:
-                if symbol in slow_cands[DIC]: #list of candidates
+                if st.symbols_to_YF[symbol] in slow_cands[DIC]: #list of candidates
                     self.define_ent_ex(
                         st.entries[symbol_complex_ent].values[-1],
                         st.exits[symbol_complex_ent].values[-1],
                         st.entries_short[symbol_complex_ent].values[-1],
                         st.exits_short[symbol_complex_ent].values[-1],
-                        symbol, 
+                        st.symbols_to_YF[symbol], 
                         DIC,
                         exchange,
                         sector=sec,
@@ -398,26 +415,27 @@ class Report(models.Model):
             pf_div=get_pf("divergence",exchange,False,sector=sector)
         ##Change underlying strategy
         st.call_strat("stratDiv")
-        ##only_exit_strat11
+        ##only_exit_substrat
         for symbol in symbols:
             symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
 
             if "divergence" in DICS and exchange is not None and\
-                    symbol in pf_div.retrieve(): 
+                    st.symbols_to_YF[symbol] in pf_div.retrieve(): 
                     self.define_ent_ex(
                         False,
                         st.exits[symbol_complex_ent].values[-1],
                         False,
                         st.exits_short[symbol_complex_ent].values[-1],
-                        symbol, 
+                        st.symbols_to_YF[symbol], 
                         "divergence",
                         exchange,
                         sector=sector,
                         **kwargs)
-                
-    def daily_report(self,input_symbols,exchange,**kwargs): #for one exchange and one sector
+    
+    def daily_report(self,actions,exchange,use_IB,**kwargs): #for one exchange and one sector
         try: 
             sector=None
+            self.it_is_index=kwargs.get("index",False)
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)
                 if exchange=="NYSE":
@@ -434,32 +452,27 @@ class Report(models.Model):
                 self.stock_ex=StockEx.objects.get(name="Paris") #convention
                 DICS=[]
   
-            if input_symbols!=[]:
+            if len(actions)!=0:
                 if self.pk is None:
                     self.save()
                     
-                ind_cat=ActionCategory.objects.get(short="IND")     
-                self.it_is_index=False
-                if ind_cat == Action.objects.get(symbol=input_symbols[0]).category:
-                    self.it_is_index=True
- 
                 #clean the symbols
-                symbols=common.filter_intro(input_symbols,DAILY_REPORT_PERIOD)
-
+                actions=common.filter_intro_action(actions,DAILY_REPORT_PERIOD)
+                    
                 #load the data and
                 #calculats everything used afterwards
                 #also used for "normal strat"
-                stnormal=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",**kwargs)
-                
+                stnormal=stratP.StratPRD(actions,str(DAILY_REPORT_PERIOD)+"y",use_IB,**kwargs)
+
                 ##Perform a single strategy on predefined actions
-                self.perform_normal_strat(symbols, stnormal, exchange, sector, **kwargs)
+                self.perform_normal_strat(stnormal.symbols, stnormal, exchange, sector, **kwargs)
                 
                 ##Populate a report with different statistics
                 sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
                 sma=ic.VBTMA.run(stnormal.close)
                 sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
                 
-                st=stratP.StratPRD(symbols,str(DAILY_REPORT_PERIOD)+"y",
+                st=stratP.StratPRD(actions,str(DAILY_REPORT_PERIOD)+"y",use_IB,
                                         open_=stnormal.open,
                                         high=stnormal.high,
                                         low=stnormal.low,
@@ -473,14 +486,14 @@ class Report(models.Model):
                                        **kwargs)
                 st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
                 
-                self.populate_report(symbols, st, sk, sma, sp)
+                self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, st, sk, sma, sp)
                 print("Strat daily report written " +(exchange or ""))
 
                 ##Perform strategies that rely on the regular preselection of a candidate
-                self.perform_slow_strats(symbols, DICS, exchange, sector, st, **kwargs)
+                self.perform_slow_strats(stnormal.symbols, DICS, exchange, sector, st, **kwargs)
                 
                 ##Perform the strategy divergence
-                self.perform_divergence(symbols,exchange,sector, st, DIC_PRESEL, DICS, **kwargs)
+                self.perform_divergence(stnormal.symbols,exchange,sector, st, DIC_PRESEL, DICS, **kwargs)
 
                 print("Slow strategy proceeded") 
                 if sector is not None:

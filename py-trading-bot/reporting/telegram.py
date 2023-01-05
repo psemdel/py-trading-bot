@@ -44,6 +44,8 @@ def start():
             TELEGRAM_TOKEN = f.read().strip()
     else:
         TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN') 
+        
+   
     res=async_sched.delay(TELEGRAM_TOKEN)
     print("bot started, task id " + str(res.id))
 
@@ -148,7 +150,7 @@ class MyScheduler():
             alert.active=False
             alert.save()
         
-    def check_change(self,ratio, symbol,short,**kwargs):
+    def check_change(self,ratio, action,short,**kwargs):
         try:
             symbols_opportunity=constants.INDEXES+constants.RAW
             now=timezone.now().time()
@@ -158,7 +160,6 @@ class MyScheduler():
             alarming=False
             opportunity=False
             opening=bool(kwargs.get("opening",False))
-            action=Action.objects.get(symbol=symbol)
             stock_open=(now >action.stock_ex.opening_time and\
                         now <action.stock_ex.closing_time)
             
@@ -171,7 +172,7 @@ class MyScheduler():
                 if (short and ratio>(ALERT_THRESHOLD-ALERT_HYST)) or (not short and ratio < -(ALERT_THRESHOLD-ALERT_HYST)):
                     alerting_reco=True    
                     
-                if (symbol in symbols_opportunity and not short and ratio>ALERT_THRESHOLD):
+                if (action.symbol in symbols_opportunity and not short and ratio>ALERT_THRESHOLD):
                     alerting=True
                     opportunity=True
                     if ratio>ALARM_THRESHOLD:
@@ -236,15 +237,12 @@ class MyScheduler():
             print("line " + str(exc_tb.tb_lineno))
             pass
 
-    def check_cours(self,symbols, short,**kwargs):
+    def check_cours(self,actions, short,**kwargs):
       #  if symbols!=[]:
         try:
-            for symbol in symbols: #otherwise issue with NaN
-                
+            for action in actions: #otherwise issue with NaN
                 try:
                     #check ETF --> better to check the underlying
-                    if not kwargs.get("index",False):
-                        action=Action.objects.get(symbol=symbol)
                         indexes=None
                         if action.category==ActionCategory.objects.get(short="ETFLONG"):
                             indexes=Action.objects.filter(etf_long=action)
@@ -252,14 +250,14 @@ class MyScheduler():
                             indexes=Action.objects.filter(etf_short=action)
                        
                         if indexes is not None and len(indexes)>0:
-                            symbol=indexes[0].symbol
+                            action=indexes[0]
                 except Exception as msg:
                      print("exception in check change ETF")
                      print(msg)
-                     print(symbol)
+                     print(action.symbol)
 
-                ratio=get_ratio(symbol,**kwargs)
-                self.check_change(ratio, symbol,short,**kwargs)
+                ratio=get_ratio(action,**kwargs)
+                self.check_change(ratio, action,short,**kwargs)
                 
         except Exception as msg:
             print("exception in check_cours ")
@@ -287,11 +285,9 @@ class MyScheduler():
                 indexes = Action.objects.filter(c1&c3)
             else:
                 indexes = Action.objects.filter(c3)
-            
-            symbols=[x.symbol for x in indexes]
 
-            self.check_cours(symbols, False,index=True,**kwargs)
-            self.check_cours(symbols, True,index=True,**kwargs)
+            self.check_cours(indexes, False,index=True,**kwargs)
+            self.check_cours(indexes, True,index=True,**kwargs)
             
         except Exception as msg:
             print("exception in check_index")
@@ -303,23 +299,19 @@ class MyScheduler():
     def check_pf(self,**kwargs):
         try:
             print("check pf")
-            symbols=pf_retrieve_all(**kwargs)
-            symbols_short=pf_retrieve_all(short=True,**kwargs)
+            actions=pf_retrieve_all(**kwargs)
+            actions_short=pf_retrieve_all(short=True,**kwargs)
             
-            try:
-                ib_pf, ib_pf_short=retrieve_ib_pf()
-                
-                symbols.extend(x for x in ib_pf if x not in symbols)
-                symbols_short.extend(x for x in ib_pf if x not in symbols_short)
-            except:
-                pass #no IB started for instance
+            ib_pf, ib_pf_short=retrieve_ib_pf()
+            actions.extend(x for x in ib_pf if x not in actions)
+            actions_short.extend(x for x in ib_pf if x not in actions_short)
             
-            if len(symbols)>0:
-                self.check_sl(symbols)
-                self.check_cours(symbols, False,**kwargs)
+            if len(actions)>0:
+                self.check_sl(actions)
+                self.check_cours(actions, False,**kwargs)
         
-            if len(symbols_short)>0:
-                self.check_cours(symbols_short, True,**kwargs)
+            if len(actions_short)>0:
+                self.check_cours(actions_short, True,**kwargs)
                 
         except Exception as msg:
             print("exception in check_pf")
@@ -328,23 +320,22 @@ class MyScheduler():
             print("line " + str(exc_tb.tb_lineno))
             pass
 
-    def check_sl(self,symbols,**kwargs):
-        for symbol in symbols:
-            action=Action.objects.get(symbol=symbol)
+    def check_sl(self,actions,**kwargs):
+        for action in actions:
             c1 = Q(action=action)
             c2 = Q(active=True)
             order=Order.objects.filter(c1 & c2)
             
             if len(order)>0:
                 if order[0].sl_threshold is not None:
-                    cours_pres=get_last_price(symbol)
+                    cours_pres=get_last_price(action)
                     if cours_pres<order[0].sl_threshold:
-                        exit_order(symbol,
+                        exit_order(action.symbol,
                                    order[0].pf.strategy, 
                                    order[0].pf.strategy.stock_ex.name,
                                    False,
                                    **kwargs)
-                        self.send_exit_msg(symbol,suffix="stop loss")
+                        self.send_exit_msg(action.symbol,suffix="stop loss")
 
     def send_order(self,report):
         for auto in [False, True]:

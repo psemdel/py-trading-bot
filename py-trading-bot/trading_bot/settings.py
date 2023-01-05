@@ -3,10 +3,6 @@
 SUMMER_TIME_US=True
 SUMMER_TIME_EUROPE=True
 
-## IB configuration
-IB_LOCALHOST='127.0.0.1'
-IB_PORT=7496
-
 ## Preselection to be used for the different stock exchanges ##
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
@@ -45,7 +41,7 @@ ALERT_HYST=1 #margin to avoid alert/recovery at high frequency
 TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
 
 ## Order settings ##
-USE_IB_FOR_DATA=False #use IB for Data or YF
+USE_IB_FOR_DATA=True #use IB for Data or YF
 IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"] #"BVME.ETF"
 IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME.ETF"]
 IB_STOCK_NO_PERMISSION=["NDX"]
