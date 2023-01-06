@@ -13,15 +13,14 @@ Created on Sat May 14 22:36:16 2022
 
 @author: maxime
 """
-from orders.models import retrieve_data
+from orders.ib import retrieve_data
 import core.indicators as ic
 
 from core.strat import Strat
 
 # Like strat but for production
 class StratPRD(Strat):
-    def __init__(self,symbols,period,**kwargs):
-        self.symbols=symbols
+    def __init__(self,actions,period,use_IB,**kwargs):
         self.period=period
         
         if kwargs.get("close") is not None:
@@ -38,9 +37,22 @@ class StratPRD(Strat):
         else:
             self.high, self.low, self.close, self.open,self.volume,\
             self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind\
-            =retrieve_data(symbols,period,**kwargs)
+            =retrieve_data(actions,period,use_IB,**kwargs)
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
-    
+        self.use_IB=use_IB
+        self.actions=actions
+        
+        self.symbols_to_YF={}
+        self.symbols=[]
+        
+        for a in actions:
+            if use_IB:
+                s=a.ib_ticker()
+            else:
+                s=a.symbol
+            self.symbols.append(s)
+            self.symbols_to_YF[s]=a.symbol
+        
     def call_strat(self,name,**kwargs):
         meth=getattr(self,name)
         meth(prd=True,**kwargs)

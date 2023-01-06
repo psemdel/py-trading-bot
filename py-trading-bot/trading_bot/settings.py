@@ -3,6 +3,10 @@
 SUMMER_TIME_US=True
 SUMMER_TIME_EUROPE=True
 
+## IB configuration
+IB_LOCALHOST='127.0.0.1'
+IB_PORT=7496
+
 ## Preselection to be used for the different stock exchanges ##
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"

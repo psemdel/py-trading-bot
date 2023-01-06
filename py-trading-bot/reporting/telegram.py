@@ -20,8 +20,9 @@ import vectorbtpro as vbt
 from celery import shared_task
 
 from reporting.models import Report, Alert, ListOfActions
-from orders.models import Action, StockEx, pf_retrieve_all, retrieve_ib_pf, get_ratio, get_last_price,\
-                          exit_order, Order, ActionCategory
+
+from orders.ib import retrieve_ib_pf, get_last_price, get_ratio, exit_order
+from orders.models import Action, StockEx, Order, ActionCategory, pf_retrieve_all
 from core import constants
 
 from trading_bot.settings import (PF_CHECK, INDEX_CHECK, REPORT_17h, REPORT_22h, HEARTBEAT, 

@@ -12,8 +12,9 @@ import warnings
 from datetime import datetime
 from django.utils import timezone
 
-from orders.models import Action, entry_order,\
-                          exit_order, get_pf, get_candidates,\
+from orders.ib import exit_order, entry_order
+
+from orders.models import Action, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission
