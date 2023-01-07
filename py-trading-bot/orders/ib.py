@@ -226,9 +226,9 @@ def retrieve_ib_pf(**kwargs):
     
             if action is not None:            
                 if pos.position>0:
-                    pf.append(action)
+                    pf.append(action.symbol)
                 else:
-                    pf_short.append(action)
+                    pf_short.append(action.symbol)
 
         return pf, pf_short
     else:
@@ -437,7 +437,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                 order.entering_price=1.0                    
             
             order.save()
-            pf.append(symbol)
+            pf.append(action.symbol)
             pf.save()
             ocap.capital-=1
             ocap.save()
@@ -449,6 +449,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
     except Exception as msg:
         print("exception in " + __name__)
         print(msg)
+        print("symbol: "+symbol)
         _, e_, exc_tb = sys.exc_info()
         print("line " + str(exc_tb.tb_lineno))
         pass
@@ -542,8 +543,7 @@ def retrieve_data_ib(actions,period,**kwargs):
             missing_index='drop',
             timeframe="1 day", #see also interval_YF_to_ib
             exchanges=exchanges,
-            indexes=indexes,
-            **kwargs),\
+            indexes=indexes),\
             ib_symbols,\
             index_symbol_ib
     except Exception as msg:
@@ -579,8 +579,12 @@ def retrieve_data(actions,period,use_IB,**kwargs):
         raise ValueError("List of symbols empty")
     else:
         if use_IB:
-            cours, symbols, index_symbol=retrieve_data_ib(actions,period,**kwargs)
-        else:
+            try:
+                cours, symbols, index_symbol=retrieve_data_ib(actions,period,**kwargs)
+            except:
+                print("IB retrieval of symbol failed, fallback on YF")
+                use_IB=False #fallback
+        if not use_IB:
             cours, symbols, index_symbol=retrieve_data_YF(actions,period,**kwargs)
         
         print(symbols)
@@ -604,7 +608,7 @@ def retrieve_data(actions,period,use_IB,**kwargs):
         
         return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind
+               cours_volume_ind, use_IB
                
                
                

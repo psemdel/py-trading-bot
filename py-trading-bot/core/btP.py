@@ -54,7 +54,7 @@ class Presel(BT):
             self.period=kwargs.get("period1")
             
             self.high, self.low, self.close, self.open,self.volume,\
-            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind\
+            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB\
             =retrieve_data(self.actions,self.period,use_IB )
                 
         self.candidates=[[] for ii in range(len(self.close))]

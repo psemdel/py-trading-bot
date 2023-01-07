@@ -7,6 +7,7 @@ Created on Tue Jun 28 21:22:48 2022
 """
 
 import unittest
+import os
 from django.test import TestCase
 import reporting.telegram as tel
 from reporting.models import Alert
@@ -29,7 +30,7 @@ class TestTelegram(TestCase):
         s=ActionSector.objects.create(name="sec")
         
         self.strategy=strategy
-        a=Action.objects.create(
+        self.a=Action.objects.create(
             symbol='AC.PA',
             #ib_ticker='AC',
             name="Accor",
@@ -39,8 +40,7 @@ class TestTelegram(TestCase):
             #strategy=strategy,
             sector=s,
             )
-        self.a=a
-        a=Action.objects.create(
+        self.a2=Action.objects.create(
             symbol='AI.PA',
             #ib_ticker='AC',
             name="Air liquide",
@@ -55,24 +55,25 @@ class TestTelegram(TestCase):
         self.sched=tel.MyScheduler(bot,test=True)
     
     #to be tested during opening hours
+    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", \
+    reason="Travis tests can be outside of market opening time.")
     def test_check_change(self):
-        self.sched.check_change(1, "AC.PA",False)
+        self.sched.check_change(1, self.a,False)
         self.assertEqual(len(Alert.objects.all()),0)       
-        self.sched.check_change(10, "AC.PA",False)
+        self.sched.check_change(10, self.a,False)
         self.assertEqual(len(Alert.objects.all()),0) 
-        self.sched.check_change(-1, "AC.PA",False)
+        self.sched.check_change(-1, self.a,False)
         self.assertEqual(len(Alert.objects.all()),0) 
-        self.sched.check_change(-4, "AC.PA",False)
+        self.sched.check_change(-4, self.a,False)
         self.assertEqual(len(Alert.objects.all()),1) 
-        self.sched.check_change(1, "AI.PA",True)
+        self.sched.check_change(1, self.a2,True)
         self.assertEqual(len(Alert.objects.all()),1)   
-        self.sched.check_change(-1, "AI.PA",True)
+        self.sched.check_change(-1, self.a2,True)
         self.assertEqual(len(Alert.objects.all()),1) 
-        self.sched.check_change(-4, "AI.PA",True)
+        self.sched.check_change(-4, self.a2,True)
         self.assertEqual(len(Alert.objects.all()),1) 
-        self.sched.check_change(10, "AC.PA",True)
+        self.sched.check_change(10, self.a,True)
         self.assertEqual(len(Alert.objects.all()),2) 
- 
 
 if __name__ == '__main__':
     unittest.main() 

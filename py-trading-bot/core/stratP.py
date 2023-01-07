@@ -20,8 +20,7 @@ from core.strat import Strat
 
 # Like strat but for production
 class StratPRD(Strat):
-    def __init__(self,actions,period,use_IB,**kwargs):
-        self.period=period
+    def __init__(self,actions,use_IB,**kwargs):
         
         if kwargs.get("close") is not None:
             self.open=kwargs.get("open_")
@@ -35,8 +34,9 @@ class StratPRD(Strat):
             self.close_ind=kwargs.get("close_ind")
             self.volume_ind=kwargs.get("volume_ind")
         else:
+            period=kwargs.get("period1")
             self.high, self.low, self.close, self.open,self.volume,\
-            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind\
+            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB\
             =retrieve_data(actions,period,use_IB,**kwargs)
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
         self.use_IB=use_IB

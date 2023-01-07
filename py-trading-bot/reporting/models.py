@@ -30,7 +30,7 @@ class ListOfActions(models.Model):
     actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
 
 class Report(models.Model):
-    date=models.DateTimeField(null=False, blank=False, default=datetime.now)   #)auto_now_add=True
+    date=models.DateTimeField(null=False, blank=False, default=timezone.now())   #)auto_now_add=True
     text=models.TextField(blank=True)
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
     it_is_index=models.BooleanField(blank=False,default=False)
@@ -463,7 +463,7 @@ class Report(models.Model):
                 #load the data and
                 #calculats everything used afterwards
                 #also used for "normal strat"
-                stnormal=stratP.StratPRD(actions,str(DAILY_REPORT_PERIOD)+"y",use_IB,**kwargs)
+                stnormal=stratP.StratPRD(actions,use_IB,period1=str(DAILY_REPORT_PERIOD)+"y",**kwargs)
 
                 ##Perform a single strategy on predefined actions
                 self.perform_normal_strat(stnormal.symbols, stnormal, exchange, sector, **kwargs)
@@ -473,7 +473,7 @@ class Report(models.Model):
                 sma=ic.VBTMA.run(stnormal.close)
                 sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
                 
-                st=stratP.StratPRD(actions,str(DAILY_REPORT_PERIOD)+"y",use_IB,
+                st=stratP.StratPRD(actions,use_IB,
                                         open_=stnormal.open,
                                         high=stnormal.high,
                                         low=stnormal.low,

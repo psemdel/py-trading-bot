@@ -24,7 +24,7 @@ class TestStratP(TestCase):
         strategy=Strategy.objects.create(name="none")
         s=ActionSector.objects.create(name="sec")
         
-        Action.objects.create(
+        self.a=Action.objects.create(
             symbol='AC.PA',
             #ib_ticker='AC',
             name="Accor",
@@ -34,7 +34,7 @@ class TestStratP(TestCase):
             #strategy=strategy,
             sector=s,
             )
-        Action.objects.create(
+        self.a2=Action.objects.create(
             symbol='AI.PA',
             #ib_ticker='AC',
             name="Air liquide",
@@ -44,7 +44,7 @@ class TestStratP(TestCase):
             #strategy=strategy,
             sector=s,
             )
-        Action.objects.create(
+        self.a3=Action.objects.create(
             symbol='AIR.PA',
             #ib_ticker='AC',
             name="Airbus",
@@ -54,8 +54,8 @@ class TestStratP(TestCase):
             #strategy=strategy,
             sector=s,
             )
-        symbols=['AC.PA','AI.PA','AIR.PA'] 
-        self.st=stratP.StratPRD(symbols,"1y")
+        self.actions=[self.a, self.a2, self.a3]
+        self.st=stratP.StratPRD(self.actions,False,period1="1y")
         
     def test_stratPRD(self):
         st=self.st
