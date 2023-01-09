@@ -299,13 +299,12 @@ class MyScheduler():
 
     def check_pf(self,**kwargs):
         try:
-            print("check pf")
             actions=pf_retrieve_all(**kwargs)
             actions_short=pf_retrieve_all(short=True,**kwargs)
-            
             ib_pf, ib_pf_short=retrieve_ib_pf()
+            
             actions.extend(x for x in ib_pf if x not in actions)
-            actions_short.extend(x for x in ib_pf if x not in actions_short)
+            actions_short.extend(x for x in ib_pf_short if x not in actions_short)
             
             if len(actions)>0:
                 self.check_sl(actions)

@@ -3,7 +3,7 @@ from django.db.models import Q
 
 import sys
 from trading_bot.settings import ( USE_IB_FOR_DATA, IB_STOCKEX_NO_PERMISSION, IB_STOCK_NO_PERMISSION)
-
+import datetime
 #from orders.ib import 
 
 
@@ -131,8 +131,8 @@ class StockEx(models.Model):
     name=models.CharField(max_length=100, blank=False)
     fees=models.ForeignKey('Fees',on_delete=models.CASCADE)
     ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
-    opening_time=models.TimeField(default="09:00:00")
-    closing_time=models.TimeField(default="17:00:00")
+    opening_time=models.TimeField(default=datetime.time(9, 00))
+    closing_time=models.TimeField(default=datetime.time(17, 00))
     
     def __str__(self):
         return self.name    
@@ -254,8 +254,8 @@ class PF(models.Model):
             self.save()
         except Exception as msg:
             print("exception in " + __name__)
-            print(symbol)
             print(msg)
+            print("symbol: "+ symbol)
             _, e_, exc_tb = sys.exc_info()
             print("line " + str(exc_tb.tb_lineno))
             pass    

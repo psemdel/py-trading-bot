@@ -210,25 +210,26 @@ def retrieve_ib_pf(**kwargs):
     if kwargs['client']:
         print("myIB retrieve")
         action=None
-        
         pf=[]
         pf_short=[]
         
         for pos in kwargs['client'].positions():
             contract=pos.contract
             actions=Action.objects.filter(symbol__contains=contract.localSymbol)
-            if len(actions)==1:
+            if len(actions)==0:
+                action=None
+            elif len(actions)==1:
                 action=actions[0]
             else:
                 for a in actions:
                     if a.ib_ticker()==contract.localSymbol:
                         action=a
-    
+            
             if action is not None:            
                 if pos.position>0:
-                    pf.append(action.symbol)
+                    pf.append(action)
                 else:
-                    pf_short.append(action.symbol)
+                    pf_short.append(action)
 
         return pf, pf_short
     else:
