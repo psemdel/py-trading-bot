@@ -565,7 +565,7 @@ def retrieve_data_YF(actions,period,**kwargs):
         else:
             _, index_symbol=exchange_to_index_symbol(actions[0].stock_ex.ib_ticker)  
             all_symbols=symbols+[index_symbol]
-            
+
         return vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs),\
                symbols,\
                index_symbol    
@@ -587,10 +587,6 @@ def retrieve_data(actions,period,use_IB,**kwargs):
                 use_IB=False #fallback
         if not use_IB:
             cours, symbols, index_symbol=retrieve_data_YF(actions,period,**kwargs)
-        
-        print(symbols)
-        print(index_symbol)
-        print(cours.get('Open').columns)
 
         cours_action=cours.select(symbols)
         cours_open =cours_action.get('Open')

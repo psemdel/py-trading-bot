@@ -463,7 +463,7 @@ class Report(models.Model):
                 #load the data and
                 #calculats everything used afterwards
                 #also used for "normal strat"
-                stnormal=stratP.StratPRD(actions,use_IB,period1=str(DAILY_REPORT_PERIOD)+"y",**kwargs)
+                stnormal=stratP.StratPRD(use_IB,actions1=actions,period1=str(DAILY_REPORT_PERIOD)+"y",**kwargs)
 
                 ##Perform a single strategy on predefined actions
                 self.perform_normal_strat(stnormal.symbols, stnormal, exchange, sector, **kwargs)
@@ -473,7 +473,8 @@ class Report(models.Model):
                 sma=ic.VBTMA.run(stnormal.close)
                 sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
                 
-                st=stratP.StratPRD(actions,use_IB,
+                st=stratP.StratPRD(use_IB,
+                                        actions1=actions,
                                         open_=stnormal.open,
                                         high=stnormal.high,
                                         low=stnormal.low,

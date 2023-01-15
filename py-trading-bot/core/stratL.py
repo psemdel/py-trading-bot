@@ -10,10 +10,12 @@ import core.indicators as ic
 
 from core.strat import Strat
 from core.bt import BT, WQ
+from core import common, constants
 import numpy as np
 import pandas as pd
 
 ### To back stage recent data
+#Need to be called outside of Django!!!
 # As strat but adapted to download every time the data
 class StratLIVE(Strat):
     def __init__(self,symbols,period,index_symbol,**kwargs):
@@ -50,7 +52,9 @@ class StratLIVE(Strat):
         self.close_ind=cours_index.get('Close')
         self.volume_ind=cours_index.get('Volume')
 
+
 #Same as bt but for recent data
+#Only import with strat supported
 class btLIVE(BT):
     def __init__(self,longshort,**kwargs):
         st=kwargs.get("st")
@@ -100,7 +104,88 @@ class btLIVE(BT):
         self.symbols_simple=self.close.columns.values
         self.symbols_complex=self.ent11.columns.values
          
-        self.last_order_dir="long"    
+        self.last_order_dir="long" 
+
+#Allow you to evaluate how performed preselection strategies on past period finishing today, so in a close past
+def scan_presel_all(period,**kwargs):
+    d={"CAC40":{"symbols":constants.CAC40,"index":"^FCHI"},
+       "DAX":  {"symbols":constants.DAX,"index":"^GDAXI"},
+       "NASDAQ":  {"symbols":constants.NASDAQ,"index":"^IXIC"}
+    }
+    presel_dic=["vol","realmadrid","retard","retard_macro","divergence","divergence_blocked",7,31,53,54]
+    res={}
+    
+    for k, v in d.items():
+        symbols=common.filter_intro(v["symbols"],period)
+        st=StratLIVE(symbols,str(period)+"y",v["index"])
+        res=scan_presel(presel_dic, k,res=res,st=st,**kwargs)
+        
+    return res
+
+def scan_presel(presel_dic, key,**kwargs):
+    res=kwargs.get('res',{})
+    res[key]={}
+    st=kwargs.get("st")
+    fees=kwargs.get("fees",0)
+    #limit the range for the calculation of the return to x market days, 
+    #set your period to be significantly longer than the restriction to avoid calculation errors
+    restriction=kwargs.get("restriction",None) 
+    
+    for p in presel_dic:
+        bti=btLIVE("long",st=st) #has to be recalculated everytime, otherwise it caches
+        if p=="vol":
+            bti.preselect_vol()
+        elif p=="retard":
+            bti.preselect_retard()
+        elif p=="macd_vol":
+            bti.preselect_macd_vol()
+        elif p=="hist_vol":
+            bti.preselect_hist_vol()
+        elif p=="divergence":
+            bti.preselect_divergence()
+        elif p=="macd_vol_macro":
+            bti.preselect_macd_vol_macro()
+        elif p=="retard_macro":
+            bti.preselect_retard_macro()
+        elif p=="divergence_blocked":
+            bti.preselect_divergence_blocked()
+        elif p=="macd_vol_slow":
+            bti.preselect_macd_vol_slow()
+        elif p=="realmadrid":
+            bti.preselect_realmadrid()
+        elif p=="macd_vol_slow":
+            bti.preselect_macd_vol_slow()
+        elif p=="hist_vol_slow":
+            bti.preselect_hist_vol_slow() 
+        elif type(p)==int:
+            bti=WQLIVE(p,st=st)
+            bti.def_cand()
+            bti.calculate(nostrat11=True)
+            
+        if restriction is not None and type(restriction)==int:
+            pf=vbt.Portfolio.from_signals(bti.close[-restriction:], 
+                                          bti.entries[-restriction:],
+                                          bti.exits[-restriction:],
+                                          short_entries=bti.entries_short[-restriction:],
+                                          short_exits  =bti.exits_short[-restriction:],
+                                          freq="1d",
+                                          call_seq='auto',
+                                          cash_sharing=True,
+                                          fees=fees
+                                 )            
+        else:
+            pf=vbt.Portfolio.from_signals(bti.close, 
+                                          bti.entries,
+                                          bti.exits,
+                                          short_entries=bti.entries_short,
+                                          short_exits  =bti.exits_short,
+                                          freq="1d",
+                                          call_seq='auto',
+                                          cash_sharing=True,
+                                          fees=fees
+                                 )
+        res[key][p]=pf.get_total_return()
+    return res
         
 #Same as WQ but for recent data        
 class WQLIVE(WQ):

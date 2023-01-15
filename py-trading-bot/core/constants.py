@@ -150,7 +150,7 @@ DAX=[
     "SIE.DE",
     "SRT.DE",
     "SY1.DE",
-    "VNA.DE"
+    "VNA.DE",
     "VOW3.DE",
     "ZAL.DE",
     ]
