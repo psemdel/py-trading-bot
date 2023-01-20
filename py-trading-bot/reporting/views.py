@@ -103,12 +103,12 @@ def trigger_22h(request):
             report=Report()
             report.save()
         
-            st=report.daily_report_action("NYSE",sector=s) 
+            st=report.daily_report_action("NYSE",sec=s) 
             if st is None:
                 raise ValueError("The creation of the strategy failed, report creation interrupted")
             
-            report.presel(st,"NYSE",sector=s)
-            report.presel_wq(st,"NYSE",sector=s)
+            report.presel(st,"NYSE",sec=s)
+            report.presel_wq(st,"NYSE",sec=s)
             send_order_test(report)
     
         report2=Report()

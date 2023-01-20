@@ -6,9 +6,7 @@ Created on Fri Jan  6 19:41:08 2023
 @author: maxime
 """
 
-from trading_bot.settings import (PERFORM_ORDER, USE_IB_FOR_DATA,DIC_PERFORM_ORDER,
-                                  IB_STOCKEX_NO_PERMISSION, IB_STOCK_NO_PERMISSION,
-                                  IB_LOCALHOST, IB_PORT)
+from trading_bot.settings import _settings
 from vectorbtpro.data.custom import RemoteData
 from vectorbtpro import _typing as tp
 import warnings
@@ -22,12 +20,14 @@ from django.utils import timezone
 import vectorbtpro as vbt
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
+
 from orders.models import (Action, Order, ActionCategory, Excluded, Strategy,
                            check_exchange_ib_permission, action_to_etf,
                            get_pf, get_order_capital, period_YF_to_ib,
                            exchange_to_index_symbol
                            )
-
 #Module to handle IB connection
 
 ##Part of the code that should be in _settings.py in vbt
@@ -43,7 +43,7 @@ data = ChildDict(
     ),
 )
 '''
-ib_cfg={"localhost":IB_LOCALHOST,"port":IB_PORT}
+ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
 ib_global={"connected":False, "client":None}
 
 ###Part of the code that should be in data/custom.py in vbt
@@ -198,13 +198,23 @@ def get_tradable_contract_ib(action,short,**kwargs):
         print("stock "+action.ib_ticker() + " not found")
         return None
     else:
-        if action.stock_ex.ib_ticker not in IB_STOCKEX_NO_PERMISSION:
+        if action.stock_ex.ib_ticker not in _settings["IB_STOCKEX_NO_PERMISSION"]:
             action=action_to_etf(action,short) #if index replace the index through the corresponding ETF
             return IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,False)
         else:
             print("stock "+action.ib_ticker() + " not in authorized stock exchange")
             return None
 
+@connect_ib
+def retrieve_quantity(in_action, **kwargs):
+    if kwargs['client']:
+        for pos in kwargs['client'].positions():
+            contract=pos.contract
+            #actions=Action.objects.filter(symbol__contains=contract.localSymbol)
+            if in_action.ib_ticker()==contract.localSymbol:
+                return pos.position
+    return 0                  
+                    
 @connect_ib
 def retrieve_ib_pf(**kwargs):
     if kwargs['client']:
@@ -236,7 +246,7 @@ def retrieve_ib_pf(**kwargs):
         return None, None
 
 @connect_ib        
-def cash_balance(self,**kwargs):
+def cash_balance(**kwargs):
     if kwargs['client']:
         for v in kwargs['client'].accountSummary():
             if v.tag == 'CashBalance':
@@ -249,7 +259,8 @@ def cash_balance(self,**kwargs):
 def get_last_price(action,**kwargs):
     try:
         #if symbol not in ["BZ=F"]: #buggy
-        if kwargs['client'] and (USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in IB_STOCKEX_NO_PERMISSION):
+        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"] and\
+                                 action.stock_ex.ib_ticker not in _settings["IB_STOCKEX_NO_PERMISSION"]):
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
             if contract is not None:
                 cours_pres=IBData.get_last_price(contract)
@@ -260,10 +271,8 @@ def get_last_price(action,**kwargs):
     
         return cours_pres
 
-    except Exception as msg:
-        print(action.symbol)
-        print("exception in " + __name__)
-        print(msg)
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
         
 @connect_ib  
 def get_ratio(action,**kwargs):
@@ -272,7 +281,8 @@ def get_ratio(action,**kwargs):
         cours_pres=0
         cours_ref=0
             
-        if kwargs['client'] and (USE_IB_FOR_DATA and action.stock_ex.ib_ticker not in IB_STOCKEX_NO_PERMISSION):
+        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"] and\
+                                 action.stock_ex.ib_ticker not in _settings["IB_STOCKEX_NO_PERMISSION"]):
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
             if contract is not None:
                 bars = kwargs['client'].reqHistoricalData(
@@ -309,45 +319,49 @@ def get_ratio(action,**kwargs):
         else:
             return 0
 
-    except Exception as msg:
-        print(action.symbol)
-        print("exception in " + __name__)
-        print(msg)
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
 
 @connect_ib  
 def place(buy,action,short,**kwargs): #quantity in euros
-    contract =get_tradable_contract_ib(action,short)
-    
-    if contract is None:
-        return "", 0, 0
-    else:
-        kwargs['client'].qualifyContracts(contract)
+    try:
+        contract =get_tradable_contract_ib(action,short)
         
-        if buy:
-            order_size=kwargs.get("order_size",0)
-            last_price=IBData.get_last_price(contract)
-            quantity=math.floor(order_size/last_price)
-            
-            if short:
-                order = MarketOrder('SELL', quantity)
-            else:
-                order = MarketOrder('BUY', quantity)
+        if contract is None:
+            return "", 0, 0
         else:
-            quantity=kwargs.get("quantity",0)
+            kwargs['client'].qualifyContracts(contract)
             
-            if short:
-                order = MarketOrder('BUY', quantity)
+            if buy:
+                order_size=kwargs.get("order_size",0)
+                last_price=IBData.get_last_price(contract)
+                quantity=math.floor(order_size/last_price)
+                
+                if short:
+                    order = MarketOrder('SELL', quantity)
+                else:
+                    order = MarketOrder('BUY', quantity)
             else:
-                order = MarketOrder('SELL', quantity)
-        trade = kwargs['client'].placeOrder(contract, order)
-
-        kwargs['client'].sleep(1.0)
-        if trade.orderStatus.status == 'Filled':
-            fill = trade.fills[-1]
-            txt=f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}'
-            price=fill.execution.avgPrice     
-            return txt, price, quantity
-
+                quantity=kwargs.get("quantity",0)
+                
+                if short:
+                    order = MarketOrder('BUY', quantity)
+                else:
+                    order = MarketOrder('SELL', quantity)
+            trade = kwargs['client'].placeOrder(contract, order)
+    
+            kwargs['client'].sleep(1.0)
+            if trade.orderStatus.status == 'Filled':
+                fill = trade.fills[-1]
+                txt=f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}'
+                price=fill.execution.avgPrice     
+                return txt, price, quantity
+            else:
+                logger.info("order not filled, pending")
+                return "", 1, 1
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
+        
 @connect_ib  
 def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):   
     #type check necessary for indexes
@@ -361,40 +375,39 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             c1 = Q(action=action)
             c2 = Q(active=True)
             
-            order=Order.objects.filter(c1 & c2)
+            orders=Order.objects.filter(c1 & c2)
+            if len(orders)==0:
+                order=Order(action=action, pf=pf) #use full if you did the entry order manually...
+                order.quantity=retrieve_quantity(action)
+                print("order not found " + symbol + " present position: "+ order.quantity)
+                order.save()
+            else:
+                order=orders[0]
 
             #profit
-            if len(order)>0:
-                if use_IB:
-                    txt, order[0].exiting_price, quantity= place(False,
-                                           action,
-                                           short,
-                                           quantity=order[0].quantity)
-                    
-                    if order[0].entering_price is not None: 
-                        order[0].profit=order[0].exiting_price-order[0].entering_price
-                        order[0].profit_percent=(order[0].exiting_price/order[0].entering_price-1)*100
-                    
-                order[0].exiting_date=timezone.now()
-                order[0].active=False
-                order[0].save()
+            if use_IB and order.quantity>0:
+                txt, order.exiting_price, quantity= place(False,
+                                       action,
+                                       short,
+                                       quantity=order.quantity)
+                
+                if order.entering_price is not None: 
+                    order.profit=order.exiting_price-order.entering_price
+                    order.profit_percent=(order.exiting_price/order.entering_price-1)*100
+                
+            order.exiting_date=timezone.now()
+            order.active=False
+            order.save()
 
-                ocap.capital+=1
-                ocap.save()
-                pf.remove(symbol)
-                pf.save()
-
-                return True
-            else:
-                print("order not found " + symbol)
-                return False
+            ocap.capital+=1
+            ocap.save()
+            pf.remove(symbol)
+            pf.save()
+            return True
         return False
     
-    except Exception as msg:
-        print("exception in exit")
-        print(msg)
-        _, e_, exc_tb = sys.exc_info()
-        print("line " + str(exc_tb.tb_lineno))
+    except Exception as e:
+        logger.error(e, stack_info=True, exc_info=True)
         pass
     
 @connect_ib 
@@ -406,7 +419,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         
         if use_IB:
             order_size=10000
-            balance=kwargs['client'].cash_balance()
+            balance=cash_balance()
         else:
             order_size=1
             balance=10 #to get true
@@ -417,6 +430,14 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         action=Action.objects.get(symbol=symbol)
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
         excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
+        if (symbol in pf.retrieve() ):
+            logger.info(symbol + " already in portfolio")
+        if (symbol in excluded.retrieve() ):
+            logger.info(symbol + " excluded")    
+        #if (ocap.capital==0):
+            #print(symbol + " order not executed, no order capital available: " + ocap.name)
+        if order_size>balance:
+            logger.info(symbol + " order not executed, not enough cash available")
         
         if (symbol not in pf.retrieve() and 
             symbol not in excluded.retrieve() and  
@@ -442,17 +463,11 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             pf.save()
             ocap.capital-=1
             ocap.save()
-            
             return True
-
         return False
     
-    except Exception as msg:
-        print("exception in " + __name__)
-        print(msg)
-        print("symbol: "+symbol)
-        _, e_, exc_tb = sys.exc_info()
-        print("line " + str(exc_tb.tb_lineno))
+    except Exception as e:
+        logger.error(e + "symbol: "+str(symbol), stack_info=True, exc_info=True)
         pass
    
 def check_hold_duration(symbol,strategy, exchange,short,**kwargs): 
@@ -472,34 +487,29 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
                 return delta.days
         
         return 0
-    except Exception as msg:
-         print("exception in " + __name__)
-         print(msg)
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
          return 0
      
 @connect_ib 
 def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
     try:
-        if kwargs['client'] and (PERFORM_ORDER and DIC_PERFORM_ORDER[strategy] #and not kwargs.get("index",False)
+        if kwargs['client'] and (_settings["PERFORM_ORDER"] and _settings["DIC_PERFORM_ORDER"][strategy] #and not kwargs.get("index",False)
             and check_exchange_ib_permission(exchange) and not auto==False): #ETF trading requires too high permissions on IB, XETRA data too expansive
-            print("automatic order execution")
+            logger.info("automatic order execution")
             return entry_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
         else: 
-            print("manual")
+            logger.info("manual order")
             t=entry_order_sub(symbol,strategy, exchange,short,False,**kwargs)
-            print(t)
             return t, False
 
-    except Exception as msg:
-         print("exception in " + __name__)
-         print(msg)
-         _, e_, exc_tb = sys.exc_info()
-         print("line " + str(exc_tb.tb_lineno))
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
          return False, False
 
 @connect_ib     
 def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
-    if kwargs['client'] and (PERFORM_ORDER and DIC_PERFORM_ORDER[strategy] #and not kwargs.get("index",False)
+    if kwargs['client'] and (_settings["PERFORM_ORDER"] and _settings["DIC_PERFORM_ORDER"][strategy] #and not kwargs.get("index",False)
         and check_exchange_ib_permission(exchange) and not auto==False): #ETF trading requires too high permissions on IB, XETRA data too expansive
         return exit_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
     else:   
@@ -537,7 +547,7 @@ def retrieve_data_ib(actions,period,**kwargs):
             indexes[index_symbol_ib]=True
             action=Action.objects.get(symbol=index_symbol)
             exchanges[index_symbol_ib]=action.stock_ex.ib_ticker    
-        
+
         return IBData.fetch(
             all_symbols, 
             period=period,
@@ -547,12 +557,8 @@ def retrieve_data_ib(actions,period,**kwargs):
             indexes=indexes),\
             ib_symbols,\
             index_symbol_ib
-    except Exception as msg:
-        print(msg)
-        print("exception in " + __name__)
-        _, e_, exc_tb = sys.exc_info()
-        print("line " + str(exc_tb.tb_lineno))    
-
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
 #YF can work with only the symbol to obtain the right contract
 def retrieve_data_YF(actions,period,**kwargs):
     #add the index to the list of stocks downloaded. Useful to make calculation on the index to determine trends
@@ -569,11 +575,8 @@ def retrieve_data_YF(actions,period,**kwargs):
         return vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs),\
                symbols,\
                index_symbol    
-    except Exception as msg:
-        print(msg)
-        print("exception in " + __name__)
-        _, e_, exc_tb = sys.exc_info()
-        print("line " + str(exc_tb.tb_lineno))
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
         
 def retrieve_data(actions,period,use_IB,**kwargs):
     if actions is None or len(actions)==0:

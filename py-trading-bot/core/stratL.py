@@ -110,7 +110,17 @@ class btLIVE(BT):
 def scan_presel_all(period,**kwargs):
     d={"CAC40":{"symbols":constants.CAC40,"index":"^FCHI"},
        "DAX":  {"symbols":constants.DAX,"index":"^GDAXI"},
-       "NASDAQ":  {"symbols":constants.NASDAQ,"index":"^IXIC"}
+       "NASDAQ":  {"symbols":constants.NASDAQ,"index":"^IXIC"},
+       "REALESTATE": {"symbols":constants.REALESTATE, "index":"^DJI"},
+       "INDUSTRY": {"symbols":constants.INDUSTRY, "index":"^DJI"},
+       "IT": {"symbols":constants.IT, "index":"^DJI"},
+       "COM": {"symbols":constants.COM, "index":"^DJI"},
+       "STAPLES": {"symbols":constants.STAPLES, "index":"^DJI"},
+       "CONSUMER": {"symbols":constants.CONSUMER, "index":"^DJI"},
+       "ENERGY": {"symbols":constants.ENERGY, "index":"^DJI"},
+       "UTILITIES": {"symbols":constants.UTILITIES, "index":"^DJI"},
+       "FIN": {"symbols":constants.FIN, "index":"^DJI"},
+       "MATERIALS": {"symbols":constants.MATERIALS, "index":"^DJI"},
     }
     presel_dic=["vol","realmadrid","retard","retard_macro","divergence","divergence_blocked",7,31,53,54]
     res={}

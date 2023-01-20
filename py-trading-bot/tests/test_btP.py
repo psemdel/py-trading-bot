@@ -55,7 +55,7 @@ class TestbtP(TestCase):
             sector=s,
             )
         self.actions=[self.a, self.a2, self.a3]        
-        self.st=stratP.StratPRD(self.actions,False,period1="1y")
+        self.st=stratP.StratPRD(False,actions1=self.actions,period1="1y")
         self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro",
                       macro_trend_bull="long",
                       macro_trend_uncertain="both",

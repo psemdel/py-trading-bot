@@ -57,7 +57,20 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: py-trading-bot-secret
-                  key: telegram_token                                   
+                  key: telegram_token       
+                  
+            - name: IB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: py-trading-bot-configmap
+                  key: ib_port
+                  
+            - name: USE_IB_FOR_DATA
+              valueFrom:
+                configMapKeyRef:
+                  name: py-trading-bot-configmap
+                  key: use_ib_for_data                                   
+                                              
 ---
 kind: Service
 apiVersion: v1

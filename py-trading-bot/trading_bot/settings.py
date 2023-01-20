@@ -1,24 +1,23 @@
 ### Setting of the trading bot ###
+import os
 
-SUMMER_TIME_US=True
-SUMMER_TIME_EUROPE=True
-
+_settings={
 ## IB configuration
-IB_LOCALHOST='127.0.0.1'
-IB_PORT=7496
+"IB_LOCALHOST":'127.0.0.1',
+"IB_PORT": os.environ.get("IB_PORT",4001), #IB Gateway 4001, TWS 7496
 
 ## Preselection to be used for the different stock exchanges ##
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
-DIC_PRESEL={
-    "Paris":["retard_manual"],
-    "XETRA":["retard_manual"], 
-    "Nasdaq":["retard"],
+"DIC_PRESEL":{
+    "Paris":["retard_manual","divergence"],
+    "XETRA":["retard_manual","divergence"], 
+    "Nasdaq":["retard","divergence"],
     "NYSE":[]
-    }
+    },
 
-DIC_PRESEL_SECTOR={
-    "realestate":["retard"],
+"DIC_PRESEL_SECTOR":{
+    "realestate":[],
     "industry":[],
     "it":["retard"],
     "com":[],
@@ -29,31 +28,31 @@ DIC_PRESEL_SECTOR={
     "fin":[],
     "materials":[],
     "healthcare":[],
-    }
+    },
 
 ## Configuration of Telegram ##
-PF_CHECK=True
-INDEX_CHECK=True
-REPORT_17h=True #for Paris and XETRA
-REPORT_22h=True
-HEARTBEAT=False # to test telegram
+"PF_CHECK":True,
+"INDEX_CHECK":True,
+"REPORT_17h":True, #for Paris and XETRA
+"REPORT_22h":True,
+"HEARTBEAT":False, # to test telegram
 
-ALERT_THRESHOLD=3 #in %
-ALARM_THRESHOLD=5 #in %
-ALERT_HYST=1 #margin to avoid alert/recovery at high frequency
+"ALERT_THRESHOLD":3, #in %
+"ALARM_THRESHOLD":5, #in %
+"ALERT_HYST":1, #margin to avoid alert/recovery at high frequency
 
-TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
+"TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
 
 ## Order settings ##
-USE_IB_FOR_DATA=True #use IB for Data or YF
-IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"] #"BVME.ETF"
-IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME.ETF"]
-IB_STOCK_NO_PERMISSION=["NDX"]
+"USE_IB_FOR_DATA":os.environ.get("USE_IB_FOR_DATA",True), #use IB for Data or YF
+"IB_STOCKEX_NO_PERMISSION":["IBIS","EUREX","NASDAQ IND"], #"BVME.ETF"
+"IB_STOCKEX_PERMISSION":["SMART","SBF","NYSE","BVME.ETF"],
+"IB_STOCK_NO_PERMISSION":["NDX"],
 
-PERFORM_ORDER=False #test or use IB to perform orders
+"PERFORM_ORDER":True, #test or use IB to perform orders
 ## Can be configured for each strategy separately (depending on how often the strategy will trade)
 ## relation is PERFORM_ORDER and DIC_PERFORM_ORDER
-DIC_PERFORM_ORDER={
+"DIC_PERFORM_ORDER":{
     "normal":True,
     "macd_vol":True,
     "retard":True,
@@ -62,39 +61,39 @@ DIC_PERFORM_ORDER={
     "wq31":False,
     "wq53":False,
     "wq54":False,
-    "divergence":False
-    }
+    "divergence":True
+    },
 
 ## Configuration of the strategies ##
 # Frequency is the number of days between successive candidates actualisation
 
-DIVERGENCE_MACRO=True
-RETARD_MACRO=True
+"DIVERGENCE_MACRO":True,
+"RETARD_MACRO":True,
 
-DAILY_REPORT_PERIOD=3 #in year
+"DAILY_REPORT_PERIOD":3, #in year
 
-VOL_MAX_CANDIDATES_NB=1
-MACD_VOL_MAX_CANDIDATES_NB=1
-HIST_VOL_MAX_CANDIDATES_NB=1
-DIVERGENCE_THRESHOLD=0.005
-VOL_SLOW_FREQUENCY=10
-VOL_SLOW_MAX_CANDIDATES_NB=2
-MACD_VOL_SLOW_FREQUENCY=10
-MACD_VOL_SLOW_MAX_CANDIDATES_NB=2
-HIST_VOL_SLOW_FREQUENCY=10
-HIST_VOL_SLOW_MAX_CANDIDATES_NB=2
-REALMADRID_DISTANCE=400
-REALMADRID_FREQUENCY=30
-REALMADRID_MAX_CANDIDATES_NB=2
-RETARD_MAX_HOLD_DURATION=15
+"VOL_MAX_CANDIDATES_NB":1,
+"MACD_VOL_MAX_CANDIDATES_NB":1,
+"HIST_VOL_MAX_CANDIDATES_NB":1,
+"DIVERGENCE_THRESHOLD":0.005,
+"VOL_SLOW_FREQUENCY":10,
+"VOL_SLOW_MAX_CANDIDATES_NB":2,
+"MACD_VOL_SLOW_FREQUENCY":10,
+"MACD_VOL_SLOW_MAX_CANDIDATES_NB":2,
+"HIST_VOL_SLOW_FREQUENCY":10,
+"HIST_VOL_SLOW_MAX_CANDIDATES_NB":2,
+"REALMADRID_DISTANCE":400,
+"REALMADRID_FREQUENCY":30,
+"REALMADRID_MAX_CANDIDATES_NB":2,
+"RETARD_MAX_HOLD_DURATION":15,
 
-STOCH_LL=20
-STOCH_LU=80
-BBAND_THRESHOLD=0.15
+"STOCH_LL":20,
+"STOCH_LU":80,
+"BBAND_THRESHOLD":0.15,
 
 #for some major events, that cannot be detected only with technical analysis
-FORCE_MACRO_TO="" #"bull"/"uncertain"/""
-
+"FORCE_MACRO_TO":"" #"bull"/"uncertain"/""
+}
 
 """
 Django settings for trading_bot project.
@@ -109,7 +108,6 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 ### Configuration Django
-import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -270,3 +268,43 @@ else:
 
 #?Celery
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers' : False,
+    'formatters': {
+        'default': {
+            'format': '[%(asctime)s] %(levelname)s %(lineno)d %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        }
+    },
+    'loggers': {
+        'general': {
+            'handlers': ['error', 'info', 'warning'],
+            'level': 1
+        }
+    },
+    'handlers': {
+        'std_err': {
+            'class': 'logging.StreamHandler'
+        },
+        'info': {
+            'class': 'logging.FileHandler',
+            'filename': 'logs/info.log',
+            'level': 'INFO',
+            'formatter': 'default',
+        },
+        'error': {
+            'class': 'logging.FileHandler',
+            'filename': 'logs/error.log',
+            'level': 'ERROR',
+            'formatter': 'default',
+        },
+        'warning': {
+            'class': 'logging.FileHandler',
+            'filename': 'logs/warning.log',
+            'level': 'WARNING',
+            'formatter': 'default',
+        },
+    }
+}

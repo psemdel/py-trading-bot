@@ -1,16 +1,14 @@
 from django.db import models
 
-import sys
 import math
 
-from trading_bot.settings import (DIC_PRESEL, DIC_PRESEL_SECTOR, DIVERGENCE_MACRO, RETARD_MACRO,
-                                 DAILY_REPORT_PERIOD)
+from trading_bot.settings import _settings
 
 from core import stratP, btP, common
 from core import indicators as ic
 import warnings
-from datetime import datetime
-from django.utils import timezone
+import logging
+logger = logging.getLogger(__name__)
 
 from orders.ib import exit_order, entry_order
 
@@ -30,7 +28,7 @@ class ListOfActions(models.Model):
     actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
 
 class Report(models.Model):
-    date=models.DateTimeField(null=False, blank=False, default=timezone.now())   #)auto_now_add=True
+    date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #) default=timezone.now()
     text=models.TextField(blank=True)
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
     it_is_index=models.BooleanField(blank=False,default=False)
@@ -69,7 +67,7 @@ class Report(models.Model):
 
     def retard(self,presel,exchange,st,**kwargs):
         #key="retard"+"_"+exchange
-        if RETARD_MACRO:
+        if _settings["RETARD_MACRO"]:
             presel.call_strat("preselect_retard_macro")
         else:
             presel.call_strat("preselect_retard")
@@ -167,6 +165,7 @@ class Report(models.Model):
         auto=kwargs.get("autok",True)
         for nb in range(102):
             key="wq"+str(nb)
+            DIC_PRESEL=_settings["DIC_PRESEL"]
             if key in DIC_PRESEL[exchange]:
                 to_calculate=True
          
@@ -179,7 +178,8 @@ class Report(models.Model):
                     wq.call_wqa(nb)
                     wq.def_cand()
                     candidates=wq.get_candidates()
-                    self.order_nosubstrat(st.symbols_to_YF[candidates], exchange, key,False,auto,**kwargs) #fees are too high on IB for wq strategy
+                    
+                    self.order_nosubstrat(self.candidates_to_YF(st.symbols_to_YF,candidates), exchange, key,False,auto,**kwargs) #fees are too high on IB for wq strategy
             print("Presel wq done for "+exchange)  
             
 ### Preselected actions strategy    
@@ -190,7 +190,7 @@ class Report(models.Model):
             if "retard" in l or "retard_manual" in l:   #auto is handled by DIC_PERFORM_ORDER in settings
                 self.retard(presel,exchange,st,**kwargs)
             if "divergence" in l:     
-                if DIVERGENCE_MACRO:
+                if _settings["DIVERGENCE_MACRO"]:
                     presel.call_strat("preselect_divergence_blocked")
                 else:
                     presel.call_strat("preselect_divergence")
@@ -209,7 +209,7 @@ class Report(models.Model):
                     cand=candidates
                     
                 for symbol in cand:
-                    symbol_complex=st.symbols_simple_to_complex(symbol)
+                    symbol_complex=st.symbols_simple_to_complex(symbol,"ent")
                     if short:
                         #only entries and exits is populated
                         self.define_ent_ex(
@@ -235,17 +235,19 @@ class Report(models.Model):
                             ) 
   
             print("Presel done for "+exchange)    
-        
 
     def presel(self,st,exchange,**kwargs): #comes after daily report
         #NYSE needs to be subdivided
         if exchange=="NYSE":
-            if 'sector' in kwargs:
-                self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[kwargs['sector']],st,exchange,**kwargs)
+            DIC_PRESEL_SECTOR=_settings["DIC_PRESEL_SECTOR"]
+            if 'sec' in kwargs:
+                self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[kwargs['sec']],st,exchange,**kwargs)
             else:    
                 for e in DIC_PRESEL_SECTOR: #try for each sector
-                    self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[e],st,exchange,sector=e,**kwargs)
+                    print("sector 123")
+                    self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[e],st,exchange,sec=e,**kwargs)
         else:
+            DIC_PRESEL=_settings["DIC_PRESEL"]
             DICS=[DIC_PRESEL[exchange]]
             for l in DICS:
                 self.presel_sub(st.use_IB,l,st,exchange,**kwargs)
@@ -261,7 +263,6 @@ class Report(models.Model):
         
         if (entries_short and not exits_short) or (exits_short and not entries_short):
             short=True
-        
         #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
         if (entries and not exits) or (entries_short and not exits_short):
             ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs) #YF symbol expected here
@@ -341,7 +342,7 @@ class Report(models.Model):
                     ar.save()  
         
     #for a group of predefined actions, determine the signals    
-    def perform_normal_strat(self,symbols, stnormal, exchange, sector, **kwargs):
+    def perform_normal_strat(self,symbols, stnormal, exchange, **kwargs):
         if self.it_is_index:
             stnormal.stratIndex()
         else:
@@ -368,7 +369,6 @@ class Report(models.Model):
                         stnormal.symbols_to_YF[symbol], 
                         "normal",
                         exchange,
-                        sector=sector,
                         **kwargs)
                     decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
                     if decision==1:
@@ -376,7 +376,7 @@ class Report(models.Model):
                     elif decision==-1:
                         self.concat(symbol + " present decision : buy")
                         
-    def perform_slow_strats(self, symbols, DICS, exchange, sec, st, **kwargs):   
+    def perform_slow_strats(self, symbols, DICS, exchange, st, **kwargs):   
         # Slow candidates
         slow_strats=["hist_slow", "realmadrid"] #only those in use
         slow_strats_active=[]
@@ -407,13 +407,12 @@ class Report(models.Model):
                         st.symbols_to_YF[symbol], 
                         DIC,
                         exchange,
-                        sector=sec,
                         **kwargs)
                         
-    def perform_divergence(self,symbols,exchange,sector, st, DIC_PRESEL, DICS, **kwargs):
+    def perform_divergence(self,symbols,exchange, st, DIC_PRESEL, DICS, **kwargs):
         
         if exchange is not None and "divergence" in DIC_PRESEL[exchange]: 
-            pf_div=get_pf("divergence",exchange,False,sector=sector)
+            pf_div=get_pf("divergence",exchange,False,**kwargs)
         ##Change underlying strategy
         st.call_strat("stratDiv")
         ##only_exit_substrat
@@ -430,24 +429,25 @@ class Report(models.Model):
                         st.symbols_to_YF[symbol], 
                         "divergence",
                         exchange,
-                        sector=sector,
                         **kwargs)
     
     def daily_report(self,actions,exchange,use_IB,**kwargs): #for one exchange and one sector
         try: 
-            sector=None
+            sec=kwargs.get("sec")
             self.it_is_index=kwargs.get("index",False)
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)
                 if exchange=="NYSE":
-                    if kwargs.get("sector"):
+                    DIC_PRESEL_SECTOR=_settings["DIC_PRESEL_SECTOR"]
+                    if kwargs.get("sec"):
                         try:
-                            sector=ActionSector.objects.get(name=kwargs.get("sector")) 
-                            DICS=DIC_PRESEL_SECTOR[kwargs.get("sector")]
+                            #sector=ActionSector.objects.get(name=) 
+                            DICS=DIC_PRESEL_SECTOR[kwargs.get("sec")]
                         except:
                             print("sector not found")
                             pass
                 else:
+                    DIC_PRESEL=_settings["DIC_PRESEL"]
                     DICS=[DIC_PRESEL[exchange]]
             else:
                 self.stock_ex=StockEx.objects.get(name="Paris") #convention
@@ -458,15 +458,15 @@ class Report(models.Model):
                     self.save()
                     
                 #clean the symbols
-                actions=common.filter_intro_action(actions,DAILY_REPORT_PERIOD)
+                actions=common.filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
                     
                 #load the data and
                 #calculats everything used afterwards
                 #also used for "normal strat"
-                stnormal=stratP.StratPRD(use_IB,actions1=actions,period1=str(DAILY_REPORT_PERIOD)+"y",**kwargs)
+                stnormal=stratP.StratPRD(use_IB,actions1=actions,period1=str(_settings["DAILY_REPORT_PERIOD"])+"y",**kwargs)
 
                 ##Perform a single strategy on predefined actions
-                self.perform_normal_strat(stnormal.symbols, stnormal, exchange, sector, **kwargs)
+                self.perform_normal_strat(stnormal.symbols, stnormal, exchange, **kwargs)
                 
                 ##Populate a report with different statistics
                 sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
@@ -492,24 +492,21 @@ class Report(models.Model):
                 print("Strat daily report written " +(exchange or ""))
 
                 ##Perform strategies that rely on the regular preselection of a candidate
-                self.perform_slow_strats(stnormal.symbols, DICS, exchange, sector, st, **kwargs)
+                self.perform_slow_strats(stnormal.symbols, DICS, exchange, st, **kwargs)
                 
                 ##Perform the strategy divergence
-                self.perform_divergence(stnormal.symbols,exchange,sector, st, DIC_PRESEL, DICS, **kwargs)
+                self.perform_divergence(stnormal.symbols,exchange, st, _settings["DIC_PRESEL"], DICS, **kwargs)
 
                 print("Slow strategy proceeded") 
-                if sector is not None:
-                    self.sector=sector
+                if sec is not None:
+                    self.sector=ActionSector.objects.get(name=sec) 
                 self.save()
                 return st
 
-        except ValueError as msg:
-            print(msg)            
-        except Exception as msg:
-            print("exception in " + __name__)
-            print(msg)
-            _, e_, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except ValueError as e:
+            logger.error(e, stack_info=True, exc_info=True)
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
             pass 
     
 class ActionReport(models.Model):

@@ -15,9 +15,11 @@ from django.db.models.query import QuerySet
 
 #from telegram.ext import CommandHandler
 import logging
+logger = logging.getLogger(__name__)
 import vectorbtpro as vbt
 
 from celery import shared_task
+from backports.zoneinfo import ZoneInfo
 
 from reporting.models import Report, Alert, ListOfActions
 
@@ -25,12 +27,10 @@ from orders.ib import retrieve_ib_pf, get_last_price, get_ratio, exit_order
 from orders.models import Action, StockEx, Order, ActionCategory, pf_retrieve_all
 from core import constants
 
-from trading_bot.settings import (PF_CHECK, INDEX_CHECK, REPORT_17h, REPORT_22h, HEARTBEAT, 
-                                  SUMMER_TIME_US, SUMMER_TIME_EUROPE,
-                                  ALERT_THRESHOLD, ALARM_THRESHOLD, ALERT_HYST,
-                                  TIME_INTERVAL_CHECK)
+from trading_bot.settings import _settings
 from reporting import telegram_sub
 
+from datetime import time
 ''' Contains the logic for:
  - Telegram bot
  - Sending alert if the market price variation exceeds a certain threshold
@@ -68,54 +68,32 @@ class MyScheduler():
         self.telegram_bot=telegram_bot
         
         #Settings
-        self.pf_check=PF_CHECK
-        self.index_check=INDEX_CHECK
-        self.report_17h=REPORT_17h
-        self.report_22h=REPORT_22h
-        self.heartbeat=HEARTBEAT # to test if telegram is working ok
+        self.pf_check=_settings["PF_CHECK"]
+        self.index_check=_settings["INDEX_CHECK"]
+        self.report_17h=_settings["REPORT_17h"]
+        self.report_22h=_settings["REPORT_22h"]
+        self.heartbeat=_settings["HEARTBEAT"] # to test if telegram is working ok
         self.cleaning=True
-
+        
+        tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
+        tz_NY=ZoneInfo('US/Eastern') #does not seem to be at ease with multiple tz
+                        
         if self.pf_check:
-            self.manager.every(TIME_INTERVAL_CHECK, 'minutes').do(self.check_pf)
-            if SUMMER_TIME_EUROPE:
-                self.do_weekday('07:03', self.check_pf, opening="9h")
-            else:
-                self.do_weekday('08:03', self.check_pf, opening="9h")
-                
-            if SUMMER_TIME_US:
-                self.do_weekday('13:03', self.check_pf, opening="15h")
-            else:                
-                self.do_weekday('14:03', self.check_pf, opening="15h")   
+            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf)
+            self.do_weekday(time(9,3,tzinfo=tz_Paris), self.check_pf, opening="9h")
+            self.do_weekday(time(9,33,tzinfo=tz_NY), self.check_pf, opening="15h")
         if self.index_check:
-            self.manager.every(TIME_INTERVAL_CHECK, 'minutes').do(self.check_index)
-            if SUMMER_TIME_EUROPE:
-                self.do_weekday('07:03', self.check_index, opening="9h")
-            else:
-                self.do_weekday('08:03', self.check_index, opening="9h")
-                
-            if SUMMER_TIME_US:      
-                self.do_weekday('13:03', self.check_index, opening="15h")
-            else:
-                self.do_weekday('14:03', self.check_index, opening="15h") 
-                
+            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_index)
+            self.do_weekday(time(9,3,tzinfo=tz_Paris), self.check_index, opening="9h")
+            self.do_weekday(time(9,33,tzinfo=tz_NY), self.check_index, opening="15h")       
         if self.report_17h: #round 15 min before closing
-            if SUMMER_TIME_EUROPE:
-                self.do_weekday('15:15' ,self.daily_report_17h)
-            else:
-                self.do_weekday('16:15' ,self.daily_report_17h)
-                
+            self.do_weekday(time(17,15,tzinfo=tz_Paris),self.daily_report_17h)
         if self.report_22h: #round 15 min before closing
-            if SUMMER_TIME_US:     
-                self.do_weekday('19:45' ,self.daily_report_22h)
-            else:
-                self.do_weekday('20:45' ,self.daily_report_22h)
+            self.do_weekday(time(15,45,tzinfo=tz_NY),self.daily_report_22h)
         if self.heartbeat:
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
         if self.cleaning:
-            if SUMMER_TIME_US:     
-                self.do_weekday('20:02',self.cleaning_f)
-            else:
-                self.do_weekday('21:02',self.cleaning_f)
+            self.do_weekday(time(16,2,tzinfo=tz_NY),self.daily_report_22h)
 
         if (self.pf_check    or
             self.index_check or
@@ -165,18 +143,19 @@ class MyScheduler():
                         now <action.stock_ex.closing_time)
             
             if stock_open:
-                if (short and ratio>ALERT_THRESHOLD) or (not short and ratio < -ALERT_THRESHOLD):
+                if (short and ratio>_settings["ALERT_THRESHOLD"]) or (not short and ratio < -_settings["ALERT_THRESHOLD"]):
                     alerting=True
-                    if (short and ratio>ALARM_THRESHOLD) or (not short and ratio<-ALARM_THRESHOLD):
+                    if (short and ratio>_settings["ALARM_THRESHOLD"]) or (not short and ratio<-_settings["ALARM_THRESHOLD"]):
                         alarming=True     
                     
-                if (short and ratio>(ALERT_THRESHOLD-ALERT_HYST)) or (not short and ratio < -(ALERT_THRESHOLD-ALERT_HYST)):
+                if (short and ratio>(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])) or \
+                    (not short and ratio < -(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])):
                     alerting_reco=True    
                     
-                if (action.symbol in symbols_opportunity and not short and ratio>ALERT_THRESHOLD):
+                if (action.symbol in symbols_opportunity and not short and ratio>_settings["ALERT_THRESHOLD"]):
                     alerting=True
                     opportunity=True
-                    if ratio>ALARM_THRESHOLD:
+                    if ratio>_settings["ALARM_THRESHOLD"]:
                         alarming=True     
                 
                 c1 = Q(action=action)
@@ -412,9 +391,9 @@ class MyScheduler():
                 report=Report()
                 report.save()
             
-                st=report.daily_report_action("NYSE",sector=s) 
-                report.presel(st,"NYSE",sector=s)
-                report.presel_wq(st,"NYSE",sector=s)
+                st=report.daily_report_action("NYSE",sec=s) 
+                report.presel(st,"NYSE",sec=s)
+                report.presel_wq(st,"NYSE",sec=s)
                 self.send_order(report)
             
             report2=Report()

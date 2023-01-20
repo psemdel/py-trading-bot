@@ -4,7 +4,7 @@ whitenoise >= 6.2.0
 celery[redis] >= 5.2.7
 
 #### trading
-vectorbtpro >= 1.7.2
+vectorbtpro >= 1.9.0
 #TA-Lib  # normally included in vectorbt
 #yfinance # normally included in vectorbt
 #pandas # normally included in vectorbt
@@ -16,3 +16,4 @@ ib_insync >= 0.9.70
 django-filter >= 22.1
 psycopg2-binary
 
+backports.zoneinfo; python_version < '3.9'

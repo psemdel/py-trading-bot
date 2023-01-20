@@ -75,7 +75,7 @@ If you want to use Telegram to receive alert, you first need to create a bot in 
 It is optional, but you Jupyter to read the Jupyter notebooks. Vectorbt is very good to visualize strategies in Jupyter, it would be too bad not to use this possibility.
 
 # Configuration
-Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software).
+Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software and to uncheck the "read-only" setting). Note that TWS and IB Gateway have different ports.
 
 
     ## IB configuration

@@ -2,22 +2,23 @@ from django.db import models
 from django.db.models import Q
 
 import sys
-from trading_bot.settings import ( USE_IB_FOR_DATA, IB_STOCKEX_NO_PERMISSION, IB_STOCK_NO_PERMISSION)
+from trading_bot.settings import _settings
 import datetime
 #from orders.ib import 
-
+import logging
+logger = logging.getLogger(__name__)
 
 ### Check if IB can be used
 def check_ib_permission(symbols):
     IBok=True
     for symbol in symbols:
-        if symbol in IB_STOCK_NO_PERMISSION:
+        if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
             print("symbol " + symbol + " has no permission for IB")
             IBok=False
             break
         
         a=Action.objects.get(symbol=symbol)        
-        if a.stock_ex.ib_ticker in IB_STOCKEX_NO_PERMISSION:
+        if a.stock_ex.ib_ticker in _settings["IB_STOCKEX_NO_PERMISSION"]:
             print("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
             IBok=False
             break
@@ -25,7 +26,7 @@ def check_ib_permission(symbols):
 
 def check_exchange_ib_permission(exchange):
     s_ex=StockEx.objects.get(name=exchange)
-    if s_ex.ib_ticker in IB_STOCKEX_NO_PERMISSION:
+    if s_ex.ib_ticker in _settings["IB_STOCKEX_NO_PERMISSION"]:
         return False
     else:
         return True   
@@ -39,15 +40,15 @@ def get_exchange_actions(exchange,**kwargs):
     c2 = Q(stock_ex=stockEx)
     c3 = Q(delisted=False)
     
-    if exchange=="NYSE" and kwargs.get("sector"):
-        action_sector=ActionSector.objects.get(name=kwargs.get("sector"))
+    if exchange=="NYSE" and kwargs.get("sec"):
+        action_sector=ActionSector.objects.get(name=kwargs.get("sec"))
         c4 = Q(sector=action_sector)
         actions=Action.objects.filter(c1 & c2 & c3 & c4)
     else:
         actions=Action.objects.filter(c1 & c2 & c3)
         
     use_IB=False
-    if USE_IB_FOR_DATA:
+    if _settings["USE_IB_FOR_DATA"]:
         use_IB=check_ib_permission([a.symbol for a in actions])
    
     return use_IB, actions
@@ -101,8 +102,6 @@ def exchange_to_index_symbol(exchange):
         return exchange_to_symbol_dic[exchange]
     else:
         return exchange_to_symbol_dic["default"]
-
-
     
 def action_to_etf(action,short):
     if action.category==ActionCategory.objects.get(short="IND"):
@@ -239,12 +238,8 @@ class PF(models.Model):
         try:
             self.actions.remove(a)
             self.save()
-        except Exception as msg:
-            print("exception in remove_symbol")
-            print(symbol)
-            print(msg)
-            _, e_, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except Exception as e:
+            logger.error(e + " symbol: " + symbol, stack_info=True, exc_info=True)          
             pass
 
     def append(self,symbol):
@@ -252,12 +247,8 @@ class PF(models.Model):
             a = Action.objects.get(symbol=symbol)
             self.actions.add(a)
             self.save()
-        except Exception as msg:
-            print("exception in " + __name__)
-            print(msg)
-            print("symbol: "+ symbol)
-            _, e_, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except Exception as e:
+            logger.error(e + " symbol: "+symbol, stack_info=True, exc_info=True)
             pass    
 
 def get_sub(strategy, exchange,short,**kwargs):
@@ -267,8 +258,9 @@ def get_sub(strategy, exchange,short,**kwargs):
         name+="_short"
         
     if exchange=="NYSE":
-        if kwargs.get("sector"):
-            sector=kwargs.get("sector") 
+        if kwargs.get("sec"):
+            sector=kwargs.get("sec") 
+            name+="_"+sector
             
     return name, sector
 
@@ -283,8 +275,8 @@ def get_pf(strategy, exchange,short,**kwargs):
                 name=name)
 
         return res
-    except Exception as msg:
-        print(msg)
+    except Exception as e:
+        logger.error(e, stack_info=True, exc_info=True)
 
 ### To distinguish between ETF, actions, indexes...
 class ActionCategory(models.Model):
@@ -349,8 +341,8 @@ def get_order_capital(strategy, exchange,**kwargs):
             res.capital=0
         
         return res
-    except Exception as msg:
-        print(msg)        
+    except Exception as e:
+        logger.error(e, stack_info=True, exc_info=True)           
 
 ###For strategy using two time frame, in the slow one (10 days) candidates are defined
 ###And on daily basis the other strategy decides which of the candidate is really bought or sold
@@ -411,12 +403,8 @@ class Excluded(models.Model):
         try:
             self.actions.remove(a)
             self.save()
-        except Exception as msg:
-            print("exception in " + __name__)
-            print(symbol)
-            print(msg)
-            _, e_, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except Exception as e:
+            logger.error(e + " symbol: "+symbol, stack_info=True, exc_info=True)    
             pass
         
     def retrieve(self):

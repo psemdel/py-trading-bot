@@ -14,13 +14,10 @@ from core.macro import VBTMACROTREND, VBTMACROTRENDOLD
 import core.indicators as ic
 from core.common import VBTfunc#, save_vbt_both
 
-from trading_bot.settings import (DIVERGENCE_THRESHOLD, VOL_SLOW_FREQUENCY, VOL_SLOW_MAX_CANDIDATES_NB,
-                                 MACD_VOL_SLOW_FREQUENCY, MACD_VOL_SLOW_MAX_CANDIDATES_NB,
-                                 HIST_VOL_SLOW_FREQUENCY, HIST_VOL_SLOW_MAX_CANDIDATES_NB,                
-                                 REALMADRID_DISTANCE,REALMADRID_FREQUENCY, REALMADRID_MAX_CANDIDATES_NB,
-                                 RETARD_MAX_HOLD_DURATION, VOL_MAX_CANDIDATES_NB,
-                                 MACD_VOL_MAX_CANDIDATES_NB, HIST_VOL_MAX_CANDIDATES_NB)
-
+from trading_bot.settings import _settings
+import sys
+import logging
+logger = logging.getLogger(__name__)
 ### Strategies with preselection ###
 # a) It select one, two,... actions
 # b) (optional) It applies a "one action" strategy on it
@@ -262,7 +259,7 @@ class BT(VBTfunc):
     def preselect_vol_sub(self, ii, **kwargs):
         v={}
         self.candidates[ii]=[]
-        self.max_candidates_nb=VOL_MAX_CANDIDATES_NB
+        self.max_candidates_nb=_settings["VOL_MAX_CANDIDATES_NB"]
         
         for symbol in self.symbols_simple:
             v[symbol]=self.vol[symbol].values[ii]
@@ -333,7 +330,7 @@ class BT(VBTfunc):
             self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)   
         else:
             for ii in range(len(self.close.index)):
-                 if self.hold_dur > RETARD_MAX_HOLD_DURATION:
+                 if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
                      self.excluded.append(self.pf[0])
                   
                  res=self.preselect_retard_sub(ii,short,**kwargs)                         
@@ -349,7 +346,7 @@ class BT(VBTfunc):
         macd=self.macd_tot.macd
         self.candidates[ii]=[]
         self.candidates_short[ii]=[]
-        self.max_candidates_nb=MACD_VOL_MAX_CANDIDATES_NB
+        self.max_candidates_nb=_settings["MACD_VOL_MAX_CANDIDATES_NB"]
         
         for symbol in self.symbols_simple:
             v[symbol]=self.vol[symbol].values[ii]
@@ -390,7 +387,7 @@ class BT(VBTfunc):
         hist=self.macd_tot.hist
         self.candidates[ii]=[]
         self.candidates_short[ii]=[]
-        self.max_candidates_nb=HIST_VOL_MAX_CANDIDATES_NB
+        self.max_candidates_nb=_settings["HIST_VOL_MAX_CANDIDATES_NB"]
         
         for symbol in self.symbols_simple:
             v[symbol]=self.vol[symbol].values[ii]
@@ -428,32 +425,36 @@ class BT(VBTfunc):
 
     #See preselect_macd_vol_macro
     def preselect_macd_vol_macro_sub(self,ii,**kwargs):
-        v={}       
-        macd=self.macd_tot.macd
-        self.candidates[ii]=[]
-        self.candidates_short[ii]=[]
-        
-        for symbol in self.symbols_simple:
-            v[symbol]=self.vol[symbol].values[ii]
-        res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-        
-        for e in res:
-            symbol=e[0]
-            #symbol_complex=self.symbols_simple_to_complex(symbol)
+        try:
+            v={}       
+            macd=self.macd_tot.macd
+            self.candidates[ii]=[]
+            self.candidates_short[ii]=[]
             
-            if kwargs.get("macro_trend_index",False):
-                short=(self.macro_trend.values[ii]==1)
-            else:
-                short=(self.macro_trend[symbol].values[ii]==1)
+            for symbol in self.symbols_simple:
+                v[symbol]=self.vol[symbol].values[ii]
+            res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+            
+            for e in res:
+                symbol=e[0]
+                #symbol_complex=self.symbols_simple_to_complex(symbol)
                 
-            if short and macd[('simple','simple',symbol)].values[ii]<0:
-               self.candidates_short[ii].append(symbol)
-               break              
-            else:
-               self.candidates[ii].append(symbol)
-               break
- 
-        return res
+                if kwargs.get("macro_trend_index",False):
+                    short=(self.macro_trend.values[ii]==1)
+                else:
+                    short=(self.macro_trend[symbol].values[ii]==1)
+                    
+                if short and macd[('simple','simple',symbol)].values[ii]<0:
+                   self.candidates_short[ii].append(symbol)
+                   break              
+                else:
+                   self.candidates[ii].append(symbol)
+                   break
+     
+            return res
+        
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
         
     #Like preselect_macd_vol, but the long/short is decided in function of the macro trend
     def preselect_macd_vol_macro(self,**kwargs):
@@ -465,15 +466,15 @@ class BT(VBTfunc):
          else:
              self.macro_trend=VBTMACROTREND.run(self.close).macro_trend
          #self.macro_trend=kwargs.get("macro_trend")
+         self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
          
          if kwargs.get("PRD",False):
              res=self.preselect_macd_vol_macro_sub(len(self.close.index)-1,**kwargs)
          else:
-             self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
              #self.macd_tot=kwargs.get("macd") 
              for ii in range(len(self.close.index)):
-                  res=self.preselect_macd_vol_macro_sub(ii,**kwargs)
-         
+                res=self.preselect_macd_vol_macro_sub(ii,**kwargs)
+           
              self.calculate_macro(**kwargs)
          self.res=res #last one 
 
@@ -493,7 +494,7 @@ class BT(VBTfunc):
             for ii in range(len(self.close.index)):
                 short=(self.macro_trend.values[ii]==1)
                 
-                if self.hold_dur > RETARD_MAX_HOLD_DURATION:
+                if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
                     self.excluded.append(self.pf[0])
 
                 res=self.preselect_retard_sub(ii,short,**kwargs)           
@@ -508,7 +509,7 @@ class BT(VBTfunc):
         self.candidates[ii]=[]
         self.candidates_short[ii]=[]
         
-        threshold=DIVERGENCE_THRESHOLD
+        threshold=_settings["DIVERGENCE_THRESHOLD"]
 
        # if not short:
         for symbol in self.divergence.columns:
@@ -576,8 +577,8 @@ class BT(VBTfunc):
         self.overwrite_strat11(self.st.entries,self.st.exits)
 
         v={}
-        self.frequency=VOL_SLOW_FREQUENCY
-        self.max_candidates_nb=VOL_SLOW_MAX_CANDIDATES_NB
+        self.frequency=_settings["VOL_SLOW_FREQUENCY"]
+        self.max_candidates_nb=_settings["VOL_SLOW_MAX_CANDIDATES_NB"]
         
         for ii in range(len(self.close.index)):
             if ii%self.frequency==0: #every 10 days
@@ -601,8 +602,8 @@ class BT(VBTfunc):
          self.overwrite_strat11(self.st.entries,self.st.exits)
          v={}
          
-         self.frequency=MACD_VOL_SLOW_FREQUENCY
-         self.max_candidates_nb=MACD_VOL_SLOW_MAX_CANDIDATES_NB
+         self.frequency=_settings["MACD_VOL_SLOW_FREQUENCY"]
+         self.max_candidates_nb=_settings["MACD_VOL_SLOW_MAX_CANDIDATES_NB"]
          
          macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
          macd=macd_tot.macd
@@ -633,8 +634,8 @@ class BT(VBTfunc):
         
          v={}
          
-         self.frequency=HIST_VOL_SLOW_FREQUENCY  
-         self.max_candidates_nb=HIST_VOL_SLOW_MAX_CANDIDATES_NB
+         self.frequency=_settings["HIST_VOL_SLOW_FREQUENCY"]  
+         self.max_candidates_nb=_settings["HIST_VOL_SLOW_MAX_CANDIDATES_NB"]
          
          macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
          macd=macd_tot.hist
@@ -664,9 +665,9 @@ class BT(VBTfunc):
          self.st.stratReal()
          self.overwrite_strat11(self.st.entries,self.st.exits)
 
-         distance=REALMADRID_DISTANCE
-         self.frequency=REALMADRID_FREQUENCY
-         self.max_candidates_nb=REALMADRID_MAX_CANDIDATES_NB
+         distance=_settings["REALMADRID_DISTANCE"]
+         self.frequency=_settings["REALMADRID_FREQUENCY"]
+         self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
 
          v={}
          grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
@@ -689,9 +690,9 @@ class BT(VBTfunc):
          self.st.stratReal()
          self.overwrite_strat11(self.st.entries,self.st.exits)
         
-         distance=REALMADRID_DISTANCE
-         self.frequency=REALMADRID_FREQUENCY
-         self.max_candidates_nb=REALMADRID_MAX_CANDIDATES_NB
+         distance=_settings["REALMADRID_DISTANCE"]
+         self.frequency=_settings["REALMADRID_FREQUENCY"]
+         self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
          self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend  
          v={}
          grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
@@ -767,7 +768,7 @@ class BT(VBTfunc):
             self.calculate_retard(ii,False,**kwargs)     
  
     def preselect_onlybull_grow(self,**kwargs):
-        distance=REALMADRID_DISTANCE
+        distance=_settings["REALMADRID_DISTANCE"]
         self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
         

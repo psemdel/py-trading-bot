@@ -21,8 +21,7 @@ from core.bt import BT, WQ
 from orders.ib import retrieve_data,check_hold_duration
 from orders.models import  get_candidates, Excluded, Strategy
 
-from trading_bot.settings import (RETARD_MAX_HOLD_DURATION, HIST_VOL_SLOW_MAX_CANDIDATES_NB,
-                                 REALMADRID_MAX_CANDIDATES_NB, REALMADRID_DISTANCE)
+from trading_bot.settings import _settings
 
 ### Strategies with preselection ###
 # a) It select one, two,... actions
@@ -36,6 +35,7 @@ class Presel(BT):
  
         if kwargs.get("st",False):
             st=kwargs.get("st")
+            self.st=st
             
             self.high=st.high
             self.low=st.low
@@ -95,6 +95,7 @@ class Presel(BT):
         self.symbols_complex=self.ent11.columns.values 
         self.exchange=kwargs.get("exchange")
         self.excluded=None
+        self.start_capital=0 #required for overwrite_strat11
          
     def call_strat(self,name,**kwargs):
         meth=getattr(self,name)
@@ -104,7 +105,7 @@ class Presel(BT):
         return self.candidates[-1], self.candidates_short[-1]     
 
     def actualize_hist_vol_slow(self,exchange):
-         max_candidates_nb=HIST_VOL_SLOW_MAX_CANDIDATES_NB
+         max_candidates_nb=_settings["HIST_VOL_SLOW_MAX_CANDIDATES_NB"]
          #take stoch
          v={}
          #to be saved longterm
@@ -126,8 +127,8 @@ class Presel(BT):
                     cand.append(symbol)   
 
     def actualize_realmadrid(self,exchange):
-         max_candidates_nb=REALMADRID_MAX_CANDIDATES_NB
-         distance=REALMADRID_DISTANCE
+         max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
+         distance=_settings["REALMADRID_DISTANCE"]
          #take stoch
          v={}
          self.excluded=Excluded.objects.get(name="realmadrid")
@@ -150,7 +151,7 @@ class Presel(BT):
 
     def check_dur(self, symbol,strategy, exchange,short,**kwargs):
         dur=check_hold_duration(symbol,strategy, exchange,short,**kwargs)
-        if dur > RETARD_MAX_HOLD_DURATION: #max duration
+        if dur > _settings["RETARD_MAX_HOLD_DURATION"]: #max duration
             print("Retard: excluding " + symbol + " max duration exceeded")
             self.excluded.append(symbol)
 
@@ -189,6 +190,7 @@ class WQPRD(WQ):
     def __init__(self,use_IB ,**kwargs):    
         if kwargs.get("st",False):
             st=kwargs.get("st")
+            self.st=st
             
             self.high=st.high
             self.low=st.low

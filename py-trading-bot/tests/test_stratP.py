@@ -55,7 +55,7 @@ class TestStratP(TestCase):
             sector=s,
             )
         self.actions=[self.a, self.a2, self.a3]
-        self.st=stratP.StratPRD(self.actions,False,period1="1y")
+        self.st=stratP.StratPRD(False,actions1=self.actions,period1="1y")
         
     def test_stratPRD(self):
         st=self.st
