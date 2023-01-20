@@ -2,37 +2,38 @@
 You can operate the bot in Docker and Kubernetes. Instruction were tested with Linux, but should be translatable for other operating systems.
 
 1. Clone the project
-2. Start minikube or equivalent. In your terminal:
+2. Adapt the Configuration in trading_bot/settings see the installation_guide. See the chapter below concerning settings.
+3. Start minikube or equivalent. In your terminal:
 
     start minikube
     
-3. Link docker to minikube:  
+4. Link docker to minikube:  
     
     eval $(minikube docker-env) 
     
-4. At the root create the Docker image. Introduce your Github token to be able to download vectorbtpro with https. If you use ssh, adapt the line corresponding to this download in the Dockerfile.
+5. At the root create the Docker image. Introduce your Github token to be able to download vectorbtpro with https. If you use ssh, adapt the line corresponding to this download in the Dockerfile.
 
     docker build . -t py-trading-bot --build-arg GH_TOKEN=<you Github Token>
 
-5. Change the password. Go in py-trading-bot/secret.yml and replace the items, especially the token for Telegram, with your values coded in base64, as it is the standard for secrets in Kubernetes.
-6. Run 
+6. Change the password. Go in py-trading-bot/secret.yml and replace the items, especially the token for Telegram, with your values coded in base64, as it is the standard for secrets in Kubernetes.
+7. Run 
 
     py-trading-bot/kubernetes/sequence_start_first_time.sh 
     
 It is just some kubectl command in a sequence, you can also run them manually.
 
-7. Check that everything went well. All pods should be running.
+8. Check that everything went well. All pods should be running.
 
     kubectl get pods
 
-8. Expose the service 
+9. Expose the service 
 
 
     minikube service py-trading-bot-service --url
     
 and click on the link to access the bot.
 
-9. Start the background scheduler, including Telegram, by clicking on "start bot". Your telegram should display you "I'm back online". To connect to the admin panel, use the user "admin2" with password "abc1234".
+10. Start the background scheduler, including Telegram, by clicking on "start bot". Your telegram should display you "I'm back online". To connect to the admin panel, use the user "admin2" with password "abc1234".
 
 Alternatively you can also start jupyter with:
 
@@ -97,6 +98,31 @@ When you want to restart your bot later, the process is lighter as the docker im
 and click on the link to access the bot.
 
 5. Start the background scheduler, including Telegram, by clicking on "start bot". Your telegram should display you "I'm back online".
+
+# Settings
+By default, only some settings can be adjusted after the docker image is built. If you want to variate more replace in settings.py: 
+
+    _settings={
+    "HARDCODED_SETTINGS":'abc',
+    
+through:
+
+    _settings={
+    "HARDCODED_SETTINGS":os.environ.get("HARDCODED_SETTINGS",<default value>),
+    
+you need then to adapt the file kubernetes/   configmap.yml under "data" with:
+
+    hardcoded_settings : 'abc'
+    
+you need then to adapt the file kubernetes/django.yml under "-env" with:
+
+    - name: HARDCODED_SETTINGS
+        valueFrom:
+          configMapKeyRef:
+            name: py-trading-bot-configmap
+            key: hardcoded_settings   
+
+So you can change the value by each deployment of the container without rebuilding the image.
 
 # Distribution
 Obviously don't distribute this image anywhere as it would contain vectorbtpro which requires a appropriate license.

@@ -15,21 +15,22 @@ from django.db.models.query import QuerySet
 
 #from telegram.ext import CommandHandler
 import logging
+logger = logging.getLogger(__name__)
 import vectorbtpro as vbt
 
 from celery import shared_task
+from backports.zoneinfo import ZoneInfo
 
 from reporting.models import Report, Alert, ListOfActions
-from orders.models import Action, StockEx, pf_retrieve_all, retrieve_ib_pf, get_ratio, get_last_price,\
-                          exit_order, Order, ActionCategory
+
+from orders.ib import retrieve_ib_pf, get_last_price, get_ratio, exit_order
+from orders.models import Action, StockEx, Order, ActionCategory, pf_retrieve_all
 from core import constants
 
-from trading_bot.settings import (PF_CHECK, INDEX_CHECK, REPORT_17h, REPORT_22h, HEARTBEAT, 
-                                  SUMMER_TIME_US, SUMMER_TIME_EUROPE,
-                                  ALERT_THRESHOLD, ALARM_THRESHOLD, ALERT_HYST,
-                                  TIME_INTERVAL_CHECK)
+from trading_bot.settings import _settings
 from reporting import telegram_sub
 
+from datetime import time
 ''' Contains the logic for:
  - Telegram bot
  - Sending alert if the market price variation exceeds a certain threshold
@@ -44,6 +45,8 @@ def start():
             TELEGRAM_TOKEN = f.read().strip()
     else:
         TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN') 
+        
+   
     res=async_sched.delay(TELEGRAM_TOKEN)
     print("bot started, task id " + str(res.id))
 
@@ -65,54 +68,32 @@ class MyScheduler():
         self.telegram_bot=telegram_bot
         
         #Settings
-        self.pf_check=PF_CHECK
-        self.index_check=INDEX_CHECK
-        self.report_17h=REPORT_17h
-        self.report_22h=REPORT_22h
-        self.heartbeat=HEARTBEAT # to test if telegram is working ok
+        self.pf_check=_settings["PF_CHECK"]
+        self.index_check=_settings["INDEX_CHECK"]
+        self.report_17h=_settings["REPORT_17h"]
+        self.report_22h=_settings["REPORT_22h"]
+        self.heartbeat=_settings["HEARTBEAT"] # to test if telegram is working ok
         self.cleaning=True
-
+        
+        tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
+        tz_NY=ZoneInfo('US/Eastern') #does not seem to be at ease with multiple tz
+                        
         if self.pf_check:
-            self.manager.every(TIME_INTERVAL_CHECK, 'minutes').do(self.check_pf)
-            if SUMMER_TIME_EUROPE:
-                self.do_weekday('07:03', self.check_pf, opening="9h")
-            else:
-                self.do_weekday('08:03', self.check_pf, opening="9h")
-                
-            if SUMMER_TIME_US:
-                self.do_weekday('13:03', self.check_pf, opening="15h")
-            else:                
-                self.do_weekday('14:03', self.check_pf, opening="15h")   
+            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf)
+            self.do_weekday(time(9,3,tzinfo=tz_Paris), self.check_pf, opening="9h")
+            self.do_weekday(time(9,33,tzinfo=tz_NY), self.check_pf, opening="15h")
         if self.index_check:
-            self.manager.every(TIME_INTERVAL_CHECK, 'minutes').do(self.check_index)
-            if SUMMER_TIME_EUROPE:
-                self.do_weekday('07:03', self.check_index, opening="9h")
-            else:
-                self.do_weekday('08:03', self.check_index, opening="9h")
-                
-            if SUMMER_TIME_US:      
-                self.do_weekday('13:03', self.check_index, opening="15h")
-            else:
-                self.do_weekday('14:03', self.check_index, opening="15h") 
-                
+            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_index)
+            self.do_weekday(time(9,3,tzinfo=tz_Paris), self.check_index, opening="9h")
+            self.do_weekday(time(9,33,tzinfo=tz_NY), self.check_index, opening="15h")       
         if self.report_17h: #round 15 min before closing
-            if SUMMER_TIME_EUROPE:
-                self.do_weekday('15:15' ,self.daily_report_17h)
-            else:
-                self.do_weekday('16:15' ,self.daily_report_17h)
-                
+            self.do_weekday(time(17,15,tzinfo=tz_Paris),self.daily_report_17h)
         if self.report_22h: #round 15 min before closing
-            if SUMMER_TIME_US:     
-                self.do_weekday('19:45' ,self.daily_report_22h)
-            else:
-                self.do_weekday('20:45' ,self.daily_report_22h)
+            self.do_weekday(time(15,45,tzinfo=tz_NY),self.daily_report_22h)
         if self.heartbeat:
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
         if self.cleaning:
-            if SUMMER_TIME_US:     
-                self.do_weekday('20:02',self.cleaning_f)
-            else:
-                self.do_weekday('21:02',self.cleaning_f)
+            self.do_weekday(time(16,2,tzinfo=tz_NY),self.daily_report_22h)
 
         if (self.pf_check    or
             self.index_check or
@@ -148,7 +129,7 @@ class MyScheduler():
             alert.active=False
             alert.save()
         
-    def check_change(self,ratio, symbol,short,**kwargs):
+    def check_change(self,ratio, action,short,**kwargs):
         try:
             symbols_opportunity=constants.INDEXES+constants.RAW
             now=timezone.now().time()
@@ -158,23 +139,23 @@ class MyScheduler():
             alarming=False
             opportunity=False
             opening=bool(kwargs.get("opening",False))
-            action=Action.objects.get(symbol=symbol)
             stock_open=(now >action.stock_ex.opening_time and\
                         now <action.stock_ex.closing_time)
             
             if stock_open:
-                if (short and ratio>ALERT_THRESHOLD) or (not short and ratio < -ALERT_THRESHOLD):
+                if (short and ratio>_settings["ALERT_THRESHOLD"]) or (not short and ratio < -_settings["ALERT_THRESHOLD"]):
                     alerting=True
-                    if (short and ratio>ALARM_THRESHOLD) or (not short and ratio<-ALARM_THRESHOLD):
+                    if (short and ratio>_settings["ALARM_THRESHOLD"]) or (not short and ratio<-_settings["ALARM_THRESHOLD"]):
                         alarming=True     
                     
-                if (short and ratio>(ALERT_THRESHOLD-ALERT_HYST)) or (not short and ratio < -(ALERT_THRESHOLD-ALERT_HYST)):
+                if (short and ratio>(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])) or \
+                    (not short and ratio < -(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])):
                     alerting_reco=True    
                     
-                if (symbol in symbols_opportunity and not short and ratio>ALERT_THRESHOLD):
+                if (action.symbol in symbols_opportunity and not short and ratio>_settings["ALERT_THRESHOLD"]):
                     alerting=True
                     opportunity=True
-                    if ratio>ALARM_THRESHOLD:
+                    if ratio>_settings["ALARM_THRESHOLD"]:
                         alarming=True     
                 
                 c1 = Q(action=action)
@@ -236,15 +217,12 @@ class MyScheduler():
             print("line " + str(exc_tb.tb_lineno))
             pass
 
-    def check_cours(self,symbols, short,**kwargs):
+    def check_cours(self,actions, short,**kwargs):
       #  if symbols!=[]:
         try:
-            for symbol in symbols: #otherwise issue with NaN
-                
+            for action in actions: #otherwise issue with NaN
                 try:
                     #check ETF --> better to check the underlying
-                    if not kwargs.get("index",False):
-                        action=Action.objects.get(symbol=symbol)
                         indexes=None
                         if action.category==ActionCategory.objects.get(short="ETFLONG"):
                             indexes=Action.objects.filter(etf_long=action)
@@ -252,14 +230,14 @@ class MyScheduler():
                             indexes=Action.objects.filter(etf_short=action)
                        
                         if indexes is not None and len(indexes)>0:
-                            symbol=indexes[0].symbol
+                            action=indexes[0]
                 except Exception as msg:
                      print("exception in check change ETF")
                      print(msg)
-                     print(symbol)
+                     print(action.symbol)
 
-                ratio=get_ratio(symbol,**kwargs)
-                self.check_change(ratio, symbol,short,**kwargs)
+                ratio=get_ratio(action,**kwargs)
+                self.check_change(ratio, action,short,**kwargs)
                 
         except Exception as msg:
             print("exception in check_cours ")
@@ -287,11 +265,9 @@ class MyScheduler():
                 indexes = Action.objects.filter(c1&c3)
             else:
                 indexes = Action.objects.filter(c3)
-            
-            symbols=[x.symbol for x in indexes]
 
-            self.check_cours(symbols, False,index=True,**kwargs)
-            self.check_cours(symbols, True,index=True,**kwargs)
+            self.check_cours(indexes, False,index=True,**kwargs)
+            self.check_cours(indexes, True,index=True,**kwargs)
             
         except Exception as msg:
             print("exception in check_index")
@@ -302,24 +278,19 @@ class MyScheduler():
 
     def check_pf(self,**kwargs):
         try:
-            print("check pf")
-            symbols=pf_retrieve_all(**kwargs)
-            symbols_short=pf_retrieve_all(short=True,**kwargs)
+            actions=pf_retrieve_all(**kwargs)
+            actions_short=pf_retrieve_all(short=True,**kwargs)
+            ib_pf, ib_pf_short=retrieve_ib_pf()
             
-            try:
-                ib_pf, ib_pf_short=retrieve_ib_pf()
-                
-                symbols.extend(x for x in ib_pf if x not in symbols)
-                symbols_short.extend(x for x in ib_pf if x not in symbols_short)
-            except:
-                pass #no IB started for instance
+            actions.extend(x for x in ib_pf if x not in actions)
+            actions_short.extend(x for x in ib_pf_short if x not in actions_short)
             
-            if len(symbols)>0:
-                self.check_sl(symbols)
-                self.check_cours(symbols, False,**kwargs)
+            if len(actions)>0:
+                self.check_sl(actions)
+                self.check_cours(actions, False,**kwargs)
         
-            if len(symbols_short)>0:
-                self.check_cours(symbols_short, True,**kwargs)
+            if len(actions_short)>0:
+                self.check_cours(actions_short, True,**kwargs)
                 
         except Exception as msg:
             print("exception in check_pf")
@@ -328,23 +299,22 @@ class MyScheduler():
             print("line " + str(exc_tb.tb_lineno))
             pass
 
-    def check_sl(self,symbols,**kwargs):
-        for symbol in symbols:
-            action=Action.objects.get(symbol=symbol)
+    def check_sl(self,actions,**kwargs):
+        for action in actions:
             c1 = Q(action=action)
             c2 = Q(active=True)
             order=Order.objects.filter(c1 & c2)
             
             if len(order)>0:
                 if order[0].sl_threshold is not None:
-                    cours_pres=get_last_price(symbol)
+                    cours_pres=get_last_price(action)
                     if cours_pres<order[0].sl_threshold:
-                        exit_order(symbol,
+                        exit_order(action.symbol,
                                    order[0].pf.strategy, 
                                    order[0].pf.strategy.stock_ex.name,
                                    False,
                                    **kwargs)
-                        self.send_exit_msg(symbol,suffix="stop loss")
+                        self.send_exit_msg(action.symbol,suffix="stop loss")
 
     def send_order(self,report):
         for auto in [False, True]:
@@ -421,9 +391,9 @@ class MyScheduler():
                 report=Report()
                 report.save()
             
-                st=report.daily_report_action("NYSE",sector=s) 
-                report.presel(st,"NYSE",sector=s)
-                report.presel_wq(st,"NYSE",sector=s)
+                st=report.daily_report_action("NYSE",sec=s) 
+                report.presel(st,"NYSE",sec=s)
+                report.presel_wq(st,"NYSE",sec=s)
                 self.send_order(report)
             
             report2=Report()

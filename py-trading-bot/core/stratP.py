@@ -13,43 +13,75 @@ Created on Sat May 14 22:36:16 2022
 
 @author: maxime
 """
-from orders.models import retrieve_data
+from orders.ib import retrieve_data
 import core.indicators as ic
 
 from core.strat import Strat
+from orders.models import Action
 
 # Like strat but for production
 class StratPRD(Strat):
-    def __init__(self,symbols,period,**kwargs):
-        self.symbols=symbols
-        self.period=period
-        
-        if kwargs.get("close") is not None:
-            self.open=kwargs.get("open_")
-            self.high=kwargs.get("high")
-            self.low=kwargs.get("low")
-            self.close=kwargs.get("close")
-            self.volume=kwargs.get("volume")
-            self.open_ind=kwargs.get("open_ind")
-            self.high_ind=kwargs.get("high_ind")
-            self.low_ind=kwargs.get("low_ind")
-            self.close_ind=kwargs.get("close_ind")
-            self.volume_ind=kwargs.get("volume_ind")
-        else:
-            self.high, self.low, self.close, self.open,self.volume,\
-            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind\
-            =retrieve_data(symbols,period,**kwargs)
-        self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
-    
+    def __init__(self,use_IB,**kwargs):
+        try:
+            actions=kwargs.get("actions1")
+            if actions is None:
+                if kwargs.get("symbols1") is None:
+                    raise ValueError("StratPRD, no symbols provided")
+                else:
+                    symbols=kwargs.get("symbols1")
+                    actions=[]
+                    
+                    for symbol in symbols:
+                        actions.append(Action.objects.get(symbol=symbol))
+            
+            if kwargs.get("close") is not None:
+                self.open=kwargs.get("open_")
+                self.high=kwargs.get("high")
+                self.low=kwargs.get("low")
+                self.close=kwargs.get("close")
+                self.volume=kwargs.get("volume")
+                self.open_ind=kwargs.get("open_ind")
+                self.high_ind=kwargs.get("high_ind")
+                self.low_ind=kwargs.get("low_ind")
+                self.close_ind=kwargs.get("close_ind")
+                self.volume_ind=kwargs.get("volume_ind")
+            else:
+                period=kwargs.get("period1")
+                if period is None:
+                    raise ValueError("StratPRD, no period provided")
+                
+                self.high, self.low, self.close, self.open,self.volume,\
+                self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB\
+                =retrieve_data(actions,period,use_IB,**kwargs)
+            self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
+            self.use_IB=use_IB
+            self.actions=actions
+            
+            self.symbols_to_YF={}
+            self.symbols=[]
+            
+            for a in actions:
+                if use_IB:
+                    s=a.ib_ticker()
+                else:
+                    s=a.symbol
+                self.symbols.append(s)
+                self.symbols_to_YF[s]=a.symbol
+                
+        except ValueError as msg:
+            print(msg)   
+            
     def call_strat(self,name,**kwargs):
         meth=getattr(self,name)
         meth(prd=True,**kwargs)
         
     def get_last_decision(self, symbol_complex_ent, symbol_complex_ex):
         for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):
-            if self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]:
+            if (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]) and not\
+            (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]):
                 return -1
-            elif self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]:
+            elif (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]) and not\
+                (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]):
                 return 1
         return 0
     

@@ -9,7 +9,7 @@ import vectorbtpro as vbt
 import numpy as np
 import talib
 from numba import njit
-from trading_bot.settings import FORCE_MACRO_TO
+from trading_bot.settings import _settings
 
 #Determine when the trend is bull/bear or uncertain in order to improve the underlying strategy or
 #to determine the ideal direction (long/short/both)
@@ -114,11 +114,11 @@ VBTMACROTREND= vbt.IF(
     
 def major_int_prd(close,threshold=0.04, threshold_uncertain=0, deadband=0.1):
     macro_trend, min_ind, max_ind=major_int(close,threshold,threshold_uncertain,deadband)
-    if FORCE_MACRO_TO=="bear":
+    if _settings["FORCE_MACRO_TO"]=="bear":
         macro_trend[-1]=1 
-    elif FORCE_MACRO_TO=="bull":
+    elif _settings["FORCE_MACRO_TO"]=="bull":
         macro_trend[-1]=-1
-    elif FORCE_MACRO_TO=="uncertain":
+    elif _settings["FORCE_MACRO_TO"]=="uncertain":
         macro_trend[-1]=0  
     return macro_trend, min_ind, max_ind
 

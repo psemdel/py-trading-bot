@@ -4,7 +4,7 @@ from reporting.telegram import start
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, ListOfActions
 from core import bt, btP
-from orders.models import ActionCategory, StockEx, Action, get_exchange_actions, MyIB
+from orders.models import ActionCategory, StockEx, Action, get_exchange_actions
 
 from .filter import ReportFilter
 
@@ -103,12 +103,12 @@ def trigger_22h(request):
             report=Report()
             report.save()
         
-            st=report.daily_report_action("NYSE",sector=s) 
+            st=report.daily_report_action("NYSE",sec=s) 
             if st is None:
                 raise ValueError("The creation of the strategy failed, report creation interrupted")
             
-            report.presel(st,"NYSE",sector=s)
-            report.presel_wq(st,"NYSE",sector=s)
+            report.presel(st,"NYSE",sec=s)
+            report.presel_wq(st,"NYSE",sec=s)
             send_order_test(report)
     
         report2=Report()
@@ -211,13 +211,12 @@ def test_order(request):
     exchange="XETRA"
     short=False
     
-    with MyIB() as myIB:
-        return myIB.entry_order(symbol,strategy, exchange,short), True
+    #with MyIB() as myIB:
+    #    return myIB.entry_order(symbol,strategy, exchange,short), True
     
     return HttpResponse("test order done")
 
 def test(request):
-    from orders.models import MyIB, retrieve_data
     from ib_insync import Stock
     import vectorbt as vbt
         

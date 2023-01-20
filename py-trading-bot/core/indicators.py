@@ -16,7 +16,7 @@ import inspect
 from core import constants
 import sys
 
-from trading_bot.settings import STOCH_LL, STOCH_LU, BBAND_THRESHOLD
+from trading_bot.settings import _settings
 
 ### General functions ###
 def rel_dif(n,d): #for instance to calculate distance between MA and signal
@@ -213,8 +213,8 @@ def stoch_kama(high, low, close):
     _, direction, top_ext, bot_ext=kama_f(close)
 
     stoch = vbt.STOCH.run(high,low,close)
-    ent_stoch =  stoch.slow_k_crossed_below(STOCH_LL)
-    ex_stoch  =stoch.slow_k_crossed_below(STOCH_LU)
+    ent_stoch =  stoch.slow_k_crossed_below(_settings["STOCH_LL"])
+    ex_stoch  =stoch.slow_k_crossed_below(_settings["STOCH_LU"])
     
     entries, exits=stoch_kama_sub(close, top_ext, ex_stoch.values, bot_ext, ent_stoch.values)
 
@@ -491,7 +491,7 @@ def macd_trend_sub(close,macd, hist, lim1, lim2):
 
 def macd_trend_sub2(close, bb_bw, direction):   #trend,
     trend= np.full(close.shape, 0.0)  
-    bband_lim=BBAND_THRESHOLD
+    bband_lim=_settings["BBAND_THRESHOLD"]
     trend_dir_arr=0 #append to table perf very bad so we make a work around
     trend_dir_arr_dim=0
 

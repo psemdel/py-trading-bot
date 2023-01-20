@@ -4,5 +4,7 @@ metadata:
   name: py-trading-bot-configmap
 data:
   postgres_db: testdb
+  ib_port: 4001
+  use_ib_for_data : false
 
 

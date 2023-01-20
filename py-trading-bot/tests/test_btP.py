@@ -24,7 +24,7 @@ class TestbtP(TestCase):
         s=ActionSector.objects.create(name="sec")
         
         self.strategy=strategy
-        a=Action.objects.create(
+        self.a=Action.objects.create(
             symbol='AC.PA',
             #ib_ticker='AC',
             name="Accor",
@@ -34,8 +34,7 @@ class TestbtP(TestCase):
             #strategy=strategy,
             sector=s,
             )
-        self.a=a
-        a=Action.objects.create(
+        self.a2=Action.objects.create(
             symbol='AI.PA',
             #ib_ticker='AC',
             name="Air liquide",
@@ -45,7 +44,7 @@ class TestbtP(TestCase):
             #strategy=strategy,
             sector=s,
             )
-        a=Action.objects.create(
+        self.a3=Action.objects.create(
             symbol='AIR.PA',
             #ib_ticker='AC',
             name="Airbus",
@@ -54,15 +53,16 @@ class TestbtP(TestCase):
             category=cat,
             #strategy=strategy,
             sector=s,
-            )        
-        self.st=stratP.StratPRD(["AC.PA", "AI.PA","AIR.PA"],"1y")
+            )
+        self.actions=[self.a, self.a2, self.a3]        
+        self.st=stratP.StratPRD(False,actions1=self.actions,period1="1y")
         self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro",
                       macro_trend_bull="long",
                       macro_trend_uncertain="both",
                       macro_trend_bear="both"
                       ) 
         
-        self.presel=btP.Presel(st=self.st,exchange="Paris")
+        self.presel=btP.Presel(False,st=self.st,exchange="Paris")
         
   #hist slow does not need code here
     def test_actualize_hist_vol_slow(self):
@@ -80,7 +80,7 @@ class TestbtP(TestCase):
         self.assertEqual(len(cand.retrieve()),2)
         
     def test_wq(self):
-        wq=btP.WQPRD(st=self.st,exchange="Paris")
+        wq=btP.WQPRD(False,st=self.st,exchange="Paris")
         wq.call_wqa(7)
         
 if __name__ == '__main__':
