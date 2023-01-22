@@ -7,6 +7,8 @@ import datetime
 #from orders.ib import 
 import logging
 logger = logging.getLogger(__name__)
+from backports.zoneinfo import ZoneInfo
+tz_Paris=ZoneInfo('Europe/Paris')
 
 ### Check if IB can be used
 def check_ib_permission(symbols):
@@ -130,8 +132,8 @@ class StockEx(models.Model):
     name=models.CharField(max_length=100, blank=False)
     fees=models.ForeignKey('Fees',on_delete=models.CASCADE)
     ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
-    opening_time=models.TimeField(default=datetime.time(9, 00))
-    closing_time=models.TimeField(default=datetime.time(17, 00))
+    opening_time=models.TimeField(default=datetime.time(9, 00,tzinfo=tz_Paris))
+    closing_time=models.TimeField(default=datetime.time(17, 00,tzinfo=tz_Paris))
     
     def __str__(self):
         return self.name    
@@ -156,7 +158,8 @@ class Action(models.Model):
     etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
     etf_short=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_short2',blank=True,null=True)
     
-    #introduction_date=models.DateTimeField(null=True, blank=True, auto_now_add=True)
+    intro_date=models.DateTimeField(null=True, blank=True, default=None)
+    delisting_date=models.DateTimeField(null=True, blank=True, default=None)
     
     class Meta:
         ordering = ["name"]
@@ -170,6 +173,28 @@ class Action(models.Model):
         
     def __str__(self):
         return self.name
+    
+def filter_intro_sub(a,y_period):
+    td=datetime.datetime.today()
+    min_y=td.year-y_period
+    limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
+
+    if a.intro_date is not None: #should come from database
+        if a.intro_date>limit_date :
+           return False
+    if a.delisting_date is not None:
+        if a.delisting_date<limit_date :
+           return False
+    return True
+
+    return False
+
+def filter_intro_action(input_actions,y_period):
+    actions=[]
+    for a in input_actions:
+        if filter_intro_sub(a,y_period):
+            actions.append(a)   
+    return actions
 
 class Order(models.Model):
     action=models.ForeignKey('Action',on_delete=models.CASCADE)

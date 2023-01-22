@@ -11,7 +11,6 @@ from vectorbtpro.data.custom import RemoteData
 from vectorbtpro import _typing as tp
 import warnings
 import math
-import sys
 from ib_insync import MarketOrder, util
 from core.indicators import rel_dif
 from django.db.models import Q

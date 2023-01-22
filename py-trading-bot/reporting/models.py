@@ -4,7 +4,7 @@ import math
 
 from trading_bot.settings import _settings
 
-from core import stratP, btP, common
+from core import stratP, btP
 from core import indicators as ic
 import warnings
 import logging
@@ -15,7 +15,7 @@ from orders.ib import exit_order, entry_order
 from orders.models import Action, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
-                          check_ib_permission
+                          check_ib_permission, filter_intro_action
       
 
 #which strategy to use for which stockexchange
@@ -458,7 +458,7 @@ class Report(models.Model):
                     self.save()
                     
                 #clean the symbols
-                actions=common.filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
+                actions=filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
                     
                 #load the data and
                 #calculats everything used afterwards
@@ -499,6 +499,7 @@ class Report(models.Model):
 
                 print("Slow strategy proceeded") 
                 if sec is not None:
+                    print(ActionSector.objects.all())
                     self.sector=ActionSector.objects.get(name=sec) 
                 self.save()
                 return st

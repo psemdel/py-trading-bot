@@ -116,7 +116,7 @@ if __name__ == '__main__':
 
     new_list=[]
     for s in all_symbols:
-        if s in constants.INTRO:
+        if s in constants.INTRO: #cannot rely on the database, as django is not running at this point.
             if constants.INTRO[s]<start_date:
                 new_list.append(s)
         else:
