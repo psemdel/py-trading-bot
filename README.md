@@ -24,6 +24,9 @@ There are many similar tools out there, that have similar purposes that are cert
 # Get started
 For installation see [installation guide](https://github.com/psemdel/py-trading-bot/blob/main/docs/installation_guide.md), alternatively you can start the bot in Docker, see the [guide](https://github.com/psemdel/py-trading-bot/blob/main/docs/docker_readme.md).
 
+# Branches
+The main branches contain many strategies that can be used right away. However, the amount of code can make it difficult to understand how the bot works. For this reason a branch "minimum" is available. It contains only the minimum infrastructure to make run the code with usual functionalities, the strategy implementation is then left to you.
+
 # To do
 Using USE_IB_FOR_DATA and PERFORM_ORDER on True is still in beta phase. Generally the bot is in beta. For USE_IB_FOR_DATA, please note that you need the permission for all actions that you need to retrieve. One missing permission lead to the failure of the process.
 

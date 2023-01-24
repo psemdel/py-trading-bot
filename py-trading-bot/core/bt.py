@@ -55,9 +55,17 @@ class BT(VBTfunc):
         
         self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.entries_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+
+        self.entries2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        self.exits2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        
+        self.exits_short2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        self.entries_short2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         
         self.pf=[]
         self.pf_short=[]
+        self.pf_keep=[]
+        self.pf_short_keep=[]
         
         #Underlying strategy to decide when to enter/exit for a group of candidates
         #self.st.strat_kama_stoch_matrend_bbands()
@@ -87,6 +95,8 @@ class BT(VBTfunc):
         self.capital=self.start_capital        
         self.pf=[]
         self.pf_short=[]
+        self.pf_keep=[]
+        self.pf_short_keep=[]
         self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
@@ -223,6 +233,20 @@ class BT(VBTfunc):
     def calculate_retard(self,ii,short,**kwargs):
         
         if ii!=0:
+             if kwargs.get("keep",False):
+                 for symbol_simple in self.pf_keep:
+                     symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
+                     if self.ex11[symbol_complex].values[ii]:
+                         self.pf_keep.remove(symbol_simple)
+                         self.exits2[symbol_simple].iloc[ii]=True
+                         
+                 for symbol_simple in self.pf_short_keep:
+                     symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
+                     if self.ent11[symbol_complex].values[ii]:
+                         self.pf_short_keep.remove(symbol_simple)
+                         self.exits_short2[symbol_simple].iloc[ii]=True       
+                         #print("exiting short " + str(ii))
+
              #sell
              if short:
                  cand=self.candidates_short[ii]
@@ -239,6 +263,16 @@ class BT(VBTfunc):
                      else:
                          self.exits_short[symbol].iloc[ii]=True
                      self.hold_dur=0
+                     
+                     if kwargs.get("keep",False):
+                         if self.last_order_dir=="long":
+                             if len(self.pf_keep)==0:
+                                 self.pf_keep.append(symbol)
+                                 self.entries2[symbol].iloc[ii]=True  
+                         else:
+                             if len(self.pf_short_keep)==0:
+                                 self.pf_short_keep.append(symbol)
+                                 self.entries_short2[symbol].iloc[ii]=True 
                  else:
                      self.hold_dur+=1
 
@@ -255,6 +289,7 @@ class BT(VBTfunc):
                          else:
                              self.entries[symbol].iloc[ii]=True  
                              self.last_order_dir="long"
+            
     #See preselect_vol
     def preselect_vol_sub(self, ii, **kwargs):
         v={}
@@ -481,6 +516,10 @@ class BT(VBTfunc):
      #Like retard, but the long/short is decided in function of the macro trend
      #Obviously the logic is reverted
     def preselect_retard_macro(self,**kwargs):
+        if kwargs.get("keep",False):
+            self.st.stratF()        
+            self.overwrite_strat11(self.st.entries,self.st.exits)            
+        
         self.dur=ic.VBTKAMATREND.run(self.close).duration
         self.macro_trend=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
         
@@ -498,7 +537,7 @@ class BT(VBTfunc):
                     self.excluded.append(self.pf[0])
 
                 res=self.preselect_retard_sub(ii,short,**kwargs)           
-                self.calculate_retard(ii,short)
+                self.calculate_retard(ii,short,**kwargs)
         self.res=res #last one    
         self.last_short=short
         #return res #for display
@@ -794,9 +833,7 @@ class BT(VBTfunc):
                     self.candidates[ii].append(symbol)
                     break
             self.calculate_retard(ii,False,**kwargs)     
-                        
- 
-    
+
 #WQ uses the prebuild 101 Formulaic Alphas
 #No underlying strategy is necessary
 class WQ(VBTfunc):

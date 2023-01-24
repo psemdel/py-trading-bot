@@ -128,18 +128,26 @@ class Report(models.Model):
     def order_nosubstrat(self,candidates, exchange, key, short,auto,**kwargs):
         #if there is a reversal the opposite pf needs to emptied
         pf_inv=get_pf(key,exchange,not short,**kwargs)
+        
+        if kwargs.get("keep",False):
+            pf_keep=get_pf("retard_keep",exchange,short,**kwargs)
 
         for symbol in pf_inv.retrieve(): 
             if symbol not in candidates:
                 ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs)
                 self.order_nosubstrat_sub(symbol, short, ex, auto)
-        
+
         #sell
         pf=get_pf(key,exchange,short,**kwargs)
         for symbol in pf.retrieve():
             if symbol not in candidates:
-                ex, auto=exit_order(symbol,key, exchange,short,auto, **kwargs)
-                self.order_nosubstrat_sub(symbol, short, ex, auto)
+                if kwargs.get("keep",False):
+                    action=Action.objects.get(symbol=symbol)
+                    pf_keep.add(action) #move the symbol from retard to keep pf
+                    pf.remove(action)
+                else:
+                    ex, auto=exit_order(symbol,key, exchange,short,auto, **kwargs)
+                    self.order_nosubstrat_sub(symbol, short, ex, auto)
         
         if len(candidates)==0:
             self.concat(key +" no candidates")
@@ -184,11 +192,13 @@ class Report(models.Model):
             
 ### Preselected actions strategy    
     def presel_sub(self,use_IB,l,st, exchange,**kwargs):
-        if len([v for v in ["retard","macd_vol","divergence","retard_manual"] if v in l])!=0:
+        if len([v for v in ["retard","macd_vol","divergence", "retard_keep"] if v in l])!=0:
             presel=btP.Presel(use_IB,st=st,exchange=exchange)
             #hist slow does not need code here
-            if "retard" in l or "retard_manual" in l:   #auto is handled by DIC_PERFORM_ORDER in settings
+            if "retard" in l:   #auto is handled by DIC_PERFORM_ORDER in settings
                 self.retard(presel,exchange,st,**kwargs)
+            if "retard_keep" in l:
+                self.retard(presel,exchange,st,keep=True,**kwargs)
             if "divergence" in l:     
                 if _settings["DIVERGENCE_MACRO"]:
                     presel.call_strat("preselect_divergence_blocked")
@@ -244,7 +254,6 @@ class Report(models.Model):
                 self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[kwargs['sec']],st,exchange,**kwargs)
             else:    
                 for e in DIC_PRESEL_SECTOR: #try for each sector
-                    print("sector 123")
                     self.presel_sub(st.use_IB,DIC_PRESEL_SECTOR[e],st,exchange,sec=e,**kwargs)
         else:
             DIC_PRESEL=_settings["DIC_PRESEL"]
@@ -375,6 +384,38 @@ class Report(models.Model):
                         self.concat(symbol + " present decision : sell")
                     elif decision==-1:
                         self.concat(symbol + " present decision : buy")
+
+
+    def perform_keep_strat(self,symbols, stnormal, exchange, **kwargs):
+        if not self.it_is_index:
+            stnormal.stratF()
+            
+            pf_keep=get_pf("retard_keep",exchange,False,**kwargs)
+            pf_short_keep=get_pf("retard_keep",exchange,True,**kwargs)
+            
+            for symbol in symbols:
+                if symbol in pf_keep.retrieve():
+                    symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+                    self.define_ent_ex(
+                        False, #only exit
+                        stnormal.exits[symbol_complex_ex_normal].values[-1],
+                        False,
+                        False,
+                        stnormal.symbols_to_YF[symbol], 
+                        "retard_keep",
+                        exchange,
+                        **kwargs)
+                if symbol in pf_short_keep.retrieve():            
+                    symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
+                    self.define_ent_ex(
+                        False, #only exit
+                        False,
+                        False,
+                        stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                        stnormal.symbols_to_YF[symbol], 
+                        "retard_keep",
+                        exchange,
+                        **kwargs)
                         
     def perform_slow_strats(self, symbols, DICS, exchange, st, **kwargs):   
         # Slow candidates
@@ -467,7 +508,7 @@ class Report(models.Model):
 
                 ##Perform a single strategy on predefined actions
                 self.perform_normal_strat(stnormal.symbols, stnormal, exchange, **kwargs)
-                
+                self.perform_keep_strat(stnormal.symbols, stnormal, exchange, **kwargs)
                 ##Populate a report with different statistics
                 sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
                 sma=ic.VBTMA.run(stnormal.close)
@@ -499,7 +540,6 @@ class Report(models.Model):
 
                 print("Slow strategy proceeded") 
                 if sec is not None:
-                    print(ActionSector.objects.all())
                     self.sector=ActionSector.objects.get(name=sec) 
                 self.save()
                 return st

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Sun Dec 12 11:27:07 2021
@@ -107,8 +107,8 @@ CAC40_INTRO={
     "LR.PA":"2006-06-01", #from YF
     "WLN.PA":"2014-07-02",
     "ACA.PA":"2002-01-01",
+    "ACA.PA":"2007-01-22", #for some inexplicable reason on YF
     "SW.PA":"2000-03-01",
-    "ACA.PA":"2007-01-22" #for some inexplicable reason on YF
     }
 
 DAX=[

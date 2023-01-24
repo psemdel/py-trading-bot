@@ -19,19 +19,14 @@ def check_ib_permission(symbols):
             IBok=False
             break
         
-        a=Action.objects.get(symbol=symbol)        
-        if a.stock_ex.ib_ticker in _settings["IB_STOCKEX_NO_PERMISSION"]:
-            print("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
-            IBok=False
-            break
+        a=Action.objects.get(symbol=symbol)      
+        dic=_settings["DIC_STOCKEX"]
+        if a.stock_ex.name in dic:
+            if dic[a.stock_ex.name]["IB_auth"]==False:
+                print("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
+                IBok=False
+                break
     return IBok
-
-def check_exchange_ib_permission(exchange):
-    s_ex=StockEx.objects.get(name=exchange)
-    if s_ex.ib_ticker in _settings["IB_STOCKEX_NO_PERMISSION"]:
-        return False
-    else:
-        return True   
     
 ### Get lists of actions for the reporting
 def get_exchange_actions(exchange,**kwargs):
@@ -40,7 +35,7 @@ def get_exchange_actions(exchange,**kwargs):
     
     c1 = Q(category=cat)
     c2 = Q(stock_ex=stockEx)
-    c3 = Q(delisted=False)
+    c3 = Q(delisted=False) #to be removed
     
     if exchange=="NYSE" and kwargs.get("sec"):
         action_sector=ActionSector.objects.get(name=kwargs.get("sec"))
@@ -49,6 +44,7 @@ def get_exchange_actions(exchange,**kwargs):
     else:
         actions=Action.objects.filter(c1 & c2 & c3)
         
+    #actions=filter_intro_action( actions,None)  
     use_IB=False
     if _settings["USE_IB_FOR_DATA"]:
         use_IB=check_ib_permission([a.symbol for a in actions])
@@ -176,8 +172,10 @@ class Action(models.Model):
     
 def filter_intro_sub(a,y_period):
     td=datetime.datetime.today()
-    min_y=td.year-y_period
-    limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
+    if y_period is None:
+        limit_date=td
+    else:
+        limit_date=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here
 
     if a.intro_date is not None: #should come from database
         if a.intro_date>limit_date :
@@ -251,6 +249,9 @@ class PF(models.Model):
     def __str__(self):
         return self.name
     
+    def get_len(self):
+        return len(self.actions.all())
+    
     def retrieve(self):
         arr=[]
         for action in self.actions.all():
@@ -301,7 +302,9 @@ def get_pf(strategy, exchange,short,**kwargs):
 
         return res
     except Exception as e:
-        logger.error(e, stack_info=True, exc_info=True)
+        print(e)
+        print(strategy)
+        #logger.error(e, stack_info=True, exc_info=True)
 
 ### To distinguish between ETF, actions, indexes...
 class ActionCategory(models.Model):
@@ -362,7 +365,8 @@ def get_order_capital(strategy, exchange,**kwargs):
             sector=ActionSector.objects.get(name=sector),
             name=name
             )
-        if created:
+        
+        if created or res.capital is None:
             res.capital=0
         
         return res

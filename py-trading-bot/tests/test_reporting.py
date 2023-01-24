@@ -28,6 +28,7 @@ class TestReporting(TestCase):
         e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART")
         e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE")
+        e5=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP")
         
         c=Currency.objects.create(name="euro")
         c2=Currency.objects.create(name="dollar")
@@ -45,6 +46,7 @@ class TestReporting(TestCase):
         strategy8=Strategy.objects.create(name="wq31")
         strategy9=Strategy.objects.create(name="wq53")
         strategy10=Strategy.objects.create(name="wq54")
+        strategy11=Strategy.objects.create(name="retard_keep")
         
         StratCandidates.objects.create(name="normal",strategy=strategy2)
         s=ActionSector.objects.create(name="undefined")
@@ -219,7 +221,7 @@ class TestReporting(TestCase):
             symbol='^FCHI',
             #ib_ticker='AC',
             name='Cac40',
-            stock_ex=e,
+            stock_ex=e5,
             currency=c,
             category=cat3,
             etf_long=etf1,
@@ -276,16 +278,17 @@ class TestReporting(TestCase):
         OrderCapital.objects.create(capital=1,name="wq31_Paris",strategy=strategy8,stock_ex=e,sector=s)
         OrderCapital.objects.create(capital=1,name="wq53_Paris",strategy=strategy9,stock_ex=e,sector=s)
         OrderCapital.objects.create(capital=1,name="wq54_Paris",strategy=strategy10,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,name="retard_keep",strategy=strategy11,stock_ex=e,sector=s)
         
         self.report1=m.Report(sector=s)
         self.report1.save()
         
         _settings["PERFORM_ORDER"]=False #avoid to perform orders
         _settings["DIC_PRESEL"]={
-                "Paris":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"],
-                "XETRA":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"], 
-                "Nasdaq":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"],
-                "NYSE":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"]
+                "Paris":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"],
+                "XETRA":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"], 
+                "Nasdaq":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"],
+                "NYSE":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"]
                 }
       
         _settings["DIC_PRESEL_SECTOR"]={
@@ -331,7 +334,6 @@ class TestReporting(TestCase):
             st=report.daily_report_action("NYSE",sec=s) 
             report.presel(st,"NYSE",sec=s)
             report.presel_wq(st,"NYSE",sec=s)
-         
+                 
 if __name__ == '__main__':
     unittest.main() 
-

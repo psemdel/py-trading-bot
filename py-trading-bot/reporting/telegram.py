@@ -6,7 +6,6 @@ Created on Sat Feb 12 14:09:14 2022
 @author: maxime
 """
 import os
-import sys
 
 from django.conf import settings
 from django.utils import timezone
@@ -210,11 +209,8 @@ class MyScheduler():
                         self.telegram_bot.send_message_to_all( 
                                 op_text+"Recovery, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                 
-        except Exception as msg:
-            print("exception in check change")
-            print(msg)
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
             pass
 
     def check_cours(self,actions, short,**kwargs):
@@ -239,11 +235,8 @@ class MyScheduler():
                 ratio=get_ratio(action,**kwargs)
                 self.check_change(ratio, action,short,**kwargs)
                 
-        except Exception as msg:
-            print("exception in check_cours ")
-            print(msg)
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
             pass   
 
     def check_index(self,**kwargs):
@@ -269,11 +262,8 @@ class MyScheduler():
             self.check_cours(indexes, False,index=True,**kwargs)
             self.check_cours(indexes, True,index=True,**kwargs)
             
-        except Exception as msg:
-            print("exception in check_index")
-            print(msg)
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
             pass
 
     def check_pf(self,**kwargs):
@@ -292,11 +282,8 @@ class MyScheduler():
             if len(actions_short)>0:
                 self.check_cours(actions_short, True,**kwargs)
                 
-        except Exception as msg:
-            print("exception in check_pf")
-            print(msg)
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
             pass
 
     def check_sl(self,actions,**kwargs):
@@ -363,12 +350,10 @@ class MyScheduler():
 
             self.telegram_bot.send_message_to_all("Daily report 17h ready")
             
-        except ValueError as msg:
-            print(msg)            
-        except Exception as msg:
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)
+        except ValueError as e:
+            logger.error(e, stack_info=True, exc_info=True)  
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
             pass
     
     def daily_report_22h(self):
@@ -404,12 +389,10 @@ class MyScheduler():
             self.telegram_bot.send_message_to_all( 
                              "Daily report 22h ready")  
             
-        except ValueError as msg:
-            print(msg)            
-        except Exception as msg:
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)
+        except ValueError as e:
+            logger.error(e, stack_info=True, exc_info=True)  
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
             pass
 
     def send_entry_exit_msg(self,symbol,entry,short, auto):

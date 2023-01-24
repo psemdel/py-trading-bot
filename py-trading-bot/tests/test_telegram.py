@@ -12,6 +12,8 @@ from django.test import TestCase
 import reporting.telegram as tel
 from reporting.models import Alert
 from orders.models import Fees, StockEx, Action, ActionSector, ActionCategory, Strategy, Currency
+import vectorbtpro as vbt
+from reporting import telegram_sub
 
 class MockTelegramBot():
     def send_message_to_all(self,msg):
@@ -74,6 +76,14 @@ class TestTelegram(TestCase):
         self.assertEqual(len(Alert.objects.all()),1) 
         self.sched.check_change(10, self.a,True)
         self.assertEqual(len(Alert.objects.all()),2) 
-
+        
+    def test_start_telegram(self):
+        with open('trading_bot/etc/TELEGRAM_TOKEN') as f:
+            TELEGRAM_TOKEN = f.read().strip()
+        bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN) #vbt.TelegramBot should work, don't hesitate to replace it
+        bot.start(in_background=True)
+        bot.stop()
+            
+            
 if __name__ == '__main__':
     unittest.main() 

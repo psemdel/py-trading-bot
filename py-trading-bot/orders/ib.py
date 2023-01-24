@@ -23,7 +23,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from orders.models import (Action, Order, ActionCategory, Excluded, Strategy,
-                           check_exchange_ib_permission, action_to_etf,
+                           action_to_etf,
                            get_pf, get_order_capital, period_YF_to_ib,
                            exchange_to_index_symbol
                            )
@@ -367,6 +367,7 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
     try:
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
+               
         action=Action.objects.get(symbol=symbol)
         action=action_to_etf(action,short)
         
@@ -430,13 +431,13 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
         excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
         if (symbol in pf.retrieve() ):
-            logger.info(symbol + " already in portfolio")
+            logger.info(str(symbol) + " already in portfolio")
         if (symbol in excluded.retrieve() ):
-            logger.info(symbol + " excluded")    
+            logger.info(str(symbol) + " excluded")    
         #if (ocap.capital==0):
             #print(symbol + " order not executed, no order capital available: " + ocap.name)
         if order_size>balance:
-            logger.info(symbol + " order not executed, not enough cash available")
+            logger.info(str(symbol) + " order not executed, not enough cash available")
         
         if (symbol not in pf.retrieve() and 
             symbol not in excluded.retrieve() and  
@@ -466,7 +467,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         return False
     
     except Exception as e:
-        logger.error(e + "symbol: "+str(symbol), stack_info=True, exc_info=True)
+        logger.error(str(e) + "symbol: "+str(symbol), stack_info=True, exc_info=True)
         pass
    
 def check_hold_duration(symbol,strategy, exchange,short,**kwargs): 
@@ -493,8 +494,15 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
 @connect_ib 
 def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
     try:
-        if kwargs['client'] and (_settings["PERFORM_ORDER"] and _settings["DIC_PERFORM_ORDER"][strategy] #and not kwargs.get("index",False)
-            and check_exchange_ib_permission(exchange) and not auto==False): #ETF trading requires too high permissions on IB, XETRA data too expansive
+        dic=_settings["DIC_STOCKEX"]
+        
+        if (kwargs['client'] and
+           _settings["PERFORM_ORDER"] and
+           exchange in dic and
+           dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
+           _settings["DIC_PERFORM_ORDER"][strategy] and
+           not auto==False):
+            
             logger.info("automatic order execution")
             return entry_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
         else: 
@@ -508,8 +516,14 @@ def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
 
 @connect_ib     
 def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
-    if kwargs['client'] and (_settings["PERFORM_ORDER"] and _settings["DIC_PERFORM_ORDER"][strategy] #and not kwargs.get("index",False)
-        and check_exchange_ib_permission(exchange) and not auto==False): #ETF trading requires too high permissions on IB, XETRA data too expansive
+    dic=_settings["DIC_STOCKEX"]
+    
+    if (kwargs['client'] and
+       _settings["PERFORM_ORDER"] and
+       exchange in dic and
+       dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
+       not auto==False):
+    
         return exit_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
     else:   
         return exit_order_sub(symbol,strategy, exchange,short,False,**kwargs), False
@@ -570,8 +584,25 @@ def retrieve_data_YF(actions,period,**kwargs):
         else:
             _, index_symbol=exchange_to_index_symbol(actions[0].stock_ex.ib_ticker)  
             all_symbols=symbols+[index_symbol]
-
-        return vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs),\
+            
+        res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+        #ok=False
+        
+        #test if the symbols were downloaded
+        #while not ok and len(symbols)>=0:
+        #    res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+        #    ok=True
+        #    o=res.get('Open')
+        #    for s in symbols:
+        #        try:
+        #            o[s]
+        #        except:
+       #             print("symbol not found: "+s)
+        #            ok=False
+        #            symbols.remove(s)
+        #            all_symbols.remove(s)
+        
+        return res,\
                symbols,\
                index_symbol    
     except Exception as e:

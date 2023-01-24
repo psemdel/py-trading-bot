@@ -4,15 +4,28 @@ import os
 _settings={
 ## IB configuration
 "IB_LOCALHOST":'127.0.0.1',
-"IB_PORT": os.environ.get("IB_PORT",4001), #IB Gateway 4001, TWS 7496
+"IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
 
 ## Preselection to be used for the different stock exchanges ##
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
+
+"DIC_STOCKEX":{
+    "Paris":{"IB_auth":True,"perform_order":False},
+    "XETRA":{"IB_auth":False,"perform_order":False},
+    "Nasdaq":{"IB_auth":True,"perform_order":True},
+    "NYSE":{"IB_auth":True,"perform_order":True},
+    "MONEP":{"IB_auth":True,"perform_order":True},
+    "EUREX":{"IB_auth":False,"perform_order":False},
+    "Milan":{"IB_auth":False,"perform_order":False},
+    "NASDAQ IND":{"IB_auth":False,"perform_order":False},
+    },
+    
+
 "DIC_PRESEL":{
-    "Paris":["retard_manual","divergence"],
-    "XETRA":["retard_manual","divergence"], 
-    "Nasdaq":["retard","divergence"],
+    "Paris":["retard","divergence"],
+    "XETRA":["retard","divergence"], 
+    "Nasdaq":["retard_keep","divergence"],
     "NYSE":[]
     },
 
@@ -44,12 +57,10 @@ _settings={
 "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
 
 ## Order settings ##
-"USE_IB_FOR_DATA":os.environ.get("USE_IB_FOR_DATA",True), #use IB for Data or YF
-"IB_STOCKEX_NO_PERMISSION":["IBIS","EUREX","NASDAQ IND"], #"BVME.ETF"
-"IB_STOCKEX_PERMISSION":["SMART","SBF","NYSE","BVME.ETF"],
+"USE_IB_FOR_DATA":os.environ.get("USE_IB_FOR_DATA",False), #use IB for Data or YF
 "IB_STOCK_NO_PERMISSION":["NDX"],
 
-"PERFORM_ORDER":True, #test or use IB to perform orders
+"PERFORM_ORDER":False, #test or use IB to perform orders
 ## Can be configured for each strategy separately (depending on how often the strategy will trade)
 ## relation is PERFORM_ORDER and DIC_PERFORM_ORDER
 "DIC_PERFORM_ORDER":{
@@ -270,41 +281,33 @@ else:
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 LOGGING = {
+    # Define the logging version
     'version': 1,
-    'disable_existing_loggers' : False,
+    # Enable the existing loggers
+    'disable_existing_loggers': False,
     'formatters': {
         'default': {
             'format': '[%(asctime)s] %(levelname)s %(lineno)d %(message)s',
             'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
-    'loggers': {
-        'general': {
-            'handlers': ['error', 'info', 'warning'],
-            'level': 1
-        }
-    },
+    # Define the handlers
     'handlers': {
-        'std_err': {
-            'class': 'logging.StreamHandler'
-        },
-        'info': {
+        'file': {
+            'level': 'INFO',
             'class': 'logging.FileHandler',
             'filename': 'logs/info.log',
+             'formatter': 'default',
+        },
+    },
+
+   # Define the loggers
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
             'level': 'INFO',
-            'formatter': 'default',
+            'propagate': True,
+
         },
-        'error': {
-            'class': 'logging.FileHandler',
-            'filename': 'logs/error.log',
-            'level': 'ERROR',
-            'formatter': 'default',
-        },
-        'warning': {
-            'class': 'logging.FileHandler',
-            'filename': 'logs/warning.log',
-            'level': 'WARNING',
-            'formatter': 'default',
-        },
-    }
+    },
 }

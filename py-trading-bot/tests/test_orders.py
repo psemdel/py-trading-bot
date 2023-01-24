@@ -10,6 +10,9 @@ import unittest
 import numpy as np
 from django.test import TestCase
 from orders import models as m
+from datetime import datetime
+from backports.zoneinfo import ZoneInfo
+tz_Paris=ZoneInfo('Europe/Paris')
 
 class TestConversion(TestCase):
     def test_period_YF_to_ib(self):
@@ -56,6 +59,7 @@ class TestOrders(TestCase):
             category=cat,
             #strategy=strategy,
             sector=self.s,
+            intro_date=datetime(2020,1,1,tzinfo=tz_Paris)
             )
         self.a2=m.Action.objects.create(
             symbol='AIR.PA',
@@ -76,6 +80,7 @@ class TestOrders(TestCase):
             category=cat,
             #strategy=strategy,
             sector=self.s,
+            
             )
         
         self.actions=[self.a, self.a2, self.a3]
@@ -135,6 +140,12 @@ class TestOrders(TestCase):
         ocap2=m.get_order_capital("none","Paris")
         
         self.assertEqual(ocap,ocap2)
+        
+    def test_filter_intro_action(self):
+        res=m.filter_intro_action([self.a2],5)
+        self.assertEqual([self.a2],res)
+        res=m.filter_intro_action([self.a],5)
+        self.assertEqual(0,len(res))
        
 if __name__ == '__main__':
     unittest.main() 
