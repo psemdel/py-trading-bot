@@ -92,7 +92,7 @@ class MyScheduler():
         if self.heartbeat:
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
         if self.cleaning:
-            self.do_weekday(time(16,2,tzinfo=tz_NY),self.daily_report_22h)
+            self.do_weekday(time(16,2,tzinfo=tz_NY),self.cleaning_f)
 
         if (self.pf_check    or
             self.index_check or
@@ -370,8 +370,7 @@ class MyScheduler():
             report1.presel_wq(st,"Nasdaq")
             self.send_order(report1)
             
-            for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
-                      "fin","materials","healthcare"]:
+            for s in _settings["NYSE_SECTOR_TO_SCAN"]:  
                 print("starting report " + s)
                 report=Report()
                 report.save()

@@ -23,8 +23,8 @@ _settings={
     
 
 "DIC_PRESEL":{
-    "Paris":["retard","divergence"],
-    "XETRA":["retard","divergence"], 
+    "Paris":["retard_keep","divergence"],
+    "XETRA":["retard_keep","divergence"], 
     "Nasdaq":["retard_keep","divergence"],
     "NYSE":[]
     },
@@ -32,7 +32,7 @@ _settings={
 "DIC_PRESEL_SECTOR":{
     "realestate":[],
     "industry":[],
-    "it":["retard"],
+    "it":["retard_keep"],
     "com":[],
     "staples":[],
     "consumer":[],
@@ -42,6 +42,9 @@ _settings={
     "materials":[],
     "healthcare":[],
     },
+
+"NYSE_SECTOR_TO_SCAN":["it"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\
+          #"fin","materials","healthcare"
 
 ## Configuration of Telegram ##
 "PF_CHECK":True,
@@ -60,7 +63,7 @@ _settings={
 "USE_IB_FOR_DATA":os.environ.get("USE_IB_FOR_DATA",False), #use IB for Data or YF
 "IB_STOCK_NO_PERMISSION":["NDX"],
 
-"PERFORM_ORDER":False, #test or use IB to perform orders
+"PERFORM_ORDER":True, #test or use IB to perform orders
 ## Can be configured for each strategy separately (depending on how often the strategy will trade)
 ## relation is PERFORM_ORDER and DIC_PERFORM_ORDER
 "DIC_PERFORM_ORDER":{
@@ -101,6 +104,9 @@ _settings={
 "STOCH_LL":20,
 "STOCH_LU":80,
 "BBAND_THRESHOLD":0.15,
+
+"CALCULATE_PATTERN":False, #pattern calculation is time consuming
+"CALCULATE_TREND":False,   #trend calculation is time consuming
 
 #for some major events, that cannot be detected only with technical analysis
 "FORCE_MACRO_TO":"" #"bull"/"uncertain"/""

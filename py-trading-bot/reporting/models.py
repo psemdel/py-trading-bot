@@ -46,7 +46,9 @@ class Report(models.Model):
         self.save()
 
     def daily_report_index(self,symbols):
-        use_IB=check_ib_permission(symbols)
+        use_IB=False
+        if _settings["USE_IB_FOR_DATA"]:
+            use_IB=check_ib_permission(symbols)
         actions=[]
         
         for symbol in symbols:
@@ -176,7 +178,7 @@ class Report(models.Model):
             DIC_PRESEL=_settings["DIC_PRESEL"]
             if key in DIC_PRESEL[exchange]:
                 to_calculate=True
-         
+        
         if to_calculate:
             wq=btP.WQPRD(st.use_IB,st=st,exchange=exchange)
             
@@ -199,7 +201,7 @@ class Report(models.Model):
                 self.retard(presel,exchange,st,**kwargs)
             if "retard_keep" in l:
                 self.retard(presel,exchange,st,keep=True,**kwargs)
-            if "divergence" in l:     
+            if "divergence" in l:    
                 if _settings["DIVERGENCE_MACRO"]:
                     presel.call_strat("preselect_divergence_blocked")
                 else:
@@ -293,8 +295,6 @@ class Report(models.Model):
             if math.isnan(st.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")
-                
                 with warnings.catch_warnings():
                     #Necessary because of the presence of NaN
                     warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -309,14 +309,18 @@ class Report(models.Model):
                     ar.date=st.date()
                     ar.vol=st.vol[symbol].values[-1]
                     
-                    ar.bbands_bandwith=st.bb_bw[symbol_complex_ent].values[-1]
+                    if _settings["CALCULATE_TREND"]:
+                        symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")
+                        
+                        ar.bbands_bandwith=st.bb_bw[symbol_complex_ent].values[-1]
+                        ar.trend=float(st.trend[symbol_complex_ent].values[-1])
+                        ar.macro_trend=float(st.macro_trend[symbol_complex_ent].values[-1])
                     
                     ar.three_mo_evol=grow_past50_raw[(50,False,symbol)].values[-1]
                     ar.three_mo_evol_sm=grow_past50_ma[(50,True,symbol)].values[-1]
                     ar.one_mo_evol=grow_past20_raw[(20,False,symbol)].values[-1]
                     ar.one_mo_evol_sm=grow_past20_ma[(20,True,symbol)].values[-1]
-                    ar.trend=float(st.trend[symbol_complex_ent].values[-1])
-                    ar.macro_trend=float(st.macro_trend[symbol_complex_ent].values[-1])
+                    
                     
                     ar.kama_ent=sk.entries_kama[symbol].values[-1]
                     ar.kama_ex=sk.exits_kama[symbol].values[-1]
@@ -333,21 +337,23 @@ class Report(models.Model):
                     ar.ma_ent=sma.entries[symbol].values[-1]
                     ar.ma_ex=sma.exits[symbol].values[-1]
             
-                    ar.pattern_light_ent=sp.entries[(True, symbol)].values[-1] or\
-                                         sp.entries[(True, symbol)].values[-2]
-                                         
-                    ar.pattern_light_ex=sp.exits[(True, symbol)].values[-1] or\
-                                        sp.exits[(True, symbol)].values[-2]
+                    if _settings["CALCULATE_PATTERN"]:
+                        ar.pattern_light_ent=sp.entries[(True, symbol)].values[-1] or\
+                                             sp.entries[(True, symbol)].values[-2]
+                                             
+                        ar.pattern_light_ex=sp.exits[(True, symbol)].values[-1] or\
+                                            sp.exits[(True, symbol)].values[-2]
             
                     if self.it_is_index:
                         if ar.kama_ent:
                             self.concat(" Index " + symbol + " KAMA bottom detected!")
                         if ar.kama_ex:
                             self.concat(" Index " + symbol + " KAMA top detected!")
-                        if st.max_ind[symbol_complex_ent][-1]!=0:
-                            self.concat(" Index " + symbol + " V maximum detected!")
-                        if st.min_ind[symbol_complex_ent][-1]!=0:
-                            self.concat(" Index " + symbol + " V minimum detected!")                            
+                        if _settings["CALCULATE_TREND"]:    
+                            if st.max_ind[symbol_complex_ent][-1]!=0:
+                                self.concat(" Index " + symbol + " V maximum detected!")
+                            if st.min_ind[symbol_complex_ent][-1]!=0:
+                                self.concat(" Index " + symbol + " V minimum detected!")                            
                     ar.save()  
         
     #for a group of predefined actions, determine the signals    
@@ -388,13 +394,14 @@ class Report(models.Model):
 
     def perform_keep_strat(self,symbols, stnormal, exchange, **kwargs):
         if not self.it_is_index:
-            stnormal.stratF()
+            #stnormal.stratF()
             
             pf_keep=get_pf("retard_keep",exchange,False,**kwargs)
             pf_short_keep=get_pf("retard_keep",exchange,True,**kwargs)
             
             for symbol in symbols:
                 if symbol in pf_keep.retrieve():
+                    print("symbol presently in keep: "+symbol)
                     symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
                     self.define_ent_ex(
                         False, #only exit
@@ -405,7 +412,8 @@ class Report(models.Model):
                         "retard_keep",
                         exchange,
                         **kwargs)
-                if symbol in pf_short_keep.retrieve():            
+                if symbol in pf_short_keep.retrieve(): 
+                    print("symbol presently in keep short: "+symbol)
                     symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
                     self.define_ent_ex(
                         False, #only exit
@@ -457,11 +465,15 @@ class Report(models.Model):
         ##Change underlying strategy
         st.call_strat("stratDiv")
         ##only_exit_substrat
+        print("symbols in divergence: "+pf_div.retrieve())
         for symbol in symbols:
             symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
 
+            
             if "divergence" in DICS and exchange is not None and\
                     st.symbols_to_YF[symbol] in pf_div.retrieve(): 
+                    print("exit " + str(st.exits[symbol_complex_ent].values[-1]))    
+                        
                     self.define_ent_ex(
                         False,
                         st.exits[symbol_complex_ent].values[-1],
@@ -512,7 +524,10 @@ class Report(models.Model):
                 ##Populate a report with different statistics
                 sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
                 sma=ic.VBTMA.run(stnormal.close)
-                sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
+                
+                sp=None
+                if _settings["CALCULATE_PATTERN"]:
+                    sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
                 
                 st=stratP.StratPRD(use_IB,
                                         actions1=actions,
@@ -527,7 +542,9 @@ class Report(models.Model):
                                         close_ind=stnormal.close_ind, 
                                         volume_ind=stnormal.volume_ind,
                                        **kwargs)
-                st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
+                
+                if _settings["CALCULATE_TREND"]:
+                    st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
                 
                 self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, st, sk, sma, sp)
                 print("Strat daily report written " +(exchange or ""))
@@ -535,7 +552,7 @@ class Report(models.Model):
                 ##Perform strategies that rely on the regular preselection of a candidate
                 self.perform_slow_strats(stnormal.symbols, DICS, exchange, st, **kwargs)
                 
-                ##Perform the strategy divergence
+                ##Perform the strategy divergence, the exit to be precise, the entry are performed by presel
                 self.perform_divergence(stnormal.symbols,exchange, st, _settings["DIC_PRESEL"], DICS, **kwargs)
 
                 print("Slow strategy proceeded") 

@@ -7,6 +7,8 @@ Created on Sun Jan  9 13:09:58 2022
 """
 import math
 import numpy as np
+from datetime import datetime
+from core.constants import INTRO
 
 from core.data_manager import retrieve
 
@@ -25,6 +27,25 @@ class VBTfunc():
         else:
             return round(n/d-1,4) 
     
+def filter_intro_symbol_sub(s,y_period):
+    td=datetime.today()
+    min_y=td.year-y_period
+    limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
+
+    if s in INTRO: #should come from database
+        if INTRO[s]<limit_date:
+            return True
+    else:
+        return True
+    return False
+
+def filter_intro_symbol(input_symbols,y_period):
+    symbols=[]
+    for s in input_symbols:
+        if filter_intro_symbol_sub(s,y_period):
+            symbols.append(s)   
+    return symbols   
+
 def save(x_df,filename):
     x_df.to_csv('data/'+filename)
 

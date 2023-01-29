@@ -19,6 +19,7 @@ import sys
 from trading_bot.settings import _settings
 
 ### General functions ###
+@njit 
 def rel_dif(n,d): #for instance to calculate distance between MA and signal
     if d==0 or np.isnan(n) or np.isnan(d):
         return 0
@@ -489,6 +490,7 @@ def macd_trend_sub(close,macd, hist, lim1, lim2):
         trend[ii]=t
     return trend 
 
+
 def macd_trend_sub2(close, bb_bw, direction):   #trend,
     trend= np.full(close.shape, 0.0)  
     bband_lim=_settings["BBAND_THRESHOLD"]
@@ -557,6 +559,7 @@ VBTMACDBBTREND = vbt.IF(
      
 ### Grow
 #Calculate the grow of an action over past period
+@njit 
 def grow_sub(close,dis):
     res=np.full(close.shape, 0.0)
     #ii=len(close)-1    #we only need the last
@@ -590,11 +593,12 @@ VBTGROW = vbt.IF(
 
 ### Divergence
 #Calculate the difference between variation of an action and the index     
+@njit
 def divergence_f_sub(close,close_ind):
     out= np.full(close.shape, 0.0)
-    
+
     for ii in range(2,len(close)):
-        if np.isnan(close[ii]) or np.isnan(close[ii-1]):
+        if np.isnan(close[ii]) or np.isnan(close[ii-1]) or np.isnan(close_ind[ii-1]):
             out[ii]=0
         else:
             p1=close[ii]/close[ii-1]
@@ -608,7 +612,7 @@ def divergence_f(close,close_ind):
     ma = vbt.MA.run(close, window).ma
     ma_ind = vbt.MA.run(close_ind, window).ma
     
-    return divergence_f_sub(ma,ma_ind)
+    return divergence_f_sub(ma.values,ma_ind.values) 
 
 VBTDIVERGENCE = vbt.IF(
       class_name='VBTDivergence',
@@ -619,6 +623,3 @@ VBTDIVERGENCE = vbt.IF(
       divergence_f, 
       takes_1d=True,  
  ) 
-     
-     
-    

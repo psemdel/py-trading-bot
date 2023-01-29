@@ -5,6 +5,7 @@ from reporting.telegram import start
 from reporting.models import Report, ActionReport, Alert, ListOfActions
 from core import bt, btP
 from orders.models import ActionCategory, StockEx, Action, get_exchange_actions
+from trading_bot.settings import _settings
 
 from .filter import ReportFilter
 
@@ -97,8 +98,7 @@ def trigger_22h(request):
         report1.presel_wq(st,"Nasdaq")
         send_order_test(report1)
         
-        for s in ["realestate","industry","it","com","staples","consumer","utilities","energy",\
-                  "fin","materials","healthcare"]: 
+        for s in _settings["NYSE_SECTOR_TO_SCAN"]:
             print("starting report " + s)      
             report=Report()
             report.save()
@@ -220,6 +220,21 @@ def test(request):
     from ib_insync import Stock
     import vectorbt as vbt
         
+    import logging
+    #logger = logging.getLogger(__name__)
+    
+    report1=Report()
+    report1.save()
+
+    st=report1.daily_report_action("Nasdaq") 
+    
+    if st is None:
+        raise ValueError("The creation of the strategy failed, report creation interrupted")
+        
+    #report1.presel(st,"Nasdaq")
+    print("presel_wq")
+    report1.presel_wq(st,"Nasdaq")
+    send_order_test(report1)
     #action=Action.objects.get(symbol="EN.PA")
     #myIB=MyIB()
     
