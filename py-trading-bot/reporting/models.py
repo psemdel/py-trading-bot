@@ -356,6 +356,17 @@ class Report(models.Model):
                                 self.concat(" Index " + symbol + " V minimum detected!")                            
                     ar.save()  
         
+        
+    def display_last_decision(self,symbol,stnormal):
+        symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
+        symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+        decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
+        if decision==1:
+            self.concat(symbol + " present decision : sell")
+        elif decision==-1:
+            self.concat(symbol + " present decision : buy")
+        return symbol_complex_ent_normal, symbol_complex_ex_normal
+            
     #for a group of predefined actions, determine the signals    
     def perform_normal_strat(self,symbols, stnormal, exchange, **kwargs):
         if self.it_is_index:
@@ -372,8 +383,7 @@ class Report(models.Model):
                 if math.isnan(stnormal.vol[symbol].values[-1]):
                     self.concat("symbol " + symbol + " no data")
                 else:
-                    symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
-                    symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
                     
                     #list present status
                     self.define_ent_ex(
@@ -385,12 +395,6 @@ class Report(models.Model):
                         "normal",
                         exchange,
                         **kwargs)
-                    decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
-                    if decision==1:
-                        self.concat(symbol + " present decision : sell")
-                    elif decision==-1:
-                        self.concat(symbol + " present decision : buy")
-
 
     def perform_keep_strat(self,symbols, stnormal, exchange, **kwargs):
         if not self.it_is_index:
@@ -402,7 +406,8 @@ class Report(models.Model):
             for symbol in symbols:
                 if symbol in pf_keep.retrieve():
                     print("symbol presently in keep: "+symbol)
-                    symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+
                     self.define_ent_ex(
                         False, #only exit
                         stnormal.exits[symbol_complex_ex_normal].values[-1],
@@ -414,7 +419,7 @@ class Report(models.Model):
                         **kwargs)
                 if symbol in pf_short_keep.retrieve(): 
                     print("symbol presently in keep short: "+symbol)
-                    symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
                     self.define_ent_ex(
                         False, #only exit
                         False,
@@ -462,10 +467,12 @@ class Report(models.Model):
         
         if exchange is not None and "divergence" in DIC_PRESEL[exchange]: 
             pf_div=get_pf("divergence",exchange,False,**kwargs)
+            print("symbols in divergence: ")
+            print(pf_div.retrieve())
         ##Change underlying strategy
         st.call_strat("stratDiv")
         ##only_exit_substrat
-        print("symbols in divergence: "+pf_div.retrieve())
+
         for symbol in symbols:
             symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
 
