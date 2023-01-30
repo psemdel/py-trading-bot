@@ -323,7 +323,7 @@ class BT(VBTfunc):
             for ii in range(len(self.close.index)):
                 res=self.preselect_vol_sub(ii,**kwargs)
             self.calculate(**kwargs)
-        self.res=res #last one                 
+        self.out=res #last one                 
 
     #See preselect_retard
     #Coded only for one candidate
@@ -371,7 +371,7 @@ class BT(VBTfunc):
                  res=self.preselect_retard_sub(ii,short,**kwargs)                         
                  self.calculate_retard(ii,short,**kwargs)
                     
-        self.res=res #last one  
+        self.out=res #last one  
         return res                   
 
         
@@ -414,7 +414,7 @@ class BT(VBTfunc):
                  res=self.preselect_macd_vol_sub(ii,short)
 
              self.calculate(**kwargs)
-         self.res=res #last one 
+         self.out=res #last one 
                 
     #See preselect_hist_vol
     def preselect_hist_vol_sub(self,ii,short,**kwargs):  
@@ -453,7 +453,7 @@ class BT(VBTfunc):
                  res=self.preselect_hist_vol_sub(ii,short)
 
          self.calculate(**kwargs)                
-         self.res=res #last one 
+         self.out=res #last one 
 
 ### Macro trend ### 
 # Preselection using the macro trend
@@ -511,7 +511,7 @@ class BT(VBTfunc):
                 res=self.preselect_macd_vol_macro_sub(ii,**kwargs)
            
              self.calculate_macro(**kwargs)
-         self.res=res #last one 
+         self.out=res #last one 
 
      #Like retard, but the long/short is decided in function of the macro trend
      #Obviously the logic is reverted
@@ -538,7 +538,7 @@ class BT(VBTfunc):
 
                 res=self.preselect_retard_sub(ii,short,**kwargs)           
                 self.calculate_retard(ii,short,**kwargs)
-        self.res=res #last one    
+        self.out=res #last one    
         self.last_short=short
         #return res #for display
 
@@ -709,7 +709,7 @@ class BT(VBTfunc):
          self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
 
          v={}
-         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
+         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
         
          for ii in range(len(self.close.index)):
              if ii%self.frequency==0: #every 10 days
@@ -734,7 +734,7 @@ class BT(VBTfunc):
          self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
          self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend  
          v={}
-         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
+         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
         
          for ii in range(len(self.close.index)):
              short=(self.macro_trend.values[ii]==1)
@@ -809,7 +809,7 @@ class BT(VBTfunc):
     def preselect_onlybull_grow(self,**kwargs):
         distance=_settings["REALMADRID_DISTANCE"]
         self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
-        grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
+        grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
         
         for ii in range(len(self.close.index)):
             bull_symbols=self.macro_trend.loc[:,(self.macro_trend.iloc[ii] == -1)].columns

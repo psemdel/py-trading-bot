@@ -209,9 +209,8 @@ class Opt(VBTfunc):
     def defi(self,ent_or_ex):
         try:
             for ind in self.indexes: #CAC, DAX, NASDAQ
-                ents_raw=None 
-                
                 for nb_macro_mode in range(self.nb_macro_modes): #bull, bear, uncertain
+                    ents_raw=None 
                     calc_arr=self.calc_arrs[nb_macro_mode]
     
                     if ent_or_ex=="ent":
@@ -369,11 +368,11 @@ class Opt(VBTfunc):
 
     def random(self):
         #choose randomly 0 and 1. All zeros is not accepted.
-        arr=np.zeros(self.len_ent+self.len_ex)
+        arr=np.random.choice(2,self.len_ent+self.len_ex, p=[0.9, 0.1]) 
         
-        while np.sum(arr[0:self.len_ent] )==0 or np.sum(arr[self.len_ent:self.len_ent+self.len_ex])==0:
-            for ii in range(len(arr)):
-               arr[ii]=np.random.choice(np.arange(0, 2), p=[0.9, 0.1])   
+        while np.sum(arr[0:self.len_ent] )==0 or np.sum(arr[self.len_ent:self.len_ent+self.len_ex])==0:#entries or exits must not be full 0
+            arr=np.random.choice(2,self.len_ent+self.len_ex, p=[0.9, 0.1]) 
+
         return arr
     
     #define here a predefined starting point

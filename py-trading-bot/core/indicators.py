@@ -12,6 +12,8 @@ from talib.abstract import *
 import numpy as np
 from numba import njit
 import inspect
+import logging
+logger = logging.getLogger(__name__)
 
 from core import constants
 import sys
@@ -48,11 +50,8 @@ def func_name_to_res(func_name, open_, high, low, close):
         f=getattr(talib.abstract,func_name)
         return f(inputs)
     
-    except Exception as msg:
-        print("exception in " + __name__)
-        print(msg)
-        _, e_, exc_tb = sys.exc_info()
-        print("line " + str(exc_tb.tb_lineno))
+    except Exception as e:
+        logger.error(e, stack_info=True, exc_info=True)   
         pass 
 
 VBTOR= vbt.IF(
@@ -378,11 +377,10 @@ def pattern(open_, high, low, close, light=False):
     for kk, pat in enumerate(arr):
         for func_name in pat:
             res=func_name_to_res(func_name, open_, high, low, close)
-            for ii in range(len(res)):
-                if kk==0:
-                    exits[ii]=(bool(exits[ii]) or res[ii]==pat[func_name])
-                else:
-                    entries[ii]=(bool(entries[ii]) or res[ii]==pat[func_name])
+            if kk==0:
+                exits=np.logical_or((res==pat[func_name]), exits)
+            else:
+                entries=np.logical_or((res==pat[func_name]), entries)
                     
     return entries, exits
                     
@@ -401,8 +399,6 @@ VBTPATTERN = vbt.IF(
 #For only one pattern
 def pattern_one(open_, high, low, close, func_name, ent_or_ex):
     try:
-        out=np.full(close.shape, False)
-        
         if ent_or_ex=="ent":
             arr=constants.BULL_PATTERNS
         else:
@@ -410,15 +406,9 @@ def pattern_one(open_, high, low, close, func_name, ent_or_ex):
         
         res=func_name_to_res(func_name, open_, high, low, close)
     
-        for ii in range(len(res)):
-            out[ii]=(res[ii]==arr[func_name])
-    
-        return out
-    except Exception as msg:
-        print("exception in " + __name__)
-        print(msg)
-        _, e_, exc_tb = sys.exc_info()
-        print("line " + str(exc_tb.tb_lineno))
+        return res==arr[func_name]
+    except Exception as e:
+        logger.error(e, stack_info=True, exc_info=True)  
         pass 
                     
 VBTPATTERNONE = vbt.IF(
@@ -583,7 +573,7 @@ VBTGROW = vbt.IF(
       short_name='vbt_grow',
       input_names=['close',],
       param_names=['distance','ma'],
-      output_names=["res"]
+      output_names=["out"]
  ).with_apply_func(
       grow, 
       distance=50,

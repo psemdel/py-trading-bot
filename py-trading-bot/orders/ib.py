@@ -365,6 +365,12 @@ def place(buy,action,short,**kwargs): #quantity in euros
 def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):   
     #type check necessary for indexes
     try:
+        print("exit_order_sub")
+        print(symbol)
+        print(strategy)
+        print(exchange)
+        print(short)
+        print(use_IB)
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
                
@@ -372,6 +378,7 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         action=action_to_etf(action,short)
         
         if symbol in pf.retrieve():
+            print("in pf.retrieve()")
             c1 = Q(action=action)
             c2 = Q(active=True)
             
@@ -561,13 +568,29 @@ def retrieve_data_ib(actions,period,**kwargs):
             action=Action.objects.get(symbol=index_symbol)
             exchanges[index_symbol_ib]=action.stock_ex.ib_ticker    
 
-        return IBData.fetch(
-            all_symbols, 
-            period=period,
-            missing_index='drop',
-            timeframe="1 day", #see also interval_YF_to_ib
-            exchanges=exchanges,
-            indexes=indexes),\
+        ok=False
+        
+        #test if the symbols were downloaded
+        while not ok and len(ib_symbols)>=0:
+            res=IBData.fetch(
+                all_symbols, 
+                period=period,
+                missing_index='drop',
+                timeframe="1 day", #see also interval_YF_to_ib
+                exchanges=exchanges,
+                indexes=indexes)
+            ok=True
+            o=res.get('Open')
+            for s in ib_symbols:
+                try:
+                    o[s]
+                except:
+                    print("symbol not found: "+s)
+                    ok=False
+                    ib_symbols.remove(s)
+                    all_symbols.remove(s)
+
+        return res,\
             ib_symbols,\
             index_symbol_ib
     except Exception as e:
@@ -585,22 +608,22 @@ def retrieve_data_YF(actions,period,**kwargs):
             _, index_symbol=exchange_to_index_symbol(actions[0].stock_ex.ib_ticker)  
             all_symbols=symbols+[index_symbol]
             
-        res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
-        #ok=False
+        #res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+        ok=False
         
         #test if the symbols were downloaded
-        #while not ok and len(symbols)>=0:
-        #    res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
-        #    ok=True
-        #    o=res.get('Open')
-        #    for s in symbols:
-        #        try:
-        #            o[s]
-        #        except:
-       #             print("symbol not found: "+s)
-        #            ok=False
-        #            symbols.remove(s)
-        #            all_symbols.remove(s)
+        while not ok and len(symbols)>=0:
+            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            ok=True
+            o=res.get('Open')
+            for s in symbols:
+                try:
+                    o[s]
+                except:
+                    print("symbol not found: "+s)
+                    ok=False
+                    symbols.remove(s)
+                    all_symbols.remove(s)
         
         return res,\
                symbols,\
@@ -638,7 +661,7 @@ def retrieve_data(actions,period,use_IB,**kwargs):
         
         return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind, use_IB
+               cours_volume_ind, use_IB, symbols
                
                
                

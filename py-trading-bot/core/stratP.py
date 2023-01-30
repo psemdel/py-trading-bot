@@ -24,6 +24,9 @@ class StratPRD(Strat):
     def __init__(self,use_IB,**kwargs):
         try:
             actions=kwargs.get("actions1")
+            self.symbols=[]
+            self.symbols_to_YF={}
+            
             if actions is None:
                 if kwargs.get("symbols1") is None:
                     raise ValueError("StratPRD, no symbols provided")
@@ -45,28 +48,31 @@ class StratPRD(Strat):
                 self.low_ind=kwargs.get("low_ind")
                 self.close_ind=kwargs.get("close_ind")
                 self.volume_ind=kwargs.get("volume_ind")
+                
+                for a in actions:
+                    if use_IB:
+                        s=a.ib_ticker()
+                    else:
+                        s=a.symbol
+                    self.symbols.append(s)
+                    self.symbols_to_YF[s]=a.symbol
             else:
                 period=kwargs.get("period1")
                 if period is None:
                     raise ValueError("StratPRD, no period provided")
                 
                 self.high, self.low, self.close, self.open,self.volume,\
-                self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB\
+                self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB,\
+                self.symbols_undef\
                 =retrieve_data(actions,period,use_IB,**kwargs)
+                
+                self.symbols=self.symbols_undef #the symbols as output are then the YF symbols
+                for s in self.symbols:
+                    self.symbols_to_YF[s]=s
+    
             self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
             self.use_IB=use_IB
             self.actions=actions
-            
-            self.symbols_to_YF={}
-            self.symbols=[]
-            
-            for a in actions:
-                if use_IB:
-                    s=a.ib_ticker()
-                else:
-                    s=a.symbol
-                self.symbols.append(s)
-                self.symbols_to_YF[s]=a.symbol
                 
         except ValueError as msg:
             print(msg)   
@@ -86,7 +92,7 @@ class StratPRD(Strat):
         return 0
     
     def grow_past(self,distance, ma):
-        res=ic.VBTGROW.run(self.close,distance=distance, ma=ma).res 
+        res=ic.VBTGROW.run(self.close,distance=distance, ma=ma).out
         self.symbols_complex_yn=res.columns.values
         
         return res

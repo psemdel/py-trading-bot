@@ -82,7 +82,7 @@ class Report(models.Model):
             direction="long"
 
         self.concat("Retard, " + "direction " + direction + ", stockex: " + exchange +\
-                    ", action duration: " +str(presel.res))
+                    ", action duration: " +str(presel.out))
         
         short=False
         if len(candidates)==0:

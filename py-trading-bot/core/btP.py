@@ -54,8 +54,8 @@ class Presel(BT):
             self.period=kwargs.get("period1")
             
             self.high, self.low, self.close, self.open,self.volume,\
-            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB\
-            =retrieve_data(self.actions,self.period,use_IB )
+            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB,\
+            self.symbols_undef=retrieve_data(self.actions,self.period,use_IB )
                 
         self.candidates=[[] for ii in range(len(self.close))]
         self.candidates_short=[[] for ii in range(len(self.close))]
@@ -137,7 +137,7 @@ class Presel(BT):
          cand=get_candidates("realmadrid",exchange)
          cand.reset()
          
-         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).res 
+         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out 
 
          for symbol in self.symbols_simple:
              v[symbol]=grow[(distance,True,symbol)].values[-1]
