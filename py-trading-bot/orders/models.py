@@ -26,6 +26,8 @@ def check_ib_permission(symbols):
                 print("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
                 IBok=False
                 break
+            
+    
     return IBok
     
 ### Get lists of actions for the reporting
@@ -140,8 +142,8 @@ class Strategy(models.Model):
     def __str__(self):
         return self.name  
 
-### Index is like action, but it had to be separated, as an index cannot be bought directly
-class Action(models.Model):
+### Index is like stock (but it had to be separated, as an index cannot be bought directly
+class Action(models.Model): #Action means stock in French
     symbol=models.CharField(max_length=15, blank=False, primary_key=True)
     ib_ticker_explicit=models.CharField(max_length=15, blank=True,default="AAA") #for index especially
     name=models.CharField(max_length=100, blank=False)

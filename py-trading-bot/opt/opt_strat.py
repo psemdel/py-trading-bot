@@ -8,6 +8,7 @@ import numpy as np
 import gc
 import copy
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
+import itertools
 
 #Script to optimize the combination of patterns/signals used for a given strategy
 
@@ -102,7 +103,7 @@ class Opt(VBTfunc):
         self.all_t_exs={}
         
         self.arrs=[]
-        self.tested_arrs={}
+        self.tested_arrs=[]
         
         if self.nb_macro_modes==3:
             self.macro_trend_bull={}
@@ -315,21 +316,24 @@ class Opt(VBTfunc):
 
         print("equivalent return " + str(self.calculate_eq_ret(pf)))
         return pf #for display for instance
+
+    def check_tested_arrs(self,**kwargs):
+        #merge all list, it makes the rest more simple
+        if self.nb_macro_modes==3:
+            a=list(itertools.chain(self.calc_arrs[0],self.calc_arrs[1],self.calc_arrs[2]))
+        else:
+            a=self.calc_arrs[0]
+                    
+        if a in self.tested_arrs: #same combination
+            return False
+        else:
+            if not kwargs.get("just_test",False):
+                self.tested_arrs.append(a)
+            return True
     
     def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret):
-        found=0
-        
-        for nb_macro_mode in range(self.nb_macro_modes):
-            if nb_macro_mode in self.tested_arrs:
-                if any((self.tested_arrs[nb_macro_mode][:]==self.calc_arrs[nb_macro_mode]).all(1)): #in np.array
-                    found+=1
-                    
-        if found==self.nb_macro_modes: #same combination
+        if not self.check_tested_arrs():
             return best_arrs_cand, best_ret_cand
-        elif nb_macro_mode in self.tested_arrs:
-            self.tested_arrs[nb_macro_mode]=np.append(self.tested_arrs[nb_macro_mode], [self.calc_arrs[nb_macro_mode]],axis=0)
-        else:
-            self.tested_arrs[nb_macro_mode]=[self.calc_arrs[nb_macro_mode]]
 
         self.defi_ent()
         self.defi_ex()
@@ -407,27 +411,19 @@ class Opt(VBTfunc):
             print("loop " + str(jj))
             log("loop " + str(jj))
             self.arrs=[]
-            
             #new start point
-            found=self.nb_macro_modes
             
             if self.predefined:
                 self.arrs=self.predef()
+                self.calc_arrs=copy.deepcopy(self.arrs)
             else:
-                while found==self.nb_macro_modes:
-                    found=0
-    
+                ok=False
+                while not ok:
                     arr=self.random()
-            
                     for nb_macro_mode in range(self.nb_macro_modes):
-                        if nb_macro_mode in self.tested_arrs:
-                            if any((self.tested_arrs[nb_macro_mode][:]==arr).all(1)):
-                                found+=1
-                                        
-                for nb_macro_mode in range(self.nb_macro_modes):
-                    self.arrs.append(arr.copy())
-
-            self.calc_arrs=copy.deepcopy(self.arrs)
+                        self.arrs.append(arr.copy())
+                    self.calc_arrs=copy.deepcopy(self.arrs)
+                    ok=self.check_tested_arrs(just_test=True)
             
             best_arrs_cand, best_ret_cand=self.calculate_pf([],self.init_threshold,self.init_threshold) #reset 
             if best_ret_cand>self.init_threshold: #normally true
