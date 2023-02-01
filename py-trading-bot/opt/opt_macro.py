@@ -10,7 +10,7 @@ from core.macro import VBTMACROTREND, VBTMACROVIS
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
-
+from opt.opt_main import log
 #Script to optimize the parameters of macro_trend
 #So to detect when the trend is bull/bear or uncertain
 
@@ -35,11 +35,6 @@ vbt.settings['caching']=Config(
     ],
     use_cached_accessors=True
 )
-
-def log(text):
-    filename="macro.txt"
-    with open("opt/output/"+filename, "a") as f:
-        f.write("\n"+str(text))  
     
 class Opt(VBTfunc):
     def __init__(self,period,**kwargs):
