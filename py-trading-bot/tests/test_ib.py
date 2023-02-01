@@ -107,7 +107,7 @@ class TestIB(TestCase):
     def test_retrieve_YF(self):
         cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind, use_IB=ib.retrieve_data(self.actions,"1y",False) 
+               cours_volume_ind, use_IB, symbols=ib.retrieve_data(self.actions,"1y",False) 
                
         self.assertEqual(np.shape(cours_close)[1],3)
         self.assertTrue(np.shape(cours_close)[0]>200)
@@ -120,7 +120,7 @@ class TestIB(TestCase):
     def test_retrieve_ib(self):
         cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind, use_IB=ib.retrieve_data(self.actions,"1y",True) 
+               cours_volume_ind, use_IB, symbols=ib.retrieve_data(self.actions,"1y",True) 
             
         self.assertEqual(np.shape(cours_close)[1],3)
         self.assertTrue(np.shape(cours_close)[0]>200)

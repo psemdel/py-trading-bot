@@ -21,6 +21,7 @@
                 <th>Action</th>
                 <th>Symbol</th>
 
+                <th>Present decision by normal strat</th>
                 <th>Pattern light, ent</th>
                 <th>Pattern light, ex</th>
                 <th>Kama, ent</th>
@@ -38,6 +39,12 @@
         <tr>
             <td>{{ar.action.name}}{{ar.index.name}}</td>
             <td>{{ar.action.symbol}}{{ar.index.symbol}}</td>
+            
+            {% if ar.last_decision="buy" %}
+                <td class="true">{{ar.last_decision}}</td> 
+            {% else %}
+                <td class="false">{{ar.last_decision}}</td> 
+            {% endif %} 
             
             {% if ar.pattern_light_ent %}
                 <td class="true">{{ar.pattern_light_ent}}</td> 

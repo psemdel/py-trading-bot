@@ -265,14 +265,14 @@ class TestIndicator(unittest.TestCase):
     def test_VBTGROW(self):
         t=ic.VBTGROW.run(self.st.close,distance=50, ma=True)
         
-        self.assertEqual(round(t.res[(50,True,'AC')].values[-1],2),-15.82)
-        self.assertEqual(round(t.res[(50,True,'AI')].values[-1],2),-17.43)
-        self.assertEqual(round(t.res[(50,True,'SAN')].values[-1],2),-3.30)
+        self.assertEqual(round(t.out[(50,True,'AC')].values[-1],2),-15.82)
+        self.assertEqual(round(t.out[(50,True,'AI')].values[-1],2),-17.43)
+        self.assertEqual(round(t.out[(50,True,'SAN')].values[-1],2),-3.30)
 
         t=ic.VBTGROW.run(self.st.close,distance=50, ma=False)
-        self.assertEqual(round(t.res[(50,False,'AC')].values[-1],2),15.08)
-        self.assertEqual(round(t.res[(50,False,'AI')].values[-1],2),-1.34)
-        self.assertEqual(round(t.res[(50,False,'SAN')].values[-1],2),-2.37)
+        self.assertEqual(round(t.out[(50,False,'AC')].values[-1],2),15.08)
+        self.assertEqual(round(t.out[(50,False,'AI')].values[-1],2),-1.34)
+        self.assertEqual(round(t.out[(50,False,'SAN')].values[-1],2),-2.37)
  
     def test_VBTDIVERGENCE(self):
         t=ic.VBTDIVERGENCE.run(self.st.close,self.st.close_ind)

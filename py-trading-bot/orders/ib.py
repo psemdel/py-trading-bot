@@ -197,7 +197,9 @@ def get_tradable_contract_ib(action,short,**kwargs):
         print("stock "+action.ib_ticker() + " not found")
         return None
     else:
-        if action.stock_ex.ib_ticker not in _settings["IB_STOCKEX_NO_PERMISSION"]:
+        DIC_STOCKEX=_settings["DIC_STOCKEX"]
+       
+        if DIC_STOCKEX[action.stock_ex.name]["IB_auth"]:
             action=action_to_etf(action,short) #if index replace the index through the corresponding ETF
             return IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,False)
         else:

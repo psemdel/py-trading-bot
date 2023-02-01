@@ -290,7 +290,7 @@ class Report(models.Model):
                 )
             ent_ex_symbols.actions.add(action)
             
-    def populate_report(self, symbols, symbols_to_YF, st, sk, sma, sp):
+    def populate_report(self, symbols, symbols_to_YF,stnormal, st, sk, sma, sp):
         for symbol in symbols:
             if math.isnan(st.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
@@ -302,6 +302,14 @@ class Report(models.Model):
                         action=Action.objects.get(symbol=symbols_to_YF[symbol]), 
                         report=Report.objects.get(pk=self.pk))
         
+                    symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
+                    symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
+                    decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
+                    if decision==1:
+                        ar.last_decision="sell"
+                    elif decision==-1:
+                        ar.last_decision="buy"
+
                     grow_past50_raw=st.grow_past(50, False)
                     grow_past50_ma=st.grow_past(50, True)
                     grow_past20_raw=st.grow_past(20, False)
@@ -553,7 +561,7 @@ class Report(models.Model):
                 if _settings["CALCULATE_TREND"]:
                     st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
                 
-                self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, st, sk, sma, sp)
+                self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, stnormal,st, sk, sma, sp)
                 print("Strat daily report written " +(exchange or ""))
 
                 ##Perform strategies that rely on the regular preselection of a candidate
@@ -579,7 +587,8 @@ class ActionReport(models.Model):
     action=models.ForeignKey('orders.Action',on_delete=models.CASCADE, null=True,default=None)
     
     date=models.CharField(max_length=100, blank=True)
- 
+  
+    last_decision=models.CharField(max_length=100, blank=True)
     #for Trend
     vol=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
     bbands_bandwith=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)

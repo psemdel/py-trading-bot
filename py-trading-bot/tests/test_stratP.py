@@ -79,15 +79,15 @@ class TestStratP(TestCase):
         self.assertFalse(res[(50,True,'AIR.PA')].values[-1]==0)        
         
     def test_call_strat(self):
-        self.st.call_strat("strat_kama_stoch")
+        self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro")
         
         pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,
                                       short_entries=self.st.entries_short,
                                       short_exits  =self.st.exits_short)
 
-        self.assertTrue(pf.get_total_return()[('VBTSTOCHKAMA',100,False,'long','AC.PA')]!=0)
-        self.assertTrue(pf.get_total_return()[('VBTSTOCHKAMA',100,False,'long','AI.PA')]!=0)
-        self.assertTrue(pf.get_total_return()[('VBTSTOCHKAMA',100,False,'long','AIR.PA')]!=0)
+        self.assertTrue(pf.get_total_return()[pf.wrapper.columns[0]]!=0)
+        self.assertTrue(pf.get_total_return()[pf.wrapper.columns[1]]!=0)
+        self.assertTrue(pf.get_total_return()[pf.wrapper.columns[2]]!=0)
 
 if __name__ == '__main__':
     unittest.main()           
