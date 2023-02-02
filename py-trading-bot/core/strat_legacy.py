@@ -75,7 +75,6 @@ def defi_i( open_,high, low, close):
 def defi(close,all_t,ent_or_ex, calc_arrs,macro_trend):
     len_ent=7+len(BULL_PATTERNS)
     len_ex=7+len(BEAR_PATTERNS)
-    #ents_raw=None 
     
     for nb_macro_mode in range(3): #bull, bear, uncertain
         ents_raw=None   #if missing it is a mistake, but the strategy have been elaborated without!!
@@ -126,11 +125,7 @@ def strat_wrapper_macro_legacy(open_,high, low, close, a_bull, a_bear, a_uncerta
         
         #calculate all signals and patterns, is a bit long
         all_t_ent, all_t_ex=defi_i(open_,high, low, close)
-        calc_arrs=[]
-        
-        calc_arrs.append(a_bull)
-        calc_arrs.append(a_bear)
-        calc_arrs.append(a_uncertain)
+        calc_arrs=[a_bull, a_bear, a_uncertain]
         
         #combine for the given array the signals and patterns
         ent=defi(close,all_t_ent,"ent", calc_arrs,macro_trend)

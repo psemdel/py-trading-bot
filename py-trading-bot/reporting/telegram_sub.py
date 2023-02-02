@@ -293,9 +293,9 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
 
         def send_to_all(self, kind: str, *args, **kwargs) -> None:
             """Send message of any kind to all in `TelegramBot.chat_ids`."""
-            #for chat_id in self.chat_ids:
-            chat_id=self.chat_ids[1]
-            self.send(kind, chat_id, *args, **kwargs)
+            #chat_id=self.chat_ids[1]
+            for chat_id in self.chat_ids:
+                self.send(kind, chat_id, *args, **kwargs)
 
         def send_message(self, chat_id: int, text: str, *args, **kwargs) -> None:
             """Send text message to `chat_id`."""

@@ -378,9 +378,9 @@ class Report(models.Model):
     #for a group of predefined actions, determine the signals    
     def perform_normal_strat(self,symbols, stnormal, exchange, **kwargs):
         if self.it_is_index:
-            stnormal.stratIndex()
+            stnormal.stratIndexB()
         else:
-            stnormal.stratF()
+            stnormal.stratG()
         
         normal_strat, _=Strategy.objects.get_or_create(name="normal")
         normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat.id) 

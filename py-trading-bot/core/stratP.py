@@ -18,6 +18,8 @@ import core.indicators as ic
 
 from core.strat import Strat
 from orders.models import Action
+import logging
+logger = logging.getLogger(__name__)
 
 # Like strat but for production
 class StratPRD(Strat):
@@ -74,8 +76,8 @@ class StratPRD(Strat):
             self.use_IB=use_IB
             self.actions=actions
                 
-        except ValueError as msg:
-            print(msg)   
+        except ValueError as e:
+            logger.error(e, stack_info=True, exc_info=True)
             
     def call_strat(self,name,**kwargs):
         meth=getattr(self,name)

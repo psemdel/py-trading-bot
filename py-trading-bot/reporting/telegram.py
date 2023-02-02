@@ -27,7 +27,7 @@ from orders.models import Action, StockEx, Order, ActionCategory, pf_retrieve_al
 from core import constants
 
 from trading_bot.settings import _settings
-from reporting import telegram_sub
+from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
 
 from datetime import time
 ''' Contains the logic for:
@@ -53,7 +53,7 @@ def start():
 def async_sched(self,TELEGRAM_TOKEN): 
     #note: only serializable data can be sent to async task
     #TelegramBot without change here
-    bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN)
+    bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN) #normally vbt.TelegramBot should be sufficient
     bot.start(in_background=True)
     MyScheduler(bot)
 

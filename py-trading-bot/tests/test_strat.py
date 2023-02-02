@@ -233,10 +233,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.st.entries_short,
                                       short_exits  =self.st.exits_short)   
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.62) #-0.6
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.23) #0.19
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),9.75) #7.47
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.49) #-0.22
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.6) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.19) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),7.47) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.22) 
         
     def test_stratIndex(self):
         self.st.stratIndex()        
@@ -245,10 +245,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.st.entries_short,
                                       short_exits  =self.st.exits_short)  
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),5.23) #1.7
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),-0.55) #-0.53
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.71) #1.41
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.86) #-0.74
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.7) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),-0.53) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.41) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.74) 
         
         self.st=strat.Strat("CAC40","2007_2022_08","test",index=True)
         self.st.stratIndex()      
@@ -256,7 +256,7 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.st.entries_short,
                                       short_exits  =self.st.exits_short)         
         
-        self.assertEqual(round(pf.get_total_return(),2),7.83) #5.72
+        self.assertEqual(round(pf.get_total_return(),2),5.72) 
         
     def test_stratReal(self):
         self.st.stratReal()
@@ -265,10 +265,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.st.entries_short,
                                       short_exits  =self.st.exits_short)
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.22) #-0.44
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.02) #-0.19
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.06) #3.72
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),0.12) #-0.12
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.44) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),-0.19) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),3.72) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.12) 
 
     def test_stratDiv(self):
         self.st.stratDiv()

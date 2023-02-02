@@ -40,7 +40,7 @@
             <td>{{ar.action.name}}{{ar.index.name}}</td>
             <td>{{ar.action.symbol}}{{ar.index.symbol}}</td>
             
-            {% if ar.last_decision="buy" %}
+            {% if ar.last_decision == "buy" %}
                 <td class="true">{{ar.last_decision}}</td> 
             {% else %}
                 <td class="false">{{ar.last_decision}}</td> 

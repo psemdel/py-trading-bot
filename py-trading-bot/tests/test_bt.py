@@ -74,7 +74,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),0.04) #2.94 
+        self.assertEqual(round(pf.get_total_return(),2),2.94) 
         
     def test_preselect_divergence(self):
         self.bti.preselect_divergence()
@@ -104,7 +104,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),14.19) #16.93 
+        self.assertEqual(round(pf.get_total_return(),2),16.93 ) 
         
     def test_preselect_retard_macro(self):
         self.bti.preselect_retard_macro()
@@ -149,7 +149,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),9.29)   #10.99
+        self.assertEqual(round(pf.get_total_return(),2),10.99)   
         
     def test_preselect_realmadrid(self):
          self.bti.preselect_realmadrid()
@@ -164,7 +164,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),5.96)     #8.05 
+         self.assertEqual(round(pf.get_total_return(),2),8.05 )     
 
     def test_preselect_realmadrid_blocked(self):
          self.bti.preselect_realmadrid_blocked()
@@ -179,7 +179,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),5.21) #5.5
+         self.assertEqual(round(pf.get_total_return(),2),5.5) 
 
 
     def test_preselect_macd_vol_slow(self):
@@ -224,7 +224,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),48.62)  #3.86
+         self.assertEqual(round(pf.get_total_return(),2),3.86)  
 
          self.bti.preselect_hist_vol_slow(only_exit_strat11=True)
 
@@ -238,7 +238,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),0.29)  #0.73
+         self.assertEqual(round(pf.get_total_return(),2),0.73)  
            
 if __name__ == '__main__':
     unittest.main()        

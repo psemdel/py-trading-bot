@@ -314,7 +314,6 @@ class OptMain(VBTfunc):
         best_ret_cand=self.init_threshold
             
         for nb_macro_mode in range(self.nb_macro_modes): 
-            print(nb_macro_mode)
             for ii in range(len(self.arrs[nb_macro_mode])):
                 self.calc_arrs=copy.deepcopy(self.arrs)
                 
