@@ -145,7 +145,7 @@ class Report(models.Model):
             if symbol not in candidates:
                 if kwargs.get("keep",False):
                     action=Action.objects.get(symbol=symbol)
-                    pf_keep.add(action) #move the symbol from retard to keep pf
+                    pf_keep.append(action) #move the symbol from retard to keep pf
                     pf.remove(action)
                 else:
                     ex, auto=exit_order(symbol,key, exchange,short,auto, **kwargs)

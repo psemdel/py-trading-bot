@@ -450,7 +450,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         
         if (symbol not in pf.retrieve() and 
             symbol not in excluded.retrieve() and  
-            ocap.capital>0 and
+            (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
             order_size<=balance):
 
             order=Order(action=action, pf=pf)

@@ -64,6 +64,10 @@ _settings={
 "IB_STOCK_NO_PERMISSION":["NDX"],
 
 "PERFORM_ORDER":True, #test or use IB to perform orders
+"BYPASS_ORDERCAPITAL_IF_IB":True, #bypass the restriction linked to order capital if using IB. with other words, 
+#if there is enough money on your account, the order will be performed, 
+#without considering how many orders/strategy you want to perform
+
 ## Can be configured for each strategy separately (depending on how often the strategy will trade)
 ## relation is PERFORM_ORDER and DIC_PERFORM_ORDER
 "DIC_PERFORM_ORDER":{

@@ -128,6 +128,10 @@ class TestOrders(TestCase):
         
         self.assertEqual(pf.retrieve(),[self.a.symbol])  
         
+        pf.append(self.a2)
+        
+        self.assertEqual(pf.retrieve(),[self.a2.symbol,self.a.symbol])  
+        
     def test_pf_remove(self):
         pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append(self.a.symbol)

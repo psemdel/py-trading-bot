@@ -272,7 +272,10 @@ class PF(models.Model):
 
     def append(self,symbol):
         try:
-            a = Action.objects.get(symbol=symbol)
+            if type(symbol)==str:
+                a = Action.objects.get(symbol=symbol)
+            else: #assumed action
+                a=symbol
             self.actions.add(a)
             self.save()
         except Exception as e:
@@ -323,28 +326,6 @@ class ActionSector(models.Model):
     def __str__(self):
         return self.name     
     
-###To define the capital assigned to one strategy.
-###Not used presently  
-class Capital(models.Model):
-    #self.ib.accountSummary()
-    capital=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    name=models.CharField(max_length=100, blank=False,default="")
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
-    
-    def __str__(self):
-        return self.name 
-
-def get_capital(strategy, exchange,short,**kwargs):
-    name, sector=get_sub(strategy, exchange,short,**kwargs)
-    res, _= Capital.objects.get_or_create(
-        stock_ex=StockEx.objects.get(name=exchange),
-        strategy=Strategy.objects.get(name=strategy),
-        short=short,    
-        sector=ActionSector.objects.get(name=sector),
-        name=name)
-    return res
-
 ###To define the number of orders assigned to one strategy
 ###1 means that only one action can be owned at a time using this strategy
 
