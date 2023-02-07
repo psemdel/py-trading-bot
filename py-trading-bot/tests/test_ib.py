@@ -29,7 +29,9 @@ class TestIB(TestCase):
         self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
         self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP")
+        self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE")
         c=m.Currency.objects.create(name="euro")
+        c2=m.Currency.objects.create(name="US")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
         cat3=m.ActionCategory.objects.create(name="ETF",short="ETF")
@@ -66,6 +68,18 @@ class TestIB(TestCase):
             #strategy=strategy,
             sector=self.s,
             )
+        self.a4=m.Action.objects.create(
+            symbol='JKHY',
+            #ib_ticker='AC',
+            name="Jack Henry",
+            stock_ex=self.e4,
+            currency=c2,
+            category=cat,
+            #strategy=strategy,
+            sector=self.s,
+            )
+        
+        
         '''
         self.a4=m.Action.objects.create(
             symbol='SIE.DE',
@@ -131,6 +145,9 @@ class TestIB(TestCase):
     def test_get_ratio(self):
         t=ib.get_ratio(self.a)
         self.assertTrue(t!=0)
+        
+    def test_get_last_price(self):
+        ib.get_last_price(self.a4)        
 
     def test_entry_order_manual(self):
         pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
@@ -170,6 +187,10 @@ class TestIB(TestCase):
         from ib_insync import Stock
         c3=Stock("AI","SBF")
         self.assertEqual(c,c3)
+        
+        #to see the contract details
+        #t=Stock("GM","NYSE")
+        #print(ib.IBData.client.reqContractDetails(t))
 
 
 ####!!!Those functions will cause real orders to be performed, as the _settings["PERFORM_ORDER"] is entry_order but not in entry_order_sub!!
