@@ -150,6 +150,10 @@ class TestOrders(TestCase):
         self.assertEqual([self.a2],res)
         res=m.filter_intro_action([self.a],5)
         self.assertEqual(0,len(res))
+        
+    def test_symbol_to_action(self):
+        self.assertEqual(self.a, m.symbol_to_action('AI.PA'))
+        self.assertEqual(self.a, m.symbol_to_action(self.a))
        
 if __name__ == '__main__':
     unittest.main() 

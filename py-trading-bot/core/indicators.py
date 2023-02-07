@@ -11,12 +11,10 @@ import talib
 from talib.abstract import *
 import numpy as np
 from numba import njit
-import inspect
 import logging
 logger = logging.getLogger(__name__)
 
 from core import constants
-import sys
 
 from trading_bot.settings import _settings
 

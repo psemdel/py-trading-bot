@@ -111,6 +111,12 @@ def action_to_etf(action,short):
             action=action.etf_long
     return action
 
+def symbol_to_action(symbol):
+    if type(symbol)==str:
+        return Action.objects.get(symbol=symbol)
+    else:
+        return symbol #action in this case
+
 class Currency(models.Model):
     name=models.CharField(max_length=100, blank=False)
     symbol=models.CharField(max_length=100, blank=False,default="A")
@@ -261,9 +267,8 @@ class PF(models.Model):
         return arr
 
     def remove(self,symbol):
-        a = Action.objects.get(symbol=symbol)
-        
         try:
+            a=symbol_to_action(symbol)
             self.actions.remove(a)
             self.save()
         except Exception as e:
@@ -371,7 +376,7 @@ class Candidates(models.Model):
             self.save()
     
     def append(self,symbol): #so we can name as for list
-        a = Action.objects.get(symbol=symbol)
+        a=symbol_to_action(symbol)
         self.actions.add(a)
         self.save()
         
@@ -405,14 +410,13 @@ class Excluded(models.Model):
             self.save()
     
     def append(self,symbol):
-        a = Action.objects.get(symbol=symbol)
+        a=symbol_to_action(symbol)
         self.actions.add(a)
         self.save()
         
     def remove(self,symbol):
-        a = Action.objects.get(symbol=symbol)
-        
         try:
+            a=symbol_to_action(symbol)
             self.actions.remove(a)
             self.save()
         except Exception as e:

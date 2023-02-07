@@ -259,7 +259,6 @@ def cash_balance(**kwargs):
 @connect_ib
 def get_last_price(action,**kwargs):
     try:
-        #if symbol not in ["BZ=F"]: #buggy
         if kwargs['client'] and (_settings["USE_IB_FOR_DATA"] and\
                                  action.stock_ex.ib_ticker not in _settings["IB_STOCKEX_NO_PERMISSION"]):
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
@@ -278,7 +277,6 @@ def get_last_price(action,**kwargs):
 @connect_ib  
 def get_ratio(action,**kwargs):
     try:
-        #if symbol not in ["BZ=F"]: #buggy
         cours_pres=0
         cours_ref=0
             
@@ -427,7 +425,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         ocap=get_order_capital(strategy, exchange,**kwargs)
         
         if use_IB:
-            order_size=10000
+            order_size=_settings["ORDER_SIZE"]
             balance=cash_balance()
         else:
             order_size=1
