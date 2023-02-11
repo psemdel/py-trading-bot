@@ -611,3 +611,17 @@ VBTDIVERGENCE = vbt.IF(
       divergence_f, 
       takes_1d=True,  
  ) 
+     
+def sum_ent(ent,arr):
+    return np.multiply(arr,ent)
+
+VBTSUM = vbt.IF(
+      class_name='VBTSUM',
+      short_name='vbt_sum',
+      input_names=['ent'],
+      param_names=['arr'],
+      output_names=["out"]
+ ).with_apply_func(
+      sum_ent, 
+      takes_1d=True,  
+ )      

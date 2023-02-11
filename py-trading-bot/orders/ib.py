@@ -18,6 +18,7 @@ from django.utils import timezone
 
 import vectorbtpro as vbt
 import numpy as np
+import decimal
 
 import logging
 logger = logging.getLogger(__name__)
@@ -98,8 +99,8 @@ class IBData(RemoteData):
         from ib_insync import Stock, Index
         if index:
             return Index(exchange=exchange,symbol=symbol)
-        elif exchange=="NASDAQ":
-            return Stock(symbol,"SMART", primaryExchange='NASDAQ')
+        elif exchange in ["NASDAQ","NYSE"]:
+            return Stock(symbol,"SMART", primaryExchange=exchange)
         else:
             return Stock(symbol,exchange)
         return None
@@ -213,8 +214,8 @@ def retrieve_quantity(in_action, **kwargs):
             contract=pos.contract
             #actions=Action.objects.filter(symbol__contains=contract.localSymbol)
             if in_action.ib_ticker()==contract.localSymbol:
-                return pos.position
-    return 0                  
+                return math.abs(pos.position)
+    return 0      
                     
 @connect_ib
 def retrieve_ib_pf(**kwargs):
@@ -327,7 +328,7 @@ def place(buy,action,short,**kwargs): #quantity in euros
         contract =get_tradable_contract_ib(action,short)
         
         if contract is None:
-            return "", 0, 0
+            return "", decimal.Decimal(1.0), decimal.Decimal(0.0)
         else:
             kwargs['client'].qualifyContracts(contract)
             
@@ -354,23 +355,97 @@ def place(buy,action,short,**kwargs): #quantity in euros
                 fill = trade.fills[-1]
                 txt=f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}'
                 price=fill.execution.avgPrice     
-                return txt, price, quantity
+                return txt, decimal.Decimal(price), decimal.Decimal(quantity)
             else:
                 logger.info("order not filled, pending")
-                return "", 1, 1
+                return "", decimal.Decimal(1.0), decimal.Decimal(1.0)
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
+
+@connect_ib 
+def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convention short==True --> we go to short
+    try:
+        #type check necessary for indexes
+        pf= get_pf(strategy, exchange,short,**kwargs) #destination portfolio
+        pf_inv= get_pf(strategy, exchange,not short,**kwargs)
+        ocap=get_order_capital(strategy, exchange,**kwargs)
         
+        action=Action.objects.get(symbol=symbol)
+        action=action_to_etf(action,short)
+        
+        c1 = Q(action=action)
+        c2 = Q(active=True)
+        orders=Order.objects.filter(c1 & c2)
+        
+        if use_IB:
+            order_size=_settings["ORDER_SIZE"]
+            balance=cash_balance()
+        else:
+            order_size=1
+            balance=10 #to get true
+        
+        if len(orders)==0: #necessary for the first trade of a stock for instance
+            order=Order(action=action, pf=pf) #use full if you did the entry order manually...
+            print("order not found " + symbol)
+            present_quantity=retrieve_quantity(action)
+            order.save()
+        else:
+            order=orders[0]
+            present_quantity=order.quantity
+        
+        if present_quantity>0: #otherwise it is the first order for this stock
+            order_size*=2 #to reverse the order
+       
+        strategy_none, _ = Strategy.objects.get_or_create(name="none")
+        
+        if (symbol in pf.retrieve() ):
+            logger.info(str(symbol) + " already in portfolio")
+        if order_size>balance and not short:
+            logger.info(str(symbol) + " order not executed, not enough cash available")
+        
+        if (symbol not in pf.retrieve() and 
+            (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
+            order_size<=balance or short):
+
+            new_order=Order(action=action, pf=pf)
+            
+            if use_IB:
+                txt, new_order.entering_price, _= place(True,
+                                        action,
+                                        short,
+                                        order_size=order_size)
+                new_order.quantity=retrieve_quantity(action) #safer
+                if kwargs.get("sl",False):
+                    sl=kwargs.get("sl")
+                    new_order.sl_threshold=order.entering_price*(1-sl)
+                    
+                if new_order.entering_price is not None and order.entering_price is not None: 
+                    order.profit=new_order.entering_price-order.entering_price
+                    if order.entering_price != 0:
+                        order.profit_percent=(new_order.entering_price/order.entering_price-1)*100
+            else:
+                new_order.entering_price=1.0              
+            
+            order.exiting_date=timezone.now()
+            order.active=False
+            order.save()
+            new_order.save()
+            pf.append(action.symbol)
+            pf_inv.remove(action.symbol)
+            pf.save()
+            pf_inv.save()
+            return True
+        return False
+    
+    except Exception as e:
+        logger.error(str(e) + "symbol: "+str(symbol), stack_info=True, exc_info=True)
+        pass        
+
+
 @connect_ib  
 def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):   
     #type check necessary for indexes
     try:
-        print("exit_order_sub")
-        print(symbol)
-        print(strategy)
-        print(exchange)
-        print(short)
-        print(use_IB)
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
                
@@ -378,14 +453,13 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         action=action_to_etf(action,short)
         
         if symbol in pf.retrieve():
-            print("in pf.retrieve()")
             c1 = Q(action=action)
             c2 = Q(active=True)
             
             orders=Order.objects.filter(c1 & c2)
             if len(orders)==0:
                 order=Order(action=action, pf=pf) #use full if you did the entry order manually...
-                order.quantity=retrieve_quantity(action)
+                order.quantity, _=retrieve_quantity(action)
                 print("order not found " + symbol + " present position: "+ order.quantity)
                 order.save()
             else:
@@ -400,7 +474,8 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                 
                 if order.entering_price is not None: 
                     order.profit=order.exiting_price-order.entering_price
-                    order.profit_percent=(order.exiting_price/order.entering_price-1)*100
+                    if order.entering_price != 0:
+                        order.profit_percent=(order.exiting_price/order.entering_price-1)*100
                 
             order.exiting_date=timezone.now()
             order.active=False
@@ -443,13 +518,13 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             logger.info(str(symbol) + " excluded")    
         #if (ocap.capital==0):
             #print(symbol + " order not executed, no order capital available: " + ocap.name)
-        if order_size>balance:
+        if order_size>balance and not short:
             logger.info(str(symbol) + " order not executed, not enough cash available")
         
         if (symbol not in pf.retrieve() and 
             symbol not in excluded.retrieve() and  
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
-            order_size<=balance):
+            order_size<=balance or short):
 
             order=Order(action=action, pf=pf)
 
@@ -498,6 +573,30 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
          logger.error(e, stack_info=True, exc_info=True)
          return 0
      
+
+@connect_ib 
+def reverse_order(symbol,strategy, exchange,short,auto,**kwargs):
+    try:
+        dic=_settings["DIC_STOCKEX"]
+        
+        if (kwargs['client'] and
+           _settings["PERFORM_ORDER"] and
+           exchange in dic and
+           dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
+           _settings["DIC_PERFORM_ORDER"][strategy] and
+           not auto==False):
+            
+            logger.info("automatic order execution")
+            return reverse_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
+        else: 
+            logger.info("manual order")
+            t=reverse_order_sub(symbol,strategy, exchange,short,False,**kwargs)
+            return t, False
+
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)
+         return False, False
+        
 @connect_ib 
 def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
     try:

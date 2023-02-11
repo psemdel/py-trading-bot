@@ -1,7 +1,6 @@
 from django.db import models
 from django.db.models import Q
 
-import sys
 from trading_bot.settings import _settings
 import datetime
 #from orders.ib import 
@@ -214,7 +213,7 @@ class Order(models.Model):
     profit=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
     profit_percent=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
     quantity=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-
+    
     def __str__(self):
         return self.action.name + " "+ str(self.entering_date)
 

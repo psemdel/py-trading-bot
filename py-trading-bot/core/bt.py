@@ -10,12 +10,11 @@ import pandas as pd
 import numpy as np
 
 from core.strat import Strat
-from core.macro import VBTMACROTREND, VBTMACROTRENDOLD
+from core.macro import VBTMACROTREND
 import core.indicators as ic
 from core.common import VBTfunc#, save_vbt_both
 
 from trading_bot.settings import _settings
-import sys
 import logging
 logger = logging.getLogger(__name__)
 ### Strategies with preselection ###
@@ -67,16 +66,6 @@ class BT(VBTfunc):
         self.pf_keep=[]
         self.pf_short_keep=[]
         
-        #Underlying strategy to decide when to enter/exit for a group of candidates
-        #self.st.strat_kama_stoch_matrend_bbands()
-        #self.st.strat_kama_stoch()
-        #self.st.stratD()
-        #self.st.stratE()
-        #self.st.stratF()
-        
-        #self.ent11=self.st.entries
-        #self.ex11=self.st.exits
-        
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
 
         self.excluded=[]
@@ -86,9 +75,6 @@ class BT(VBTfunc):
         self.candidates_short=[[] for ii in range(len(self.close))]
         
         self.symbols_simple=self.close.columns.values
-        #self.symbols_complex_ent=self.ent11.columns.values
-        #self.symbols_complex_ex=self.ex11.columns.values
-        
         self.last_order_dir="long"
     
     def reinit(self):

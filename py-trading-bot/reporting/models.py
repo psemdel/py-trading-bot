@@ -10,7 +10,7 @@ import warnings
 import logging
 logger = logging.getLogger(__name__)
 
-from orders.ib import exit_order, entry_order
+from orders.ib import exit_order, entry_order, reverse_order
 
 from orders.models import Action, get_pf, get_candidates,\
                           get_exchange_actions,\
@@ -272,16 +272,23 @@ class Report(models.Model):
         auto=False
         short=False
         
-        if (entries_short and not exits_short) or (exits_short and not entries_short):
+        if entries and exits_short:
+            ent, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
+        elif entries_short and exits:
             short=True
-        #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
-        if (entries and not exits) or (entries_short and not exits_short):
-            ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs) #YF symbol expected here
-        if (exits and not entries) or (exits_short and not entries_short):  
-            ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs) #YF symbol expected here
+            ex, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
+        else:   
+            if (entries_short and not exits_short) or (exits_short and not entries_short):
+                short=True
+            #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
+            if (entries and not exits) or (entries_short and not exits_short):
+                ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs) #YF symbol expected here
+            if (exits and not entries) or (exits_short and not entries_short):  
+                ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs) #YF symbol expected here
             
         action=Action.objects.get(symbol=symbol)
         if ent or ex:
+            print("Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
             ent_ex_symbols, _=ListOfActions.objects.get_or_create(
                 report=self,
                 entry=ent,

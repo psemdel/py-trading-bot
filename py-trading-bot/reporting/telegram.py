@@ -18,7 +18,12 @@ logger = logging.getLogger(__name__)
 import vectorbtpro as vbt
 
 from celery import shared_task
-from backports.zoneinfo import ZoneInfo
+import sys
+
+if sys.version_info.minor>=9:
+    from zoneinfo import ZoneInfo
+else:
+    from backports.zoneinfo import ZoneInfo
 
 from reporting.models import Report, Alert, ListOfActions
 
