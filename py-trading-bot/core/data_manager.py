@@ -8,6 +8,8 @@ Created on Sat May 14 21:28:42 2022
 
 import vectorbtpro as vbt
 import math
+from trading_bot.settings import BASE_DIR
+import os
 
 if __name__ != '__main__':
     from core import constants
@@ -43,7 +45,7 @@ def save_data(symbols, index, action_symbols, start_date, end_date):
 
 ### Read local data
 def retrieve(index, period):
-    data=vbt.HDFData.fetch('saved_cours/'+index+'_' + period+'.h5')
+    data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+index+'_' + period+'.h5'))
     
     close=data.get("Close")
     open_=data.get("Open")
@@ -60,7 +62,7 @@ def retrieve(index, period):
     else:
         ind_sym="DJI"
 
-    data=vbt.HDFData.fetch('saved_cours/'+ind_sym+'_' + period+'.h5')
+    data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+ind_sym+'_' + period+'.h5'))
     close_ind=data.get("Close")
     open_ind=data.get("Open")
     high_ind=data.get("High")
