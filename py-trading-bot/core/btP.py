@@ -70,7 +70,7 @@ class Presel(BT):
             self.ent11=st.entries
             self.ex11=st.exits
         else:
-            st=StratPRD(use_IB,actions1=self.actions,periods1=self.period,**kwargs)
+            st=StratPRD(use_IB,**kwargs)
             st.strat_kama_stoch_matrend_bbands()
             
             self.ent11=st.entries

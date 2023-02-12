@@ -156,43 +156,43 @@ def send_entry_exit_msg_test(symbol,entry,short, auto)      :
     print(part1+part2+symbol + " "+ part3) 
             
 def actualize_hist_paris(request):
-    symbols=get_exchange_actions("Paris")
-    presel=btP.Presel(symbols1=symbols,period1="1y",exchange="Paris")
+    use_IB, actions=get_exchange_actions("Paris")
+    presel=btP.Presel(use_IB,actions1=actions,period1="1y",exchange="Paris")
     presel.actualize_hist_vol_slow("Paris")
     
     return HttpResponse("candidates actualised")
 
 def actualize_hist_xetra(request):
-    symbols=get_exchange_actions("XETRA")
-    presel=btP.Presel(symbols1=symbols,period1="1y",exchange="XETRA")
+    use_IB, actions=get_exchange_actions("XETRA")
+    presel=btP.Presel(use_IB,actions1=actions,period1="1y",exchange="XETRA")
     presel.actualize_hist_vol_slow("XETRA")
     
     return HttpResponse("candidates actualised")
 
 def actualize_hist_nasdaq(request):
-    symbols=get_exchange_actions("Nasdaq")
-    presel=btP.Presel(symbols1=symbols,period1="1y",exchange="Nasdaq")
+    use_IB, actions=get_exchange_actions("Nasdaq")
+    presel=btP.Presel(use_IB,actions1=actions,period1="1y",exchange="Nasdaq")
     presel.actualize_hist_vol_slow("Nasdaq")
     
     return HttpResponse("candidates actualised")
 
 def actualize_realmadrid_paris(request):
-    symbols=get_exchange_actions("Paris")
-    presel=btP.Presel(symbols1=symbols,period1="4y",exchange="Paris")
+    use_IB, actions=get_exchange_actions("Paris")
+    presel=btP.Presel(use_IB,actions1=actions,period1="4y",exchange="Paris")
     presel.actualize_realmadrid("Paris")
     
     return HttpResponse("candidates actualised")
 
 def actualize_realmadrid_xetra(request):
-    symbols=get_exchange_actions("XETRA")
-    presel=btP.Presel(symbols1=symbols,period1="4y",exchange="XETRA")
+    use_IB, actions=get_exchange_actions("XETRA")
+    presel=btP.Presel(use_IB,actions1=actions,period1="4y",exchange="XETRA")
     presel.actualize_realmadrid("XETRA")
     
     return HttpResponse("candidates actualised")
 
 def actualize_realmadrid_nasdaq(request):
-    symbols=get_exchange_actions("Nasdaq")
-    presel=btP.Presel(symbols1=symbols,period1="4y",exchange="Nasdaq")
+    use_IB, actions=get_exchange_actions("Nasdaq")
+    presel=btP.Presel(use_IB,actions1=actions,period1="4y",exchange="Nasdaq")
     presel.actualize_realmadrid("Nasdaq")
     
     return HttpResponse("candidates actualised")
@@ -221,20 +221,13 @@ def test(request):
     import vectorbt as vbt
         
     import logging
+    from orders.ib import place
     #logger = logging.getLogger(__name__)
-    
-    report1=Report()
-    report1.save()
-
-    st=report1.daily_report_action("Nasdaq") 
-    
-    if st is None:
-        raise ValueError("The creation of the strategy failed, report creation interrupted")
-        
-    #report1.presel(st,"Nasdaq")
-    print("presel_wq")
-    report1.presel_wq(st,"Nasdaq")
-    send_order_test(report1)
+    action=Action.objects.get(symbol="IBM")
+    txt, _, _= place(True,
+                            action,
+                            False,
+                            order_size=15000)
     #action=Action.objects.get(symbol="EN.PA")
     #myIB=MyIB()
     

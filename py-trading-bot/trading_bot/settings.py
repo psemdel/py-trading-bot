@@ -64,7 +64,7 @@ _settings={
 "IB_STOCK_NO_PERMISSION":["NDX"],
 
 "PERFORM_ORDER":True, #test or use IB to perform orders
-"BYPASS_ORDERCAPITAL_IF_IB":True, #bypass the restriction linked to order capital if using IB. with other words, 
+"BYPASS_ORDERCAPITAL_IF_IB":False, #bypass the restriction linked to order capital if using IB. with other words, 
 #if there is enough money on your account, the order will be performed, 
 #without considering how many orders/strategy you want to perform
 "ORDER_SIZE":15000, 
@@ -130,9 +130,10 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 ### Configuration Django
+from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
@@ -142,11 +143,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEBUG = os.environ.get('DEBUG',True)
 
 if DEBUG and DEBUG!="False":
-    with open('trading_bot/etc/DJANGO_SECRET') as f:
+    with open(os.path.join(BASE_DIR, 'trading_bot/etc/DJANGO_SECRET')) as f:
         SECRET_KEY = f.read().strip()
-    with open('trading_bot/etc/DB_SECRET') as f:
+    with open(os.path.join(BASE_DIR, 'trading_bot/etc/DB_SECRET')) as f:
         DB_SECRET_KEY = f.read().strip()
-    with open('trading_bot/etc/DB_USER') as f:
+    with open(os.path.join(BASE_DIR, 'trading_bot/etc/DB_USER')) as f:
         DB_USER = f.read().strip()
 else:
     SECRET_KEY = os.environ.get('SECRET_KEY') 
