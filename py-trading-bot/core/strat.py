@@ -13,23 +13,31 @@ import core.indicators as ic
 from core.macro import VBTMACROFILTER, VBTMACROMODE, VBTMACROTREND, VBTMACROTRENDPRD, major_int
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
 import inspect
+import pandas as pd
 
 import logging
 logger = logging.getLogger(__name__)
 ### Strategies on one action, no preselection ###
 #So it determines entries and exits for one action to optimize the return
-    
-#Calculate only what is needed   
-#Better for production   
+ 
 def defi_i_fast_sub(all_t_ent,t, calc_arrs, jj):
-    for ii in range(len(calc_arrs)):
-        if calc_arrs[ii][jj]:
-            if all_t_ent[ii] is None:
-                all_t_ent[ii]=t
-            else:
-                all_t_ent[ii]=ic.VBTOR.run(all_t_ent[ii],t).out
-    return all_t_ent
-  
+    try:
+        for ii in range(len(calc_arrs)):
+            t2=ic.VBTSUM.run(t,arr=calc_arrs[ii][jj]).out
+            
+            if type(t2)==pd.core.frame.DataFrame:
+             #==pandas.core.frame.DataFrame
+                multi=t2.columns 
+                l=len(multi[0])
+                for kk in range(l-2,-1,-1):
+                    multi=multi.droplevel(kk)
+                t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
+            all_t_ent[ii]+=t2
+    
+        return all_t_ent    
+    except Exception as e:
+        print(e)
+ 
 def filter_macro(all_t_ent, macro_trend):
     ent=None
     dic={0:-1, 1:1, 2:0}  #bull, bear, uncertain
@@ -46,8 +54,8 @@ def defi_i_fast( open_,high, low, close,calc_arrs,**kwargs):
     try:
         core_length=7
         
-        all_t_ent=[None for ii in range(len(calc_arrs))]
-        all_t_ex=[None for ii in range(len(calc_arrs))]
+        all_t_ent=[np.full(np.shape(close),0.0) for ii in range(len(calc_arrs))]
+        all_t_ex=[np.full(np.shape(close),0.0) for ii in range(len(calc_arrs))]
         
         #determine if it is needed to calculate
         u_core=[False for ii in range(7)]
@@ -104,6 +112,9 @@ def defi_i_fast( open_,high, low, close,calc_arrs,**kwargs):
                 t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ex").out
                 all_t_ex=defi_i_fast_sub(all_t_ex,t, calc_arrs, ii+2*core_length+len(BULL_PATTERNS))        
 
+        for ii in range(len(calc_arrs)):
+            all_t_ent[ii]=(all_t_ent[ii]>=1)
+            all_t_ex[ii]=(all_t_ex[ii]>=1)
         #agregate the signals for different macro trends
         macro_trend=kwargs.get("macro_trend")
         if macro_trend is not None:

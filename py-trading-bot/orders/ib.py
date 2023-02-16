@@ -214,7 +214,7 @@ def retrieve_quantity(in_action, **kwargs):
             contract=pos.contract
             #actions=Action.objects.filter(symbol__contains=contract.localSymbol)
             if in_action.ib_ticker()==contract.localSymbol:
-                return math.abs(pos.position)
+                return abs(pos.position)
     return 0      
                     
 @connect_ib
@@ -415,6 +415,8 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
                                         short,
                                         order_size=order_size)
                 new_order.quantity=retrieve_quantity(action) #safer
+                print("quantity: "+str(new_order.quantity))
+                
                 if kwargs.get("sl",False):
                     sl=kwargs.get("sl")
                     new_order.sl_threshold=order.entering_price*(1-sl)
@@ -732,7 +734,7 @@ def retrieve_data_YF(actions,period,**kwargs):
         
 def retrieve_data(actions,period,use_IB,**kwargs):
     if actions is None or len(actions)==0:
-        raise ValueError("List of symbols empty")
+        raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:
         if use_IB:
             try:
@@ -757,6 +759,9 @@ def retrieve_data(actions,period,use_IB,**kwargs):
         cours_low_ind=cours_index.get('Low')
         cours_close_ind=cours_index.get('Close')
         cours_volume_ind=cours_index.get('Volume')
+        
+        if len(cours_open_ind)==0 or len(cours_open)==0:
+            raise ValueError("Retrieve data failed and returned empty Dataframe, check the symbols")
         
         return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
                cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\

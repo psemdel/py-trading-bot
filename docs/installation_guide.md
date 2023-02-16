@@ -71,6 +71,8 @@ pgtradingbotdb is the name of the database in postgres (but you can use whatever
 # Telegram
 If you want to use Telegram to receive alert, you first need to create a bot in Telegram with BotFather. Internet is full of explanation on the topic. Note your token.
 
+Note: think of starting it with the command /start in Telegram.
+
 # Jupyter (optional)
 It is optional, but you Jupyter to read the Jupyter notebooks. Vectorbt is very good to visualize strategies in Jupyter, it would be too bad not to use this possibility.
 

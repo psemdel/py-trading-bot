@@ -147,7 +147,10 @@ class TestIB(TestCase):
         self.assertTrue(t!=0)
         
     def test_get_last_price(self):
-        ib.get_last_price(self.a4)        
+        ib.get_last_price(self.a4)       
+        
+    def test_cash_balance(self):
+        self.assertTrue(ib.cash_balance()>=0)       
 
     def test_entry_order_manual(self):
         pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
@@ -189,8 +192,8 @@ class TestIB(TestCase):
         self.assertEqual(c,c3)
         
         #to see the contract details
-        #t=Stock("GM","NYSE")
-        #print(ib.IBData.client.reqContractDetails(t))
+        t=Stock("IBM","SMART", primaryExchange='NYSE')
+        print(ib.IBData.client.reqContractDetails(t))
 
 
 ####!!!Those functions will cause real orders to be performed, as the _settings["PERFORM_ORDER"] is entry_order but not in entry_order_sub!!

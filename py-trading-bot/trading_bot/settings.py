@@ -50,7 +50,7 @@ _settings={
 "PF_CHECK":True,
 "INDEX_CHECK":True,
 "REPORT_17h":True, #for Paris and XETRA
-"REPORT_22h":True,
+"REPORT_22h":True, #for Nasdaq and Nyse
 "HEARTBEAT":False, # to test telegram
 
 "ALERT_THRESHOLD":3, #in %

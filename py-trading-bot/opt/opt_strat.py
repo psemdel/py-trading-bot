@@ -73,7 +73,6 @@ class Opt(OptMain):
     def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret):
         if not self.check_tested_arrs():
             return best_arrs_cand, best_ret_cand
-
         self.defi_ent()
         self.defi_ex()
         self.macro_mode()

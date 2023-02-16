@@ -9,6 +9,7 @@ import gc
 import copy
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
 import itertools
+import pandas as pd
 
 #Script to optimize the combination of patterns/signals used for a given strategy
 
@@ -119,6 +120,7 @@ class OptMain(VBTfunc):
                 self.macro_trend[ind]=t.macro_trend
         
         #all entries and exits for all patterns and signals are calculated once and for all here
+        self.threshold=1
         self.defi_i()
         print("init finished")
     
@@ -218,20 +220,36 @@ class OptMain(VBTfunc):
                     else:
                         arr=calc_arr[self.len_ent:self.len_ent+self.len_ex]  
                 
+                    if not self.index:
+                        s=np.full(np.shape(self.all_t_ents[ind][0]),0.0)
                     for ii in range(len(arr)):
-                        if arr[ii]:
-                            if ent_or_ex=="ent":
-                                t=self.all_t_ents[ind][ii]
-                            else:
-                                t=self.all_t_exs[ind][ii]
+                        if ent_or_ex=="ent":
+                            t=self.all_t_ents[ind][ii]
+                        else:
+                            t=self.all_t_exs[ind][ii]
                         
+                        #print(t)
+                        if self.index:
                             if ents_raw is None:
                                 ents_raw=t
                             else:
                                 ents_raw=ic.VBTOR.run(ents_raw,t).out
                                 
-                    if ents_raw is None:
-                        raise ValueError
+                        else:
+                            t2=ic.VBTSUM.run(t,arr=arr[ii]).out
+                            #print(t2)
+                            #adapt the multiindex
+                            if type(t2)==pd.core.frame.DataFrame:
+                                multi=t2.columns #does not work for indexes...
+                                l=len(multi[0])
+        
+                                for ii in range(l-2,-1,-1):
+                                    multi=multi.droplevel(ii)
+                                t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
+                            s+=t2
+                    
+                    if not self.index:
+                        ents_raw=(s>=self.threshold)
                     
                     if self.nb_macro_modes==1:
                         ent=ents_raw

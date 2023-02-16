@@ -36,8 +36,16 @@ One of the most important features of the bot is the possibility to perform orde
    It will add this preselection to the report. To perform the order automatically set DIC_PERFORM_ORDER={"wq7":True} in addition to PERFORM_ORDER=true.
    The other preselection algorithms can be set the same way. The preselection algorithms can be found in core/bt.py (for backtesting) and in core/btP.py (for production, when differing).
    
+5. Additionally, before performing any order, the algorithm will check that there is enough "resources" (money) available. If you want to rely only on your cash balance in IB, or to get started with the bot, you can go in the settings and set: 
+
+    "BYPASS_ORDERCAPITAL_IF_IB":True 
+    
+However, it has the drawback that you cannot limit the money invested in one strategy compared to the others. The strategy normal can use all the money, and the strategy divergence cannot be used then for instance.
+
+To handle that, the OrderCapital can be defined in the admin portal. It limits the number of orders for one strategy and stock exchanges to a certain number which has to be set in the field capital. For instance, if I create an OrderCapital normal_XETRA for the strategy "normal" and the stockexchange "XETRA" (note the naming convention), and set the capital to 1. It will execute maximum one order for this strategy on the XETRA. Another entry order will be possible only after the first order is exited.
+If an OrderCapital is not found for the strategy and stock exchange, it will be automatically created with capital 0.
    
-5. Every time an order is performed, a Telegram message is sent. Generally, the order creation is handled in orders/models.py. The messaging in reporting/telegram.py. As the bot and django are asynchronous, the database is used for the communication between both. Concretelly, the order is performed and a note is left in the Report which order was done. After the report creation is finished, another script read those notes and send the Telegram messages.
+6. Every time an order is performed, a Telegram message is sent. Generally, the order creation is handled in orders/models.py. The messaging in reporting/telegram.py. As the bot and django are asynchronous, the database is used for the communication between both. Concretelly, the order is performed and a note is left in the Report which order was done. After the report creation is finished, another script read those notes and send the Telegram messages.
 
 
 

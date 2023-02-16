@@ -32,14 +32,18 @@ def check_ib_permission(symbols):
 ### Get lists of actions for the reporting
 def get_exchange_actions(exchange,**kwargs):
     cat=ActionCategory.objects.get(short="ACT")
-    stockEx=StockEx.objects.get(name=exchange)
+    
+    try:
+        stockEx=StockEx.objects.get(name=exchange)
+    except:
+        raise ValueError("Stock exchange: "+str(exchange)+" not found, create it in the admin panel")
     
     c1 = Q(category=cat)
     c2 = Q(stock_ex=stockEx)
     c3 = Q(delisted=False) #to be removed
     
     if exchange=="NYSE" and kwargs.get("sec"):
-        action_sector=ActionSector.objects.get(name=kwargs.get("sec"))
+        action_sector, _=ActionSector.objects.get_or_create(name=kwargs.get("sec"))
         c4 = Q(sector=action_sector)
         actions=Action.objects.filter(c1 & c2 & c3 & c4)
     else:
@@ -51,7 +55,6 @@ def get_exchange_actions(exchange,**kwargs):
         use_IB=check_ib_permission([a.symbol for a in actions])
    
     return use_IB, actions
-
 
 ### Conversion between input from YF and IB
 def period_YF_to_ib(period): #see also split_freq_str in vbt

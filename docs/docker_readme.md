@@ -1,7 +1,7 @@
 # First time
 You can operate the bot in Docker and Kubernetes. Instruction were tested with Linux, but should be translatable for other operating systems.
 
-1. Clone the project
+1. Clone the project. Optionally, you can get rid of the folder saved_cours, which is not needed in production.
 2. Adapt the Configuration in trading_bot/settings see the installation_guide. See the chapter below concerning settings.
 3. Start minikube or equivalent. In your terminal:
 
@@ -11,7 +11,7 @@ You can operate the bot in Docker and Kubernetes. Instruction were tested with L
     
     eval $(minikube docker-env) 
     
-5. At the root create the Docker image. Introduce your Github token to be able to download vectorbtpro with https. If you use ssh, adapt the line corresponding to this download in the Dockerfile.
+5. Go to the folder containing the Dockerfile. Introduce your Github token to be able to download vectorbtpro with https. If you use ssh, adapt the line corresponding to this download in the Dockerfile.
 
     docker build . -t py-trading-bot --build-arg GH_TOKEN=<you Github Token>
 
