@@ -3,7 +3,7 @@ This trader bot automatizes orders on all kind of financial products, and is not
 
 Features implemented:
 
-- Backstaging of complex strategies (including 101 Formulaic Alphas) using [vectorbtpro](https://vectorbt.pro/)
+- Backstaging of complex strategies (including [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf)) using [vectorbtpro](https://vectorbt.pro/)
 - Performing live automatically orders using the tested strategies and interactive brockers, thanks to ib_insync
 - Send Telegram messages when performing an order
 - Send Telegram alerts when the action price variation exceeds a certain threshold
