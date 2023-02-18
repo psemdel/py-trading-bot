@@ -9,6 +9,7 @@ from core import indicators as ic
 import warnings
 import logging
 logger = logging.getLogger(__name__)
+logger_trade = logging.getLogger('trade')
 
 from orders.ib import exit_order, entry_order, reverse_order
 
@@ -190,7 +191,7 @@ class Report(models.Model):
                     candidates=wq.get_candidates()
                     
                     self.order_nosubstrat(self.candidates_to_YF(st.symbols_to_YF,candidates), exchange, key,False,auto,**kwargs) #fees are too high on IB for wq strategy
-            print("Presel wq done for "+exchange)  
+            logger.info("Presel wq done for "+exchange)  
             
 ### Preselected actions strategy    
     def presel_sub(self,use_IB,l,st, exchange,**kwargs):
@@ -246,7 +247,7 @@ class Report(models.Model):
                             **kwargs
                             ) 
   
-            print("Presel done for "+exchange)    
+            logger.info("Presel done for "+exchange)    
 
     def presel(self,st,exchange,**kwargs): #comes after daily report
         #NYSE needs to be subdivided
@@ -288,7 +289,7 @@ class Report(models.Model):
             
         action=Action.objects.get(symbol=symbol)
         if ent or ex:
-            print("Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
+            logger_trade.info("define_ent_ex, Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
             ent_ex_symbols, _=ListOfActions.objects.get_or_create(
                 report=self,
                 entry=ent,
@@ -420,7 +421,7 @@ class Report(models.Model):
             
             for symbol in symbols:
                 if symbol in pf_keep.retrieve():
-                    print("symbol presently in keep: "+symbol)
+                    logger.info("symbol presently in keep: "+symbol)
                     symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
 
                     self.define_ent_ex(
@@ -433,7 +434,7 @@ class Report(models.Model):
                         exchange,
                         **kwargs)
                 if symbol in pf_short_keep.retrieve(): 
-                    print("symbol presently in keep short: "+symbol)
+                    logger.info("symbol presently in keep short: "+symbol)
                     symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
                     self.define_ent_ex(
                         False, #only exit
@@ -482,19 +483,17 @@ class Report(models.Model):
         
         if exchange is not None and "divergence" in DIC_PRESEL[exchange]: 
             pf_div=get_pf("divergence",exchange,False,**kwargs)
-            print("symbols in divergence: ")
-            print(pf_div.retrieve())
+            logger.info("symbols in divergence: " +str(pf_div.retrieve()))
         ##Change underlying strategy
         st.call_strat("stratDiv")
         ##only_exit_substrat
 
         for symbol in symbols:
             symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
-
             
             if "divergence" in DICS and exchange is not None and\
                     st.symbols_to_YF[symbol] in pf_div.retrieve(): 
-                    print("exit " + str(st.exits[symbol_complex_ent].values[-1]))    
+                    logger_trade.info("Divergence exit " + str(st.exits[symbol_complex_ent].values[-1]))    
                         
                     self.define_ent_ex(
                         False,
@@ -519,7 +518,7 @@ class Report(models.Model):
                             #sector=ActionSector.objects.get(name=) 
                             DICS=DIC_PRESEL_SECTOR[kwargs.get("sec")]
                         except:
-                            print("sector not found")
+                            logger.warning("sector not found: " + str(kwargs.get("sec")))
                             pass
                 else:
                     DIC_PRESEL=_settings["DIC_PRESEL"]
@@ -569,7 +568,7 @@ class Report(models.Model):
                     st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
                 
                 self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, stnormal,st, sk, sma, sp)
-                print("Strat daily report written " +(exchange or ""))
+                logger.info("Strat daily report written " +(exchange or ""))
 
                 ##Perform strategies that rely on the regular preselection of a candidate
                 self.perform_slow_strats(stnormal.symbols, DICS, exchange, st, **kwargs)
@@ -577,7 +576,7 @@ class Report(models.Model):
                 ##Perform the strategy divergence, the exit to be precise, the entry are performed by presel
                 self.perform_divergence(stnormal.symbols,exchange, st, _settings["DIC_PRESEL"], DICS, **kwargs)
 
-                print("Slow strategy proceeded") 
+                logger.info("Slow strategy proceeded") 
                 if sec is not None:
                     self.sector=ActionSector.objects.get(name=sec) 
                 self.save()

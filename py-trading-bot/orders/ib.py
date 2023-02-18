@@ -22,6 +22,7 @@ import decimal
 
 import logging
 logger = logging.getLogger(__name__)
+logger_trade = logging.getLogger('trade')
 
 from orders.models import (Action, Order, ActionCategory, Excluded, Strategy,
                            action_to_etf,
@@ -195,7 +196,7 @@ def connect_ib(func):
 @connect_ib
 def get_tradable_contract_ib(action,short,**kwargs):
     if action.ib_ticker()=="AAA":
-        print("stock "+action.ib_ticker() + " not found")
+        logger.info("stock "+action.ib_ticker() + " not found")
         return None
     else:
         DIC_STOCKEX=_settings["DIC_STOCKEX"]
@@ -204,7 +205,7 @@ def get_tradable_contract_ib(action,short,**kwargs):
             action=action_to_etf(action,short) #if index replace the index through the corresponding ETF
             return IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,False)
         else:
-            print("stock "+action.ib_ticker() + " not in authorized stock exchange")
+            logger.info("stock "+action.ib_ticker() + " not in authorized stock exchange")
             return None
 
 @connect_ib
@@ -349,16 +350,17 @@ def place(buy,action,short,**kwargs): #quantity in euros
                 else:
                     order = MarketOrder('SELL', quantity)
             trade = kwargs['client'].placeOrder(contract, order)
+            logger_trade.info("order sent to IB, action " + str(action)+", short: " + str(short) + ", quantity: "+str(quantity))
     
             kwargs['client'].sleep(1.0)
             if trade.orderStatus.status == 'Filled':
                 fill = trade.fills[-1]
-                txt=f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}'
+                logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
                 price=fill.execution.avgPrice     
-                return txt, decimal.Decimal(price), decimal.Decimal(quantity)
+                return decimal.Decimal(price), decimal.Decimal(quantity)
             else:
-                logger.info("order not filled, pending")
-                return "", decimal.Decimal(1.0), decimal.Decimal(1.0)
+                logger_trade.info("order not filled, pending")
+                return decimal.Decimal(1.0), decimal.Decimal(1.0)
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
 
@@ -386,14 +388,15 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         
         if len(orders)==0: #necessary for the first trade of a stock for instance
             order=Order(action=action, pf=pf) #use full if you did the entry order manually...
-            print("order not found " + symbol)
-            present_quantity=retrieve_quantity(action)
-            order.save()
+            logger.info("order not found " + symbol+ ", created")
         else:
             order=orders[0]
-            present_quantity=order.quantity
+            
+        if order.quantity is None:    
+            order.quantity=retrieve_quantity(action)
+            order.save()
         
-        if present_quantity>0: #otherwise it is the first order for this stock
+        if order.quantity>0: #otherwise it is the first order for this stock
             order_size*=2 #to reverse the order
        
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
@@ -410,12 +413,11 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             new_order=Order(action=action, pf=pf)
             
             if use_IB:
-                txt, new_order.entering_price, _= place(True,
+                new_order.entering_price, _= place(True,
                                         action,
                                         short,
                                         order_size=order_size)
                 new_order.quantity=retrieve_quantity(action) #safer
-                print("quantity: "+str(new_order.quantity))
                 
                 if kwargs.get("sl",False):
                     sl=kwargs.get("sl")
@@ -462,14 +464,14 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             if len(orders)==0:
                 order=Order(action=action, pf=pf) #use full if you did the entry order manually...
                 order.quantity, _=retrieve_quantity(action)
-                print("order not found " + symbol + " present position: "+ order.quantity)
+                logger.info("order not found " + str(symbol) + " present position: "+ str(order.quantity))
                 order.save()
             else:
                 order=orders[0]
 
             #profit
             if use_IB and order.quantity>0:
-                txt, order.exiting_price, quantity= place(False,
+                order.exiting_price, quantity= place(False,
                                        action,
                                        short,
                                        quantity=order.quantity)
@@ -531,7 +533,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             order=Order(action=action, pf=pf)
 
             if use_IB:
-                txt, order.entering_price, order.quantity= place(True,
+                order.entering_price, order.quantity= place(True,
                                         action,
                                         short,
                                         order_size=order_size)
@@ -588,10 +590,10 @@ def reverse_order(symbol,strategy, exchange,short,auto,**kwargs):
            _settings["DIC_PERFORM_ORDER"][strategy] and
            not auto==False):
             
-            logger.info("automatic order execution")
+            logger_trade.info("Starting automatic reverse order execution, symbol: "+symbol)
             return reverse_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
         else: 
-            logger.info("manual order")
+            logger_trade.info("Starting manual reverse order, symbol: "+symbol)
             t=reverse_order_sub(symbol,strategy, exchange,short,False,**kwargs)
             return t, False
 
@@ -611,10 +613,10 @@ def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
            _settings["DIC_PERFORM_ORDER"][strategy] and
            not auto==False):
             
-            logger.info("automatic order execution")
+            logger_trade.info("Starting automatic order execution, symbol: "+symbol)
             return entry_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
         else: 
-            logger.info("manual order")
+            logger_trade.info("Starting manual order, symbol: "+symbol)
             t=entry_order_sub(symbol,strategy, exchange,short,False,**kwargs)
             return t, False
 
@@ -686,7 +688,7 @@ def retrieve_data_ib(actions,period,**kwargs):
                 try:
                     o[s]
                 except:
-                    print("symbol not found: "+s)
+                    logger.info("symbol not found: "+s)
                     ok=False
                     ib_symbols.remove(s)
                     all_symbols.remove(s)
@@ -721,7 +723,7 @@ def retrieve_data_YF(actions,period,**kwargs):
                 try:
                     o[s]
                 except:
-                    print("symbol not found: "+s)
+                    logger.info("symbol not found: "+s)
                     ok=False
                     symbols.remove(s)
                     all_symbols.remove(s)
@@ -740,7 +742,7 @@ def retrieve_data(actions,period,use_IB,**kwargs):
             try:
                 cours, symbols, index_symbol=retrieve_data_ib(actions,period,**kwargs)
             except:
-                print("IB retrieval of symbol failed, fallback on YF")
+                logger.info("IB retrieval of symbol failed, fallback on YF")
                 use_IB=False #fallback
         if not use_IB:
             cours, symbols, index_symbol=retrieve_data_YF(actions,period,**kwargs)
@@ -751,7 +753,7 @@ def retrieve_data(actions,period,use_IB,**kwargs):
         cours_low=cours_action.get('Low')
         cours_close=cours_action.get('Close')
         cours_volume=cours_action.get('Volume')
-        print("number of days retrieved: " + str(np.shape(cours_close)[0]))
+        logger.info("number of days retrieved: " + str(np.shape(cours_close)[0]))
         
         cours_index=cours.select(index_symbol)
         cours_open_ind =cours_index.get('Open')

@@ -293,33 +293,49 @@ else:
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 LOGGING = {
-    # Define the logging version
     'version': 1,
-    # Enable the existing loggers
     'disable_existing_loggers': False,
     'formatters': {
         'default': {
             'format': '[%(asctime)s] %(levelname)s %(lineno)d %(message)s',
             'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+        'trade_format': {
+            'format': '[%(asctime)s]  %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
-    # Define the handlers
+    
     'handlers': {
-        'file': {
-            'level': 'INFO',
+        'info_file': {
+            'level': 'INFO',# INFO
             'class': 'logging.FileHandler',
             'filename': 'logs/info.log',
              'formatter': 'default',
-        },
+             },
+       'warning_file': {
+                'level': 'WARNING',
+                'class': 'logging.FileHandler',
+                'filename': 'logs/warning_and_error.log',
+                 'formatter': 'default',
+            },
+       'trade_file': {
+                'level': 'INFO',
+                'class': 'logging.FileHandler',
+                'filename': 'logs/trade.log',
+                 'formatter': 'trade_format',
+            },       
     },
-
-   # Define the loggers
     'loggers': {
-        'django': {
-            'handlers': ['file'],
+        '': {
+            'handlers': ['info_file', 'warning_file'],
             'level': 'INFO',
             'propagate': True,
-
         },
+       'trade': {
+           'handlers': ['trade_file'],
+           'level': 'INFO',
+           'propagate': True,
+       }, 
     },
 }

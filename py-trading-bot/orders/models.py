@@ -14,7 +14,7 @@ def check_ib_permission(symbols):
     IBok=True
     for symbol in symbols:
         if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
-            print("symbol " + symbol + " has no permission for IB")
+            logger.info("symbol " + symbol + " has no permission for IB")
             IBok=False
             break
         
@@ -22,7 +22,7 @@ def check_ib_permission(symbols):
         dic=_settings["DIC_STOCKEX"]
         if a.stock_ex.name in dic:
             if dic[a.stock_ex.name]["IB_auth"]==False:
-                print("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
+                logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
                 IBok=False
                 break
             
@@ -314,9 +314,8 @@ def get_pf(strategy, exchange,short,**kwargs):
 
         return res
     except Exception as e:
-        print(e)
-        print(strategy)
-        #logger.error(e, stack_info=True, exc_info=True)
+        logger.error(strategy)
+        logger.error(e, stack_info=True, exc_info=True)
 
 ### To distinguish between ETF, actions, indexes...
 class ActionCategory(models.Model):

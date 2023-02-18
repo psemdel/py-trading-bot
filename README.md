@@ -33,9 +33,9 @@ Using USE_IB_FOR_DATA and PERFORM_ORDER on True is still in beta phase. Generall
 # Deployment
 Deployment of the bot on external machine has not been achieved yet for several reasons:
 
-- If you use Interactive brokers, your trader workstation (TWS) or IB Gateway needs to be open on a machine which can communicate with the bot. As the login requires MFA, you need to be able to display the desktop of this machine. TWS requires a minimum of 4Gb ram, which exclude use of Raspberry pi. It is a challenge also for the security. Update 20/01/2023: Re-evaluating this paragraph for IB Gateway.
+- If you use Interactive brokers, your trader workstation (TWS) or IB Gateway needs to be open on a machine which can communicate with the bot. As the login requires MFA, you need to be able to display the desktop of this machine. You can consider setting up on a powerful Raspberry with IB Gateway. However, it stays challenging as the docker image of the bot is very heavy.
 - Talib library, which is coded in C, need to be installed. In proved to be challenging on PaaS, like heroku for instance.
 - Vertorbt is very heavy (docker image > 4 Gb). It excludes a deployment on Amazon lambda for instance.
 
 # Disclaimer
-Do not risk money which you are afraid to lose. USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
+Do not risk money which you are afraid to lose. USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS, EVEN IF CAUSED BY A BUG OF THE SOFTWARE.
