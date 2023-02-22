@@ -20,7 +20,7 @@ _settings={
     "Milan":{"IB_auth":False,"perform_order":False},
     "NASDAQ IND":{"IB_auth":False,"perform_order":False},
     },
-    
+"ETF_IB_auth":False,   
 
 "DIC_PRESEL":{
     "Paris":["retard_keep","divergence"],

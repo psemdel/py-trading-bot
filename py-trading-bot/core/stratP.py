@@ -66,7 +66,7 @@ class StratPRD(Strat):
                 self.high, self.low, self.close, self.open,self.volume,\
                 self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB,\
                 self.symbols_undef\
-                =retrieve_data(actions,period,use_IB,**kwargs)
+                =retrieve_data(actions,period,use_IB)
                 
                 self.symbols=self.symbols_undef #the symbols as output are then the YF symbols
                 for s in self.symbols:

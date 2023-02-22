@@ -126,7 +126,7 @@ def scan_presel_all(period,**kwargs):
     res={}
     
     for k, v in d.items():
-        symbols=common.filter_intro(v["symbols"],period)
+        symbols=common.filter_intro_symbol(v["symbols"],period)
         st=StratLIVE(symbols,str(period)+"y",v["index"])
         res=scan_presel(presel_dic, k,res=res,st=st,**kwargs)
         

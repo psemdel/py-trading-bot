@@ -207,6 +207,16 @@ class OptMain(VBTfunc):
         self.exs={}
         self.exs_short={}
         self.defi("ex")
+        
+    def remove_multi(self,t2):
+        if type(t2)==pd.core.frame.DataFrame:
+            multi=t2.columns #does not work for indexes...
+            l=len(multi[0])
+
+            for ii in range(l-2,-1,-1):
+                multi=multi.droplevel(ii)
+            t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
+        return t2
     
     def defi(self,ent_or_ex):
         try:
@@ -228,28 +238,16 @@ class OptMain(VBTfunc):
                         else:
                             t=self.all_t_exs[ind][ii]
                         
-                        #print(t)
-                        if self.index:
-                            if ents_raw is None:
-                                ents_raw=t
-                            else:
-                                ents_raw=ic.VBTOR.run(ents_raw,t).out
-                                
-                        else:
-                            t2=ic.VBTSUM.run(t,arr=arr[ii]).out
-                            #print(t2)
-                            #adapt the multiindex
-                            if type(t2)==pd.core.frame.DataFrame:
-                                multi=t2.columns #does not work for indexes...
-                                l=len(multi[0])
-        
-                                for ii in range(l-2,-1,-1):
-                                    multi=multi.droplevel(ii)
-                                t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
-                            s+=t2
+                        t2=ic.VBTSUM.run(t,arr=arr[ii]).out #equivalent to if arr[ii]: then consider self.all_t_ents[ind][ii]
+                        t2=self.remove_multi(t2)
+                        
+                        if self.shift:
+                            t_shift=ic.VBTSUM.run(t2.shift(periods=1, fill_value=0),self.shift_arr[0]).out
+                            t_shift+=ic.VBTSUM.run(t2.shift(periods=2, fill_value=0),self.shift_arr[1]).out
+                            s+=t_shift
+                        s+=t2
                     
-                    if not self.index:
-                        ents_raw=(s>=self.threshold)
+                    ents_raw=(s>=self.threshold)
                     
                     if self.nb_macro_modes==1:
                         ent=ents_raw

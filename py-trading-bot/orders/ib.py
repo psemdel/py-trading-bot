@@ -445,7 +445,6 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         logger.error(str(e) + "symbol: "+str(symbol), stack_info=True, exc_info=True)
         pass        
 
-
 @connect_ib  
 def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):   
     #type check necessary for indexes
@@ -576,68 +575,47 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
          return 0
-     
 
+def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
+    def wrapper(*args,**kwargs):
+        try: 
+            dic=_settings["DIC_STOCKEX"]
+            action=Action.objects.get(symbol=symbol)
+            
+            if (kwargs['client'] and
+               _settings["PERFORM_ORDER"] and
+               exchange in dic and
+               (not check_if_index(action) or (check_if_index(action) and _settings["ETF_IB_auth"])) and #ETF trading requires too high 
+               dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
+               _settings["DIC_PERFORM_ORDER"][strategy] and
+               not auto==False):
+                
+                logger_trade.info("Starting automatic reverse order execution, symbol: "+symbol)
+                auto_checked=True
+    
+            else: 
+                logger_trade.info("Starting manual reverse order, symbol: "+symbol)
+                auto_checked=False
+            
+            return func(symbol,strategy, exchange,short,auto_checked,**kwargs), auto_checked
+        except Exception as e:
+             logger.error(e, stack_info=True, exc_info=True)
+             return False, False
+    
+    return wrapper(symbol,strategy, exchange,short,auto,**kwargs)     
+     
 @connect_ib 
 def reverse_order(symbol,strategy, exchange,short,auto,**kwargs):
-    try:
-        dic=_settings["DIC_STOCKEX"]
-        
-        if (kwargs['client'] and
-           _settings["PERFORM_ORDER"] and
-           exchange in dic and
-           dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
-           _settings["DIC_PERFORM_ORDER"][strategy] and
-           not auto==False):
-            
-            logger_trade.info("Starting automatic reverse order execution, symbol: "+symbol)
-            return reverse_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
-        else: 
-            logger_trade.info("Starting manual reverse order, symbol: "+symbol)
-            t=reverse_order_sub(symbol,strategy, exchange,short,False,**kwargs)
-            return t, False
-
-    except Exception as e:
-         logger.error(e, stack_info=True, exc_info=True)
-         return False, False
+    return check_auto_manual(reverse_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
         
 @connect_ib 
 def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
-    try:
-        dic=_settings["DIC_STOCKEX"]
-        
-        if (kwargs['client'] and
-           _settings["PERFORM_ORDER"] and
-           exchange in dic and
-           dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
-           _settings["DIC_PERFORM_ORDER"][strategy] and
-           not auto==False):
-            
-            logger_trade.info("Starting automatic order execution, symbol: "+symbol)
-            return entry_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
-        else: 
-            logger_trade.info("Starting manual order, symbol: "+symbol)
-            t=entry_order_sub(symbol,strategy, exchange,short,False,**kwargs)
-            return t, False
-
-    except Exception as e:
-         logger.error(e, stack_info=True, exc_info=True)
-         return False, False
+    return check_auto_manual(entry_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
 
 @connect_ib     
 def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
-    dic=_settings["DIC_STOCKEX"]
-    
-    if (kwargs['client'] and
-       _settings["PERFORM_ORDER"] and
-       exchange in dic and
-       dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
-       not auto==False):
-    
-        return exit_order_sub(symbol,strategy, exchange,short,True,**kwargs), True
-    else:   
-        return exit_order_sub(symbol,strategy, exchange,short,False,**kwargs), False
- 
+    return check_auto_manual(exit_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
+
 def check_if_index(action):
     if action.category==ActionCategory.objects.get(short="IND"):
         return True

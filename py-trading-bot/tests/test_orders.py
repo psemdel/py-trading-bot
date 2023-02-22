@@ -11,7 +11,13 @@ import numpy as np
 from django.test import TestCase
 from orders import models as m
 from datetime import datetime
-from backports.zoneinfo import ZoneInfo
+
+import sys
+if sys.version_info.minor>=9:
+    from zoneinfo import ZoneInfo
+else:
+    from backports.zoneinfo import ZoneInfo
+    
 tz_Paris=ZoneInfo('Europe/Paris')
 
 class TestConversion(TestCase):

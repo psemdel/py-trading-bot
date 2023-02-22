@@ -6,8 +6,21 @@ import datetime
 #from orders.ib import 
 import logging
 logger = logging.getLogger(__name__)
-from backports.zoneinfo import ZoneInfo
+
+import sys
+if sys.version_info.minor>=9:
+    import zoneinfo
+    from zoneinfo import ZoneInfo
+else:
+    import backports.zoneinfo as zoneinfo
+    from backports.zoneinfo import ZoneInfo
+    
 tz_Paris=ZoneInfo('Europe/Paris')
+
+all_tz=[]
+for tz in zoneinfo.available_timezones():
+    all_tz.append((tz,tz))
+all_tz=sorted(all_tz)  
 
 ### Check if IB can be used
 def check_ib_permission(symbols):
@@ -138,8 +151,9 @@ class StockEx(models.Model):
     name=models.CharField(max_length=100, blank=False)
     fees=models.ForeignKey('Fees',on_delete=models.CASCADE)
     ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
-    opening_time=models.TimeField(default=datetime.time(9, 00,tzinfo=tz_Paris))
-    closing_time=models.TimeField(default=datetime.time(17, 00,tzinfo=tz_Paris))
+    opening_time=models.TimeField(default=datetime.time(9, 00))
+    closing_time=models.TimeField(default=datetime.time(17, 00))
+    timezone=models.CharField(max_length=60,choices=all_tz, blank=False,default='Europe/Paris')
     
     def __str__(self):
         return self.name    
@@ -185,7 +199,7 @@ def filter_intro_sub(a,y_period):
     if y_period is None:
         limit_date=td
     else:
-        limit_date=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here
+        limit_date=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here but otherwise bug
 
     if a.intro_date is not None: #should come from database
         if a.intro_date>limit_date :

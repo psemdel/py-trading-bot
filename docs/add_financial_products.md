@@ -22,7 +22,8 @@ To add a stock (Action in the bot):
 # Report about another stock exchange
 Let's suppose you want to produce a report about a stock exchange which is not included yet. For the example, let's take Hong Kong.
 
-- Create the stock exchange and the related stocks
+- Create the stock exchange, the opening and closing time must be in the time of the timezone indicated.
+- Create the related stocks
 - Go in reporting/telegram.py create a new method:
 
     def daily_report_HK(self):

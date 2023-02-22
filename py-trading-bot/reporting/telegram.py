@@ -34,7 +34,7 @@ from core import constants
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
 
-from datetime import time
+from datetime import time, datetime
 ''' Contains the logic for:
  - Telegram bot
  - Sending alert if the market price variation exceeds a certain threshold
@@ -136,7 +136,8 @@ class MyScheduler():
     def check_change(self,ratio, action,short,**kwargs):
         try:
             symbols_opportunity=constants.INDEXES+constants.RAW
-            now=timezone.now().time()
+            tz=ZoneInfo(action.stock_ex.timezone)
+            now=datetime.now(tz).time() #wil compare the time in the local time to opening_time, also in the local time
 
             alerting_reco=False
             alerting=False
