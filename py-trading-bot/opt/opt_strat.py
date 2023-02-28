@@ -86,7 +86,8 @@ class Opt(OptMain):
             pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
                                           short_entries=self.ents_short[ind],
                                           short_exits=self.exs_short[ind],
-                                          freq="1d",fees=self.fees)
+                                          freq="1d",fees=self.fees,sl_stop=self.sl,
+                                          ) #stop_exit_price="close"
             
             if self.index:
                 ret_arr.append(self.calculate_eq_ret(pf))

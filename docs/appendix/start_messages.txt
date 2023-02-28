@@ -1,0 +1,84 @@
+4706:C 28 Feb 2023 08:27:11.823 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+4706:C 28 Feb 2023 08:27:11.823 # Redis version=6.2.6, bits=64, commit=dd41c764, modified=1, pid=4706, just started
+4706:C 28 Feb 2023 08:27:11.823 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf
+4706:M 28 Feb 2023 08:27:11.824 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+4706:M 28 Feb 2023 08:27:11.824 * monotonic clock: POSIX clock_gettime
+                _._                                                  
+           _.-``__ ''-._                                             
+      _.-``    `.  `_.  ''-._           Redis 6.2.6 (dd41c764/1) 64 bit
+  .-`` .-```.  ```\/    _.,_ ''-._                                  
+ (    '      ,       .-`  | `,    )     Running in standalone mode
+ |`-._`-...-` __...-.``-._|'` _.-'|     Port: 6379
+ |    `-._   `._    /     _.-'    |     PID: 4706
+  `-._    `-._  `-./  _.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |           https://redis.io       
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |                                  
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+      `-._    `-.__.-'    _.-'                                       
+          `-._        _.-'                                           
+              `-.__.-'                                               
+
+4706:M 28 Feb 2023 08:27:11.826 # Server initialized
+4706:M 28 Feb 2023 08:27:11.826 # WARNING overcommit_memory is set to 0! Background save may fail under low memory condition. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+4706:M 28 Feb 2023 08:27:11.827 * Loading RDB produced by version 6.2.6
+4706:M 28 Feb 2023 08:27:11.827 * RDB age 35477 seconds
+4706:M 28 Feb 2023 08:27:11.827 * RDB memory usage when created 0.78 Mb
+4706:M 28 Feb 2023 08:27:11.827 # Done loading RDB, keys loaded: 3, keys expired: 0.
+4706:M 28 Feb 2023 08:27:11.827 * DB loaded from disk: 0.001 seconds
+4706:M 28 Feb 2023 08:27:11.827 * Ready to accept connections
+Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+February 28, 2023 - 07:27:18
+Django version 4.1.2, using settings 'trading_bot.settings'
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+ATTENTION: default value of option mesa_glthread overridden by environment.
+ATTENTION: default value of option mesa_glthread overridden by environment.
+ATTENTION: default value of option mesa_glthread overridden by environment.
+ATTENTION: default value of option mesa_glthread overridden by environment.
+[28/Feb/2023 07:27:34] "GET /start_bot HTTP/1.1" 301 0
+bot started, task id ecb0c4a4-36e3-4d88-a8c8-ac7bb67975cf
+bot_start ok
+[28/Feb/2023 07:27:35] "GET /start_bot/ HTTP/1.1" 302 0
+ 
+ -------------- celery@maxime-MS-7B86 v5.2.7 (dawn-chorus)
+--- ***** ----- 
+-- ******* ---- Linux-5.15.0-60-generic-x86_64-with-glibc2.29 2023-02-28 07:27:36
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         trading_bot:0x7f6ff857c580
+- ** ---------- .> transport:   redis://localhost:6379/0
+- ** ---------- .> results:     disabled://
+- *** --- * --- .> concurrency: 4 (prefork)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> trading-bot-worker exchange=trading-bot-worker(direct) key=trading-bot-worker
+                
+
+[tasks]
+  . reporting.telegram.async_sched
+  . trading_bot.celery.debug_task
+
+[2023-02-28 07:27:37,535: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2023-02-28 07:27:37,538: INFO/MainProcess] mingle: searching for neighbors
+[2023-02-28 07:27:38,552: INFO/MainProcess] mingle: all alone
+[2023-02-28 07:27:38,570: WARNING/MainProcess] /home/maxime/.local/lib/python3.8/site-packages/celery/fixups/django.py:203: UserWarning: Using settings.DEBUG leads to a memory
+            leak, never use this setting in production environments!
+  warnings.warn('''Using settings.DEBUG leads to a memory
+
+[2023-02-28 07:27:38,570: INFO/MainProcess] celery@maxime-MS-7B86 ready.
+[2023-02-28 07:27:38,574: INFO/MainProcess] Task reporting.telegram.async_sched[ecb0c4a4-36e3-4d88-a8c8-ac7bb67975cf] received
+[2023-02-28 07:27:38,576: INFO/ForkPoolWorker-2] Initializing bot
+[2023-02-28 07:27:38,577: INFO/ForkPoolWorker-2] Loaded chat ids [51232456]
+[2023-02-28 07:27:38,781: INFO/ForkPoolWorker-2] Running bot My_telegram_bot
+[2023-02-28 07:27:38,781: INFO/ForkPoolWorker-2] Scheduler started
+[2023-02-28 07:27:38,984: INFO/ForkPoolWorker-2] 5402841128 - Bot: "I'm back online!"
+[2023-02-28 07:27:38,987: INFO/ForkPoolWorker-2] Starting schedule manager with jobs [Every 10 minutes do check_pf() (last run: [never], next run: 2023-02-28 07:37:38), Every 1 week at 08:03:00 do check_pf(opening='9h') (last run: [never], next run: 2023-03-06 08:03:00), Every 1 week at 08:03:00 do check_pf(opening='9h') (last run: [never], next run: 2023-02-28 08:03:00), Every 1 week at 08:03:00 do check_pf(opening='9h') (last run: [never], next run: 2023-03-01 08:03:00), Every 1 week at 08:03:00 do check_pf(opening='9h') (last run: [never], next run: 2023-03-02 08:03:00), Every 1 week at 08:03:00 do check_pf(opening='9h') (last run: [never], next run: 2023-03-03 08:03:00), Every 1 week at 14:33:00 do check_pf(opening='15h') (last run: [never], next run: 2023-03-06 14:33:00), Every 1 week at 14:33:00 do check_pf(opening='15h') (last run: [never], next run: 2023-02-28 14:33:00), Every 1 week at 14:33:00 do check_pf(opening='15h') (last run: [never], next run: 2023-03-01 14:33:00), Every 1 week at 14:33:00 do check_pf(opening='15h') (last run: [never], next run: 2023-03-02 14:33:00), Every 1 week at 14:33:00 do check_pf(opening='15h') (last run: [never], next run: 2023-03-03 14:33:00), Every 10 minutes do check_index() (last run: [never], next run: 2023-02-28 07:37:38), Every 1 week at 08:03:00 do check_index(opening='9h') (last run: [never], next run: 2023-03-06 08:03:00), Every 1 week at 08:03:00 do check_index(opening='9h') (last run: [never], next run: 2023-02-28 08:03:00), Every 1 week at 08:03:00 do check_index(opening='9h') (last run: [never], next run: 2023-03-01 08:03:00), Every 1 week at 08:03:00 do check_index(opening='9h') (last run: [never], next run: 2023-03-02 08:03:00), Every 1 week at 08:03:00 do check_index(opening='9h') (last run: [never], next run: 2023-03-03 08:03:00), Every 1 week at 14:33:00 do check_index(opening='15h') (last run: [never], next run: 2023-03-06 14:33:00), Every 1 week at 14:33:00 do check_index(opening='15h') (last run: [never], next run: 2023-02-28 14:33:00), Every 1 week at 14:33:00 do check_index(opening='15h') (last run: [never], next run: 2023-03-01 14:33:00), Every 1 week at 14:33:00 do check_index(opening='15h') (last run: [never], next run: 2023-03-02 14:33:00), Every 1 week at 14:33:00 do check_index(opening='15h') (last run: [never], next run: 2023-03-03 14:33:00), Every 1 week at 16:15:00 do daily_report_17h() (last run: [never], next run: 2023-03-06 16:15:00), Every 1 week at 16:15:00 do daily_report_17h() (last run: [never], next run: 2023-02-28 16:15:00), Every 1 week at 16:15:00 do daily_report_17h() (last run: [never], next run: 2023-03-01 16:15:00), Every 1 week at 16:15:00 do daily_report_17h() (last run: [never], next run: 2023-03-02 16:15:00), Every 1 week at 16:15:00 do daily_report_17h() (last run: [never], next run: 2023-03-03 16:15:00), Every 1 week at 20:45:00 do daily_report_22h() (last run: [never], next run: 2023-03-06 20:45:00), Every 1 week at 20:45:00 do daily_report_22h() (last run: [never], next run: 2023-02-28 20:45:00), Every 1 week at 20:45:00 do daily_report_22h() (last run: [never], next run: 2023-03-01 20:45:00), Every 1 week at 20:45:00 do daily_report_22h() (last run: [never], next run: 2023-03-02 20:45:00), Every 1 week at 20:45:00 do daily_report_22h() (last run: [never], next run: 2023-03-03 20:45:00), Every 1 week at 21:02:00 do cleaning_f() (last run: [never], next run: 2023-03-06 21:02:00), Every 1 week at 21:02:00 do cleaning_f() (last run: [never], next run: 2023-02-28 21:02:00), Every 1 week at 21:02:00 do cleaning_f() (last run: [never], next run: 2023-03-01 21:02:00), Every 1 week at 21:02:00 do cleaning_f() (last run: [never], next run: 2023-03-02 21:02:00), Every 1 week at 21:02:00 do cleaning_f() (last run: [never], next run: 2023-03-03 21:02:00)]
+[28/Feb/2023 07:27:39] "GET /reports/ HTTP/1.1" 200 131512
+

@@ -213,10 +213,9 @@ def retrieve_quantity(in_action, **kwargs):
     if kwargs['client']:
         for pos in kwargs['client'].positions():
             contract=pos.contract
-            #actions=Action.objects.filter(symbol__contains=contract.localSymbol)
             if in_action.ib_ticker()==contract.localSymbol:
-                return abs(pos.position)
-    return 0      
+                return abs(pos.position), np.sign(pos.position)
+    return 0, 0      
                     
 @connect_ib
 def retrieve_ib_pf(**kwargs):
@@ -324,7 +323,7 @@ def get_ratio(action,**kwargs):
          logger.error(e, stack_info=True, exc_info=True)
 
 @connect_ib  
-def place(buy,action,short,**kwargs): #quantity in euros
+def place(buy,action,short,**kwargs): 
     try:
         contract =get_tradable_contract_ib(action,short)
         
@@ -332,18 +331,19 @@ def place(buy,action,short,**kwargs): #quantity in euros
             return "", decimal.Decimal(1.0), decimal.Decimal(0.0)
         else:
             kwargs['client'].qualifyContracts(contract)
+            quantity=kwargs.get("quantity",0)
             
             if buy:
-                order_size=kwargs.get("order_size",0)
-                last_price=IBData.get_last_price(contract)
-                quantity=math.floor(order_size/last_price)
+                if quantity==0:
+                    order_size=kwargs.get("order_size",0)
+                    last_price=IBData.get_last_price(contract)
+                    quantity=math.floor(order_size/last_price)
                 
                 if short:
                     order = MarketOrder('SELL', quantity)
                 else:
                     order = MarketOrder('BUY', quantity)
             else:
-                quantity=kwargs.get("quantity",0)
                 
                 if short:
                     order = MarketOrder('BUY', quantity)
@@ -387,18 +387,14 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             balance=10 #to get true
         
         if len(orders)==0: #necessary for the first trade of a stock for instance
-            order=Order(action=action, pf=pf) #use full if you did the entry order manually...
+            order=Order(action=action, pf=pf, short=short) #use full if you did the entry order manually...
             logger.info("order not found " + symbol+ ", created")
         else:
             order=orders[0]
             
-        if order.quantity is None:    
-            order.quantity=retrieve_quantity(action)
-            order.save()
+        order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
         
-        if order.quantity>0: #otherwise it is the first order for this stock
-            order_size*=2 #to reverse the order
-       
+        order.save()
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
         
         if (symbol in pf.retrieve() ):
@@ -409,19 +405,38 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         if (symbol not in pf.retrieve() and 
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
             order_size<=balance or short):
+            
+            #pf should be enough, but it is a double security
+            if (short and sign<0) or (not short and sign>0):
+                logger.info("pf correction performed, no order executed")
+                pf.remove(action.symbol)
+                pf_inv.append(action.symbol)       
+                return False
 
             new_order=Order(action=action, pf=pf)
             
             if use_IB:
-                new_order.entering_price, _= place(True,
-                                        action,
-                                        short,
-                                        order_size=order_size)
-                new_order.quantity=retrieve_quantity(action) #safer
+                if order.quantity==0: #for the first order
+                    new_order.entering_price, _= place(True,
+                                            action,
+                                            short,
+                                            order_size=order_size)
+                else:
+                    new_order.entering_price, _= place(True,
+                                            action,
+                                            short,
+                                            quantity=order.quantity*2) #*2 to revert the order
+                new_order.quantity=retrieve_quantity(action)
+                new_order.short=short
                 
                 if kwargs.get("sl",False):
                     sl=kwargs.get("sl")
-                    new_order.sl_threshold=order.entering_price*(1-sl)
+                    if short:
+                        new_order.sl_threshold=order.entering_price*(1+sl)
+                    else:
+                        new_order.sl_threshold=order.entering_price*(1-sl)
+                if kwargs.get("daily_sl",False):
+                    new_order.daily_sl_threshold=kwargs.get("daily_sl")
                     
                 if new_order.entering_price is not None and order.entering_price is not None: 
                     order.profit=new_order.entering_price-order.entering_price
@@ -529,7 +544,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
             order_size<=balance or short):
 
-            order=Order(action=action, pf=pf)
+            order=Order(action=action, pf=pf, short=short)
 
             if use_IB:
                 order.entering_price, order.quantity= place(True,
@@ -539,7 +554,13 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
 
                 if kwargs.get("sl",False):
                     sl=kwargs.get("sl")
-                    order.sl_threshold=order.entering_price*(1-sl)
+                    if short:
+                        order.sl_threshold=order.entering_price*(1+sl)
+                    else:
+                        order.sl_threshold=order.entering_price*(1-sl)
+                if kwargs.get("daily_sl",False):
+                    order.daily_sl_threshold=kwargs.get("daily_sl")
+                
             else:
                 order.entering_price=1.0                    
             
@@ -606,14 +627,17 @@ def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
      
 @connect_ib 
 def reverse_order(symbol,strategy, exchange,short,auto,**kwargs):
+    logger_trade.info("reverse order called")
     return check_auto_manual(reverse_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
         
 @connect_ib 
 def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
+    logger_trade.info("entry order called")
     return check_auto_manual(entry_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
 
 @connect_ib     
 def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
+    logger_trade.info("exit order called")
     return check_auto_manual(exit_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
 
 def check_if_index(action):

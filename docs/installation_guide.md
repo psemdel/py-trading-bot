@@ -119,12 +119,25 @@ In trading_bot/etc/ adapt the values in files (never commit those files!! Uncomm
     - DB_SECRET contains your database password
     - DJANGO_SECRET contains your Django secret
     - TELEGRAM_TOKEN contains your Telegram bot token
+    
+I would recommend to leave TIME_ZONE = 'UTC' except if you know what you are doing. 
 
 # Import the dump (optional)
 Reimport the dump file using "python manage.py loaddata dump.rdb" to fill your database with some financial products: CAC40, DAX, Nasdaq100 and S&P 500.
 
 # Start the bot
 Click on start_bot.sh
+
+I recommend to open it in a terminal, so you can see the console messages and can close it more easily. Don't open several instances of the bot at the same times, it does not work!
+When starting the bot, the message appearing will relate to Django, Redis, Telegram. Look at the file [start_messages](https://github.com/psemdel/py-trading-bot/blob/main/docs/appendix/start_messages.txt) for an example. Afterwards a message from the scheduler defining which job will run at which time will appear. Later the alerting check will run every few minutes depending on the setting. It shows:
+
+     0%|          | 0/1 [00:00<?, ?it/s]kPoolWorker-2] 
+     AAPL:   0%|          | 0/1 [00:00<?, ?it/s]ker-2] 
+     AAPL: 100%|##########| 1/1 [00:00<00:00,  8.02it/s]
+     AAPL: 100%|##########| 1/1 [00:00<00:00,  8.01it/s]
+     
+If everything goes well, your Telegram should display a message "I'm back online".
+
 Note the admin panel from Django that allows creating finance products.
 
 

@@ -86,6 +86,7 @@ class OptMain(VBTfunc):
         self.nb_macro_modes=kwargs.get('nb_macro_modes',3)
         
         self.fees=kwargs.get("fees",0.0005)
+        self.sl=kwargs.get("sl")
         
         self.best_arrs=np.zeros((self.loops*40,self.nb_macro_modes,self.len_ent+self.len_ex))
         self.best_arrs_ret=np.zeros(self.loops*40)
@@ -122,6 +123,8 @@ class OptMain(VBTfunc):
         #all entries and exits for all patterns and signals are calculated once and for all here
         self.threshold=1
         self.defi_i()
+        
+        self.shift=False
         print("init finished")
     
     def defi_i(self):
@@ -230,8 +233,7 @@ class OptMain(VBTfunc):
                     else:
                         arr=calc_arr[self.len_ent:self.len_ent+self.len_ex]  
                 
-                    if not self.index:
-                        s=np.full(np.shape(self.all_t_ents[ind][0]),0.0)
+                    s=np.full(np.shape(self.all_t_ents[ind][0]),0.0)
                     for ii in range(len(arr)):
                         if ent_or_ex=="ent":
                             t=self.all_t_ents[ind][ii]
@@ -321,7 +323,10 @@ class OptMain(VBTfunc):
     
     #define here a predefined starting point
     def predef(self):
-        return [np.array(self.a_bull_init), np.array(self.a_bear_init), np.array(self.a_uncertain_init)]
+        if self.nb_macro_modes==1:
+            return [np.array(self.a_bull_init)]
+        else:
+            return [np.array(self.a_bull_init), np.array(self.a_bear_init), np.array(self.a_uncertain_init)]
         
     #variates the array, if it is better, the new array is returned otherwise the original one
  
@@ -386,7 +391,6 @@ class OptMain(VBTfunc):
                     self.arrs=best_arrs_cand
                 else:
                     calc=False
-                    
                     self.best_end_arrs[self.best_end_arrs_index,:]= self.best_arrs[self.best_arrs_index-1,:]
                     self.best_end_arrs_ret[self.best_end_arrs_index]=self.best_arrs_ret[self.best_arrs_index-1]
                     self.best_end_arrs_index+=1

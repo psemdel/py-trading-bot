@@ -299,16 +299,28 @@ class MyScheduler():
             order=Order.objects.filter(c1 & c2)
             
             if len(order)>0:
-                if order[0].sl_threshold is not None:
+                if order[0].sl_threshold is not None or order[0].daily_sl_threshold is not None:
                     cours_pres=get_last_price(action)
-                    if cours_pres<order[0].sl_threshold:
-                        exit_order(action.symbol,
-                                   order[0].pf.strategy, 
-                                   order[0].pf.strategy.stock_ex.name,
-                                   False,
-                                   **kwargs)
-                        self.send_exit_msg(action.symbol,suffix="stop loss")
-
+                    if order[0].sl_threshold is not None:
+                        if (not order.short and cours_pres<order[0].sl_threshold) or\
+                        (order.short and cours_pres>order[0].sl_threshold):
+                            exit_order(action.symbol,
+                                       order[0].pf.strategy, 
+                                       order[0].pf.strategy.stock_ex.name,
+                                       order.short,
+                                       **kwargs)
+                            self.send_exit_msg(action.symbol,suffix="stop loss")
+                        
+                    if order[0].daily_sl_threshold is not None:
+                        if (not order.short and cours_pres<order[0].entering_price*(1-order[0].daily_sl_threshold)) or\
+                        (order.short and cours_pres>order[0].entering_price*(1+order[0].daily_sl_threshold)):
+                            exit_order(action.symbol,
+                                       order[0].pf.strategy, 
+                                       order[0].pf.strategy.stock_ex.name,
+                                       order.short,
+                                       **kwargs)
+                            self.send_exit_msg(action.symbol,suffix="daily stop loss")                        
+                
     def send_order(self,report):
         for auto in [False, True]:
             for entry in [False, True]:

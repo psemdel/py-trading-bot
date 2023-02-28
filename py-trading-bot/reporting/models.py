@@ -18,9 +18,8 @@ from orders.models import Action, get_pf, get_candidates,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission, filter_intro_action
       
-
-#which strategy to use for which stockexchange
-
+##Temporary storage for the telegram to message the orders at the end of the reporting.
+##Difficulty is that the telegram bot is async, so it is not possible to just make send_msg() in the order execution function
 class ListOfActions(models.Model):
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     entry=models.BooleanField(blank=False,default=False) #otherwise exit
@@ -222,26 +221,25 @@ class Report(models.Model):
                     cand=candidates
                     
                 for symbol in cand:
-                    symbol_complex=st.symbols_simple_to_complex(symbol,"ent")
+                    symbol_complex=presel.st.symbols_simple_to_complex(symbol,"ent")
                     if short:
-                        #only entries and exits is populated
                         self.define_ent_ex(
-                            st.exits_short[symbol_complex].values[-1],
-                            st.entries_short[symbol_complex].values[-1],
-                            st.exits[symbol_complex].values[-1],
-                            st.entries[symbol_complex].values[-1],
-                            st.symbols_to_YF[symbol], 
+                            False,
+                            False,
+                            presel.st.exits[symbol_complex].values[-1],
+                            presel.st.entries[symbol_complex].values[-1],
+                            presel.st.symbols_to_YF[symbol], 
                             "macd_vol",
                             exchange,
                             **kwargs
                             )
                     else:
                         self.define_ent_ex(
-                            st.entries[symbol_complex].values[-1],
-                            st.exits[symbol_complex].values[-1],
-                            st.entries_short[symbol_complex].values[-1],
-                            st.exits_short[symbol_complex].values[-1],
-                            st.symbols_to_YF[symbol], 
+                            presel.st.entries[symbol_complex].values[-1],
+                            presel.st.exits[symbol_complex].values[-1],
+                            False,
+                            False,
+                            presel.st.symbols_to_YF[symbol], 
                             "macd_vol",
                             exchange,
                             **kwargs
@@ -411,6 +409,63 @@ class Report(models.Model):
                         "normal",
                         exchange,
                         **kwargs)
+                    
+    def perform_sl_strat(self,symbols, stnormal, exchange, **kwargs):
+        if self.it_is_index:
+            stnormal.stratSL()
+        else:
+            stnormal.stratSL()
+        
+        sl_strat, _=Strategy.objects.get_or_create(name="sl")
+        sl_strat_act, _=StratCandidates.objects.get_or_create(name="sl",strategy=sl_strat.id) 
+        sl_strat_symbols=sl_strat_act.retrieve()
+        
+        for symbol in symbols:
+            if symbol in sl_strat_symbols:
+                if math.isnan(stnormal.vol[symbol].values[-1]):
+                    self.concat("symbol " + symbol + " no data")
+                else:
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                    
+                    #list present status
+                    self.define_ent_ex(
+                        stnormal.entries[symbol_complex_ent_normal].values[-1],
+                        stnormal.exits[symbol_complex_ex_normal].values[-1],
+                        stnormal.entries_short[symbol_complex_ex_normal].values[-1],
+                        stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                        stnormal.symbols_to_YF[symbol], 
+                        "normal",
+                        exchange,
+                        sl=0.005,
+                        **kwargs)   
+                    
+        if self.it_is_index:
+            stnormal.stratTSL()
+        else:
+            stnormal.stratTSL()
+        
+        tsl_strat, _=Strategy.objects.get_or_create(name="tsl")
+        tsl_strat_act, _=StratCandidates.objects.get_or_create(name="tsl",strategy=tsl_strat.id) 
+        tsl_strat_symbols=tsl_strat_act.retrieve()
+        
+        for symbol in symbols:
+            if symbol in tsl_strat_symbols:
+                if math.isnan(stnormal.vol[symbol].values[-1]):
+                    self.concat("symbol " + symbol + " no data")
+                else:
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                    
+                    #list present status
+                    self.define_ent_ex(
+                        stnormal.entries[symbol_complex_ent_normal].values[-1],
+                        stnormal.exits[symbol_complex_ex_normal].values[-1],
+                        stnormal.entries_short[symbol_complex_ex_normal].values[-1],
+                        stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                        stnormal.symbols_to_YF[symbol], 
+                        "normal",
+                        exchange,
+                        daily_sl=0.005,
+                        **kwargs)                       
 
     def perform_keep_strat(self,symbols, stnormal, exchange, **kwargs):
         if not self.it_is_index:
@@ -421,7 +476,7 @@ class Report(models.Model):
             
             for symbol in symbols:
                 if symbol in pf_keep.retrieve():
-                    logger.info("symbol presently in keep: "+symbol)
+                    self.concat("symbol presently in keep: "+symbol)
                     symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
 
                     self.define_ent_ex(
@@ -434,7 +489,7 @@ class Report(models.Model):
                         exchange,
                         **kwargs)
                 if symbol in pf_short_keep.retrieve(): 
-                    logger.info("symbol presently in keep short: "+symbol)
+                    self.concat("symbol presently in keep short: "+symbol)
                     symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
                     self.define_ent_ex(
                         False, #only exit
@@ -472,8 +527,8 @@ class Report(models.Model):
                     self.define_ent_ex(
                         st.entries[symbol_complex_ent].values[-1],
                         st.exits[symbol_complex_ent].values[-1],
-                        st.entries_short[symbol_complex_ent].values[-1],
-                        st.exits_short[symbol_complex_ent].values[-1],
+                        False, #both strategy use only long
+                        False,
                         st.symbols_to_YF[symbol], 
                         DIC,
                         exchange,
@@ -483,7 +538,7 @@ class Report(models.Model):
         
         if exchange is not None and "divergence" in DIC_PRESEL[exchange]: 
             pf_div=get_pf("divergence",exchange,False,**kwargs)
-            logger.info("symbols in divergence: " +str(pf_div.retrieve()))
+            self.concat("symbols in divergence: " +str(pf_div.retrieve()))
         ##Change underlying strategy
         st.call_strat("stratDiv")
         ##only_exit_substrat
@@ -499,7 +554,7 @@ class Report(models.Model):
                         False,
                         st.exits[symbol_complex_ent].values[-1],
                         False,
-                        st.exits_short[symbol_complex_ent].values[-1],
+                        False,
                         st.symbols_to_YF[symbol], 
                         "divergence",
                         exchange,
@@ -569,6 +624,8 @@ class Report(models.Model):
                 
                 self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, stnormal,st, sk, sma, sp)
                 logger.info("Strat daily report written " +(exchange or ""))
+                
+                self.perform_sl_strat(stnormal.symbols, stnormal, exchange, **kwargs)
 
                 ##Perform strategies that rely on the regular preselection of a candidate
                 self.perform_slow_strats(stnormal.symbols, DICS, exchange, st, **kwargs)

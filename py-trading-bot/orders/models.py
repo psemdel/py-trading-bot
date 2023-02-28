@@ -222,11 +222,13 @@ class Order(models.Model):
     action=models.ForeignKey('Action',on_delete=models.CASCADE)
     pf=models.ForeignKey('PF',on_delete=models.SET_NULL,blank=True,null=True)
     active=models.BooleanField(blank=False,default=True)
+    short=models.BooleanField(blank=False,default=False)
     entering_date=models.DateTimeField(null=False, blank=False, auto_now_add=True)#default=timezone.now())
     exiting_date=models.DateTimeField(null=True, blank=True)
     entering_price=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
     exiting_price=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
+    sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as price
+    daily_sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as pu
     profit=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
     profit_percent=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
     quantity=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)

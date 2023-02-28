@@ -512,6 +512,56 @@ class Strat(VBTfunc):
                             a_uncertain,
                             **kwargs)   
         
+    #Optimized on 2007-2023, for sl=0.5 %
+    def stratSL(self,**kwargs):
+        a_bull=[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1.,
+                1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
+        a_bear= [0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
+         1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
+         1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        a_uncertain=  [0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 0.,
+         1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)   
+        
+    #Optimized on 2007-2023, for tsl=0.5 %
+    def stratTSL(self,**kwargs):
+        a_bull=[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1.,
+                1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
+        a_bear= [0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
+         1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
+         1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        a_uncertain=  [0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 0.,
+         1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)           
+        
     # As strat_kama_stoch for bear and uncertain trend
     # Use MA for bull, so if the 5 days smoothed price crosses the 15 days smoothed price, a signal is created
     def strat_kama_stoch_matrend_bbands(self,**kwargs): #ex strat11
