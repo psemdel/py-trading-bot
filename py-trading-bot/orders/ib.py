@@ -257,11 +257,20 @@ def cash_balance(**kwargs):
         return 0
 
 #for SL check
+
 @connect_ib
+
+#"DIC_STOCKEX":{
+#    "Paris":{"IB_auth":True
+
 def get_last_price(action,**kwargs):
     try:
-        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"] and\
-                                 action.stock_ex.ib_ticker not in _settings["IB_STOCKEX_NO_PERMISSION"]):
+        
+        DIC_STOCKEX=_settings["DIC_STOCKEX"]
+        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
+                                 DIC_STOCKEX[action.stock_ex.name]["IB_auth"] and\
+                                  action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
+            
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
             if contract is not None:
                 cours_pres=IBData.get_last_price(contract)
@@ -280,9 +289,12 @@ def get_ratio(action,**kwargs):
     try:
         cours_pres=0
         cours_ref=0
+        DIC_STOCKEX=_settings["DIC_STOCKEX"]
             
-        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"] and\
-                                 action.stock_ex.ib_ticker not in _settings["IB_STOCKEX_NO_PERMISSION"]):
+        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
+                                 DIC_STOCKEX[action.stock_ex.name]["IB_auth"] and\
+                                  action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
+            
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
             if contract is not None:
                 bars = kwargs['client'].reqHistoricalData(
@@ -386,7 +398,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             order_size=1
             balance=10 #to get true
         
-        if len(orders)==0: #necessary for the first trade of a stock for instance
+        if len(orders)==0: #necessary for the first trade of a stock for instance, or if it was closed on a stop loss
             order=Order(action=action, pf=pf, short=short) #use full if you did the entry order manually...
             logger.info("order not found " + symbol+ ", created")
         else:

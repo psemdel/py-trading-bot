@@ -297,29 +297,35 @@ class MyScheduler():
             c1 = Q(action=action)
             c2 = Q(active=True)
             order=Order.objects.filter(c1 & c2)
+            auto=True
             
             if len(order)>0:
-                if order[0].sl_threshold is not None or order[0].daily_sl_threshold is not None:
+                o=order[0]
+                if o.sl_threshold is not None or o.daily_sl_threshold is not None:
                     cours_pres=get_last_price(action)
-                    if order[0].sl_threshold is not None:
-                        if (not order.short and cours_pres<order[0].sl_threshold) or\
-                        (order.short and cours_pres>order[0].sl_threshold):
+                    if o.sl_threshold is not None:
+                        if (not o.short and cours_pres<o.sl_threshold) or\
+                        (o.short and cours_pres>o.sl_threshold):
+
                             exit_order(action.symbol,
-                                       order[0].pf.strategy, 
-                                       order[0].pf.strategy.stock_ex.name,
-                                       order.short,
+                                       o.pf.strategy.name, 
+                                       o.pf.stock_ex.name,
+                                       o.short,
+                                       auto,
                                        **kwargs)
-                            self.send_exit_msg(action.symbol,suffix="stop loss")
+                            self.send_entry_exit_msg(action.symbol,False,False,True,suffix="stop loss") 
                         
-                    if order[0].daily_sl_threshold is not None:
-                        if (not order.short and cours_pres<order[0].entering_price*(1-order[0].daily_sl_threshold)) or\
-                        (order.short and cours_pres>order[0].entering_price*(1+order[0].daily_sl_threshold)):
+                    if o.daily_sl_threshold is not None:
+                        if (not o.short and cours_pres<o.entering_price*(1-o.daily_sl_threshold)) or\
+                        (o.short and cours_pres>o.entering_price*(1+o.daily_sl_threshold)):
+                            
                             exit_order(action.symbol,
-                                       order[0].pf.strategy, 
-                                       order[0].pf.strategy.stock_ex.name,
-                                       order.short,
+                                       o.pf.strategy.name, 
+                                       o.pf.stock_ex.name,
+                                       o.short,
+                                       auto,
                                        **kwargs)
-                            self.send_exit_msg(action.symbol,suffix="daily stop loss")                        
+                            self.send_entry_exit_msg(action.symbol,False,False,True,suffix="daily stop loss")                        
                 
     def send_order(self,report):
         for auto in [False, True]:

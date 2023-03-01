@@ -114,6 +114,10 @@ class BT(VBTfunc):
             
     ##create buy/sell from candidates
     def calculate(self,**kwargs): #day basis
+        daily_sl=kwargs.get("daily_sl")
+        sl=kwargs.get("sl")
+        last_entry_price=0
+    
         for ii in range(len(self.close.index)): #for each day
             if ii!=0:
                 if not kwargs.get("short",False):
@@ -122,10 +126,13 @@ class BT(VBTfunc):
                     for symbol_simple in self.pf:
                         symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
                         
-                        if self.ex11[symbol_complex].values[ii] or kwargs.get("nostrat11",False):
+                        if self.ex11[symbol_complex].values[ii] or kwargs.get("nostrat11",False) or\
+                        (daily_sl is not None and self.close[symbol_simple].iloc[ii]/self.close[symbol_simple].iloc[ii-1]<(1-daily_sl)) or\
+                        (sl is not None and last_entry_price!=0 and self.close[symbol_simple].iloc[ii]/last_entry_price<(1-sl)):
                             new_pf.remove(symbol_simple)
                             self.capital+=self.order_size
                             self.exits[symbol_simple].iloc[ii]=True
+                                
                     self.pf=new_pf
                     #buy
                     for symbol_simple in self.candidates[ii]:
@@ -137,6 +144,7 @@ class BT(VBTfunc):
                             self.pf.append(symbol_simple)
                             self.capital-=self.order_size
                             self.entries[symbol_simple].iloc[ii]=True
+                            last_entry_price=self.close[symbol_simple].iloc[ii]
                             
                 if kwargs.get("short",False):
                     #re-buy
@@ -567,7 +575,7 @@ class BT(VBTfunc):
             for ii in range(len(self.close)):
                 self.preselect_divergence_sub(ii,False,**kwargs)
             self.calculate(only_exit_strat11=True,**kwargs) 
-            self.entries.to_csv('initial')
+            #self.entries.to_csv('initial')
             
     #Like preselect_divergence, but the mechanism is blocked when macro_trend is bear
     #Reverting the mechanism did not prove to be very rewarding for this strategy
@@ -587,7 +595,20 @@ class BT(VBTfunc):
                 self.preselect_divergence_sub(ii,short,**kwargs)
             self.calculate(only_exit_strat11=True,**kwargs) #for a blocked behavior
             #self.calculate_macro(only_exit_strat11=True,**kwargs)  #for a macro behavior
-            
+
+    def preselect_divergence_sl(self,**kwargs):
+        self.st.stratDiv()
+        self.overwrite_strat11(self.st.entries,self.st.exits)
+        
+        self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
+
+        if kwargs.get("PRD",False):
+            self.preselect_divergence_sub(len(self.close.index)-1,False,**kwargs)
+        else:
+            for ii in range(len(self.close)):
+                self.preselect_divergence_sub(ii,False,**kwargs)
+            self.calculate(only_exit_strat11=True,sl=0.1, **kwargs) 
+            #self.entries.to_csv('initial')            
 ### Slow ###
 #Not called for production
 
@@ -737,6 +758,31 @@ class BT(VBTfunc):
              elif ii!=0 and not short:
                  self.candidates[ii]=self.candidates[ii-1]                         
          self.calculate(**kwargs)   
+         
+    def preselect_realmadrid_sl(self,**kwargs):   
+         self.st.stratReal()
+         self.overwrite_strat11(self.st.entries,self.st.exits)
+
+         distance=_settings["REALMADRID_DISTANCE"]
+         self.frequency=_settings["REALMADRID_FREQUENCY"]
+         self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
+
+         v={}
+         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
+        
+         for ii in range(len(self.close.index)):
+             if ii%self.frequency==0: #every 10 days
+                 for symbol in self.symbols_simple:
+                     v[symbol]=grow[(distance,True,symbol)].values[ii]
+                 res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+
+                 for e in res:
+                    if len(self.candidates[ii])<self.max_candidates_nb:
+                        symbol=e[0]
+                        self.candidates[ii].append(symbol)
+             elif ii!=0:
+                 self.candidates[ii]=self.candidates[ii-1]                         
+         self.calculate(sl=0.005,**kwargs)             
          
     def preselect_onlybull_vol(self,**kwargs):
         self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   

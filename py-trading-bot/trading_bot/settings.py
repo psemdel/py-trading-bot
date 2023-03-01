@@ -19,6 +19,7 @@ _settings={
     "EUREX":{"IB_auth":False,"perform_order":False},
     "Milan":{"IB_auth":False,"perform_order":False},
     "NASDAQ IND":{"IB_auth":False,"perform_order":False},
+    "Chicago":{"IB_auth":False,"perform_order":False},
     },
 "ETF_IB_auth":False,   
 
@@ -60,8 +61,12 @@ _settings={
 "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
 
 ## Order settings ##
-"USE_IB_FOR_DATA":os.environ.get("USE_IB_FOR_DATA",False), #use IB for Data or YF
-"IB_STOCK_NO_PERMISSION":["NDX"],
+"USE_IB_FOR_DATA":{
+    "alerting":os.environ.get("USE_IB_FOR_DATA_ALERTING",True), #use IB for Data or YF, for alerting
+    "reporting":os.environ.get("USE_IB_FOR_DATA_REPORTING",False), #use IB for Data or YF, for the generation of the reports
+    },
+    
+"IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
 "PERFORM_ORDER":True, #test or use IB to perform orders
 "BYPASS_ORDERCAPITAL_IF_IB":False, #bypass the restriction linked to order capital if using IB. with other words, 
@@ -84,11 +89,12 @@ _settings={
     },
 
 ## Configuration of the strategies ##
+
+
+"DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
+"RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
+
 # Frequency is the number of days between successive candidates actualisation
-
-"DIVERGENCE_MACRO":True,
-"RETARD_MACRO":True,
-
 "DAILY_REPORT_PERIOD":3, #in year
 
 "VOL_MAX_CANDIDATES_NB":1,
@@ -103,15 +109,15 @@ _settings={
 "HIST_VOL_SLOW_MAX_CANDIDATES_NB":2,
 "REALMADRID_DISTANCE":400,
 "REALMADRID_FREQUENCY":30,
-"REALMADRID_MAX_CANDIDATES_NB":2,
+"REALMADRID_MAX_CANDIDATES_NB":2, 
 "RETARD_MAX_HOLD_DURATION":15,
 
 "STOCH_LL":20,
 "STOCH_LU":80,
 "BBAND_THRESHOLD":0.15,
 
-"CALCULATE_PATTERN":False, #pattern calculation is time consuming
-"CALCULATE_TREND":False,   #trend calculation is time consuming
+"CALCULATE_PATTERN":True, #pattern calculation is time consuming
+"CALCULATE_TREND":True,   #trend calculation is time consuming
 
 #for some major events, that cannot be detected only with technical analysis
 "FORCE_MACRO_TO":"" #"bull"/"uncertain"/""

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
- cd bot
- 
+
  redis-server & 
  python3 manage.py runserver & 
  sleep 20

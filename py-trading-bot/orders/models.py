@@ -64,7 +64,7 @@ def get_exchange_actions(exchange,**kwargs):
         
     #actions=filter_intro_action( actions,None)  
     use_IB=False
-    if _settings["USE_IB_FOR_DATA"]:
+    if _settings["USE_IB_FOR_DATA"]["reporting"]:
         use_IB=check_ib_permission([a.symbol for a in actions])
    
     return use_IB, actions

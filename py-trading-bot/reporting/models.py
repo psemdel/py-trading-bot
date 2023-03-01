@@ -389,7 +389,7 @@ class Report(models.Model):
             stnormal.stratG()
         
         normal_strat, _=Strategy.objects.get_or_create(name="normal")
-        normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat.id) 
+        normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat)  #.id
         normal_strat_symbols=normal_strat_act.retrieve()
         
         for symbol in symbols:
@@ -417,7 +417,7 @@ class Report(models.Model):
             stnormal.stratSL()
         
         sl_strat, _=Strategy.objects.get_or_create(name="sl")
-        sl_strat_act, _=StratCandidates.objects.get_or_create(name="sl",strategy=sl_strat.id) 
+        sl_strat_act, _=StratCandidates.objects.get_or_create(name="sl",strategy=sl_strat) 
         sl_strat_symbols=sl_strat_act.retrieve()
         
         for symbol in symbols:
@@ -445,7 +445,7 @@ class Report(models.Model):
             stnormal.stratTSL()
         
         tsl_strat, _=Strategy.objects.get_or_create(name="tsl")
-        tsl_strat_act, _=StratCandidates.objects.get_or_create(name="tsl",strategy=tsl_strat.id) 
+        tsl_strat_act, _=StratCandidates.objects.get_or_create(name="tsl",strategy=tsl_strat) 
         tsl_strat_symbols=tsl_strat_act.retrieve()
         
         for symbol in symbols:
@@ -618,12 +618,13 @@ class Report(models.Model):
                                         close_ind=stnormal.close_ind, 
                                         volume_ind=stnormal.volume_ind,
                                        **kwargs)
-                
+
                 if _settings["CALCULATE_TREND"]:
                     st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
                 
                 self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, stnormal,st, sk, sma, sp)
                 logger.info("Strat daily report written " +(exchange or ""))
+                
                 
                 self.perform_sl_strat(stnormal.symbols, stnormal, exchange, **kwargs)
 
