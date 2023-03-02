@@ -132,22 +132,25 @@ class MyScheduler():
         for alert in alerts:
             alert.active=False
             alert.save()
+    
+    def check_stock_open(self,action):
+        tz=ZoneInfo(action.stock_ex.timezone)
+        now=datetime.now(tz).time() #wil compare the time in the local time to opening_time, also in the local time
         
+        return (now >action.stock_ex.opening_time and\
+                    now <action.stock_ex.closing_time)
+     
     def check_change(self,ratio, action,short,**kwargs):
         try:
             symbols_opportunity=constants.INDEXES+constants.RAW
-            tz=ZoneInfo(action.stock_ex.timezone)
-            now=datetime.now(tz).time() #wil compare the time in the local time to opening_time, also in the local time
 
             alerting_reco=False
             alerting=False
             alarming=False
             opportunity=False
             opening=bool(kwargs.get("opening",False))
-            stock_open=(now >action.stock_ex.opening_time and\
-                        now <action.stock_ex.closing_time)
-            
-            if stock_open:
+
+            if self.check_stock_open(action):
                 if (short and ratio>_settings["ALERT_THRESHOLD"]) or (not short and ratio < -_settings["ALERT_THRESHOLD"]):
                     alerting=True
                     if (short and ratio>_settings["ALARM_THRESHOLD"]) or (not short and ratio<-_settings["ALARM_THRESHOLD"]):
@@ -294,38 +297,39 @@ class MyScheduler():
 
     def check_sl(self,actions,**kwargs):
         for action in actions:
-            c1 = Q(action=action)
-            c2 = Q(active=True)
-            order=Order.objects.filter(c1 & c2)
-            auto=True
-            
-            if len(order)>0:
-                o=order[0]
-                if o.sl_threshold is not None or o.daily_sl_threshold is not None:
-                    cours_pres=get_last_price(action)
-                    if o.sl_threshold is not None:
-                        if (not o.short and cours_pres<o.sl_threshold) or\
-                        (o.short and cours_pres>o.sl_threshold):
-
-                            exit_order(action.symbol,
-                                       o.pf.strategy.name, 
-                                       o.pf.stock_ex.name,
-                                       o.short,
-                                       auto,
-                                       **kwargs)
-                            self.send_entry_exit_msg(action.symbol,False,False,True,suffix="stop loss") 
-                        
-                    if o.daily_sl_threshold is not None:
-                        if (not o.short and cours_pres<o.entering_price*(1-o.daily_sl_threshold)) or\
-                        (o.short and cours_pres>o.entering_price*(1+o.daily_sl_threshold)):
+            if self.check_stock_open(action):
+                c1 = Q(action=action)
+                c2 = Q(active=True)
+                order=Order.objects.filter(c1 & c2)
+                auto=True
+                
+                if len(order)>0:
+                    o=order[0]
+                    if o.sl_threshold is not None or o.daily_sl_threshold is not None:
+                        cours_pres=get_last_price(action)
+                        if o.sl_threshold is not None:
+                            if (not o.short and cours_pres<o.sl_threshold) or\
+                            (o.short and cours_pres>o.sl_threshold):
+    
+                                exit_order(action.symbol,
+                                           o.pf.strategy.name, 
+                                           o.pf.stock_ex.name,
+                                           o.short,
+                                           auto,
+                                           **kwargs)
+                                self.send_entry_exit_msg(action.symbol,False,False,True,suffix="stop loss") 
                             
-                            exit_order(action.symbol,
-                                       o.pf.strategy.name, 
-                                       o.pf.stock_ex.name,
-                                       o.short,
-                                       auto,
-                                       **kwargs)
-                            self.send_entry_exit_msg(action.symbol,False,False,True,suffix="daily stop loss")                        
+                        if o.daily_sl_threshold is not None:
+                            if (not o.short and cours_pres<o.entering_price*(1-o.daily_sl_threshold)) or\
+                            (o.short and cours_pres>o.entering_price*(1+o.daily_sl_threshold)):
+
+                                exit_order(action.symbol,
+                                           o.pf.strategy.name, 
+                                           o.pf.stock_ex.name,
+                                           o.short,
+                                           auto,
+                                           **kwargs)
+                                self.send_entry_exit_msg(action.symbol,False,False,True,suffix="daily stop loss")                        
                 
     def send_order(self,report):
         for auto in [False, True]:
@@ -418,7 +422,7 @@ class MyScheduler():
             logger.error(e, stack_info=True, exc_info=True)
             pass
 
-    def send_entry_exit_msg(self,symbol,entry,short, auto):
+    def send_entry_exit_msg(self,symbol,entry,short, auto,**kwargs):
         if auto:
             part1=""
             part2=""
@@ -435,8 +439,9 @@ class MyScheduler():
             part3=" short"
         else:
             part3=""
+        part4=kwargs.get("suffix","")
             
-        self.telegram_bot.send_message_to_all(part1+part2+symbol + " "+ part3)
+        self.telegram_bot.send_message_to_all(part1+part2+symbol + " "+ part3+" " +part4)
  
     #just check that bot is running
     def heartbeat_f(self):

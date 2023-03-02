@@ -428,6 +428,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             new_order=Order(action=action, pf=pf)
             
             if use_IB:
+                logger_trade.info("place reverse order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 if order.quantity==0: #for the first order
                     new_order.entering_price, _= place(True,
                                             action,
@@ -497,6 +498,7 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
 
             #profit
             if use_IB and order.quantity>0:
+                logger_trade.info("place exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 order.exiting_price, quantity= place(False,
                                        action,
                                        short,
@@ -516,6 +518,8 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             pf.remove(symbol)
             pf.save()
             return True
+        else:
+            logger.info(str(symbol) + " not found in portfolio for exit order")
         return False
     
     except Exception as e:
@@ -559,6 +563,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             order=Order(action=action, pf=pf, short=short)
 
             if use_IB:
+                logger_trade.info("place entry order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 order.entering_price, order.quantity= place(True,
                                         action,
                                         short,
@@ -622,12 +627,10 @@ def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
                dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
                _settings["DIC_PERFORM_ORDER"][strategy] and
                not auto==False):
-                
-                logger_trade.info("Starting automatic reverse order execution, symbol: "+symbol)
+
                 auto_checked=True
     
             else: 
-                logger_trade.info("Starting manual reverse order, symbol: "+symbol)
                 auto_checked=False
             
             return func(symbol,strategy, exchange,short,auto_checked,**kwargs), auto_checked
@@ -639,17 +642,14 @@ def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
      
 @connect_ib 
 def reverse_order(symbol,strategy, exchange,short,auto,**kwargs):
-    logger_trade.info("reverse order called")
     return check_auto_manual(reverse_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
         
 @connect_ib 
 def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
-    logger_trade.info("entry order called")
     return check_auto_manual(entry_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
 
 @connect_ib     
 def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
-    logger_trade.info("exit order called")
     return check_auto_manual(exit_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
 
 def check_if_index(action):
