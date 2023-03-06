@@ -257,12 +257,7 @@ def cash_balance(**kwargs):
         return 0
 
 #for SL check
-
 @connect_ib
-
-#"DIC_STOCKEX":{
-#    "Paris":{"IB_auth":True
-
 def get_last_price(action,**kwargs):
     try:
         

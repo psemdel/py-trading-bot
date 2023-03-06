@@ -412,7 +412,7 @@ class Report(models.Model):
                     
     def perform_sl_strat(self,symbols, stnormal, exchange, **kwargs):
         if self.it_is_index:
-            stnormal.stratSL()
+            stnormal.stratIndexSL()
         else:
             stnormal.stratSL()
         
@@ -440,7 +440,7 @@ class Report(models.Model):
                         **kwargs)   
                     
         if self.it_is_index:
-            stnormal.stratTSL()
+            stnormal.stratIndexTSL()
         else:
             stnormal.stratTSL()
         

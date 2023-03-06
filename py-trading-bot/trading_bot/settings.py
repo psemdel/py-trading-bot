@@ -53,6 +53,7 @@ _settings={
 "REPORT_17h":True, #for Paris and XETRA
 "REPORT_22h":True, #for Nasdaq and Nyse
 "HEARTBEAT":False, # to test telegram
+"HEARTBEAT_IB":True, # to test telegram
 
 "ALERT_THRESHOLD":3, #in %
 "ALARM_THRESHOLD":5, #in %

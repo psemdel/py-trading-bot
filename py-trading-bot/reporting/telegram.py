@@ -42,6 +42,16 @@ from datetime import time, datetime
  - Send message after each order
 '''
 logging.basicConfig(level=logging.INFO)  
+
+from telegram import __version__ as TG_VER
+
+try:
+    from telegram import __version_info__
+except ImportError:
+    __version_info__ = (0, 0, 0, 0, 0)
+
+if __version_info__ >= (20, 0, 0, "alpha", 1):
+    raise RuntimeError(f"This example is not compatible with your current PTB version {TG_VER}")
     
 def start():
     if settings.DEBUG: #
@@ -77,6 +87,7 @@ class MyScheduler():
         self.report_17h=_settings["REPORT_17h"]
         self.report_22h=_settings["REPORT_22h"]
         self.heartbeat=_settings["HEARTBEAT"] # to test if telegram is working ok
+        self.heartbeat_ib=_settings["HEARTBEAT"]
         self.cleaning=True
         
         tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
@@ -96,6 +107,8 @@ class MyScheduler():
             self.do_weekday(time(15,45,tzinfo=tz_NY),self.daily_report_22h)
         if self.heartbeat:
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
+        if self.heartbeat_ib:
+            self.manager.every(10, 'seconds').do(self.heartbeat_ib_f)
         if self.cleaning:
             self.do_weekday(time(16,2,tzinfo=tz_NY),self.cleaning_f)
 
@@ -116,6 +129,7 @@ class MyScheduler():
                                +"\n 17h " + str(self.report_17h)
                                +"\n 22h " + str(self.report_22h)
                                +"\n heartbeat " + str(self.heartbeat)
+                               +"\n heartbeat IB " + str(self.heartbeat_ib)
                                +"\n cleaning " + str(self.cleaning) 
                                )   
 
@@ -447,6 +461,9 @@ class MyScheduler():
     def heartbeat_f(self):
         self.telegram_bot.send_message_to_all("Heart beat")
 
-
+    def heartbeat_ib_f(self):
+        a=Action.objects.get(symbol="AAPL")
+        t=get_last_price(a)
+        self.telegram_bot.send_message_to_all("Apple current price: " + str(t))
 
         

@@ -511,6 +511,54 @@ class Strat(VBTfunc):
                             a_bear, 
                             a_uncertain,
                             **kwargs)   
+       
+    def stratIndexSL(self,**kwargs):
+        a_bull=[1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1., 1., 1., 1., 0., 0.,
+        1., 1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 1., 0.,
+        0., 0., 0., 0., 0., 0., 0., 1., 1., 1., 1., 0.]
+        a_bear=[0., 0., 1., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1., 0., 0.,
+         1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
+         0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 1., 0.]
+        a_uncertain=[1., 1., 1., 1., 1., 0., 1., 0., 0., 0., 0., 0., 0., 1., 1., 0.,
+         1., 1., 0., 0., 1., 1., 1., 0., 1., 1., 1., 1., 0., 0., 0., 0.,
+         0., 0., 1., 1., 1., 0., 1., 1., 1., 1., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)         
+
+    def stratIndexTSL(self,**kwargs):
+        a_bull=[1., 0., 0., 1., 1., 0., 1., 0., 0., 0., 1., 1., 0., 1., 0., 0.,
+                0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 0.]
+        a_bear=[0., 0., 1., 0., 1., 1., 1., 0., 0., 0., 0., 0., 1., 1., 1., 0.,
+         1., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0.,
+         0., 1., 0., 1., 0., 0., 1., 1., 0., 1., 1., 0.]
+        a_uncertain=[1., 1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 1., 1., 0.,
+         1., 0., 1., 1., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
+         0., 1., 0., 1., 1., 0., 1., 0., 1., 1., 0., 0.]
+        
+        self.entries, self.exits, self.entries_short, self.exits_short, \
+        self.macro_trend, self.min_ind, self.max_ind=\
+        strat_wrapper_macro(
+                            self.open,
+                            self.high, 
+                            self.low,
+                            self.close,
+                            #self.close_ind,
+                            a_bull, 
+                            a_bear, 
+                            a_uncertain,
+                            **kwargs)
         
     #Optimized on 2007-2023, for sl=0.5 %
     def stratSL(self,**kwargs):
