@@ -1,45 +1,36 @@
 <h1>Portfolio</h1>
-<h2>Long</h2>
-{% if actions %}
-        
-    <table>
-        <thead>
-            <tr>
-                <th>Symbol</th>
-                <th>Name</th>
-            </tr>
-        </thead>
-            {% for action in actions.all %}
-            <tr>
-                <td>{{action.symbol}}</td>
-                <td>{{action.name}}</td>
-            </tr>
-            {% endfor %}
-    </table>      
-{% else %}
-    <p>No long action</p>    
-{% endif %}
-
-<h2>Short</h2>
-
-{% if actions_short %}
-    <table>
-        <thead>
-            <tr>
-                <th>Symbol</th>
-                <th>Name</th>
-            </tr>
-        </thead>
-         {% for action in actions_short.all %}
+<table>
+    <thead>
         <tr>
-            <td>{{action.symbol}}</td>
-            <td>{{action.name}}</td>
+            <th>Symbol</th>
+            <th>Name</th>
+            <th>Stock exchange</th>
+            <th>Strategy</th>
+            <th>Direction</th>
+            <th>Sector</th>
         </tr>
+    </thead>
+        {% for pf in pfs %}   
+            {% if pf.actions %}
+                {% for action in pf.actions.all %}
+                    <tr>
+                        <td>{{action.symbol}}</td>
+                        <td>{{action.name}}</td>
+                        <td>{{action.stock_ex.name}}</td>
+                        <td>{{pf.strategy.name}}</td>
+                        
+                        {% if pf.short %}
+                            <td>Short</td>
+                        {% else %}
+                            <td>Long</td>
+                        {% endif %}
+                        <td>{{pf.sector.name}}</td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
         {% endfor %}
-    </table>    
-{% else %}
-    <p>No short action</p>    
-{% endif %}
+</table>      
+
 <p><a href="{% url 'reporting:reports' %}">Daylies</a></p>
 <p><a href="{% url 'orders:portfolio' %}">Portfolio</a></p>
 <p><a href="{% url 'reporting:alerts' %}">Alerts</a></p>

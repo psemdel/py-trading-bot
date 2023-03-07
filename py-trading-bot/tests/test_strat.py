@@ -282,7 +282,32 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.09)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.53) 
 
-
+    def test_stratSL(self):
+        self.st.stratSL()
+        
+        pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,
+                                      short_entries=self.st.entries_short,
+                                      short_exits  =self.st.exits_short,
+                                      sl_stop=0.005)  
+        
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),280.4)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),28.47)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),695.37)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),236.14) 
+        
+    def test_stratTSL(self):
+        self.st.stratTSL()
+        
+        pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,
+                                      short_entries=self.st.entries_short,
+                                      short_exits  =self.st.exits_short,
+                                      tsl_stop=0.005)  
+        
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),16127.0)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),407.78)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),75398.95)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),37324.82) 
+        
 if __name__ == '__main__':
     unittest.main()        
         

@@ -87,7 +87,7 @@ class MyScheduler():
         self.report_17h=_settings["REPORT_17h"]
         self.report_22h=_settings["REPORT_22h"]
         self.heartbeat=_settings["HEARTBEAT"] # to test if telegram is working ok
-        self.heartbeat_ib=_settings["HEARTBEAT"]
+        self.heartbeat_ib=_settings["HEARTBEAT_IB"]
         self.cleaning=True
         
         tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
