@@ -24,7 +24,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
-from orders.models import (Action, Order, ActionCategory, Excluded, Strategy,
+from orders.models import (Action, Order, ActionCategory, StockEx, Excluded, Strategy,
                            action_to_etf,
                            get_pf, get_order_capital, period_YF_to_ib,
                            exchange_to_index_symbol
@@ -199,9 +199,7 @@ def get_tradable_contract_ib(action,short,**kwargs):
         logger.info("stock "+action.ib_ticker() + " not found")
         return None
     else:
-        DIC_STOCKEX=_settings["DIC_STOCKEX"]
-       
-        if DIC_STOCKEX[action.stock_ex.name]["IB_auth"]:
+        if action.stock_ex.name.ib_auth:
             action=action_to_etf(action,short) #if index replace the index through the corresponding ETF
             return IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,False)
         else:
@@ -260,10 +258,8 @@ def cash_balance(**kwargs):
 @connect_ib
 def get_last_price(action,**kwargs):
     try:
-        
-        DIC_STOCKEX=_settings["DIC_STOCKEX"]
         if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
-                                 DIC_STOCKEX[action.stock_ex.name]["IB_auth"] and\
+                                 action.stock_ex.name.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
@@ -284,10 +280,9 @@ def get_ratio(action,**kwargs):
     try:
         cours_pres=0
         cours_ref=0
-        DIC_STOCKEX=_settings["DIC_STOCKEX"]
             
         if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
-                                 DIC_STOCKEX[action.stock_ex.name]["IB_auth"] and\
+                                 action.stock_ex.name.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
@@ -359,15 +354,22 @@ def place(buy,action,short,**kwargs):
             trade = kwargs['client'].placeOrder(contract, order)
             logger_trade.info("order sent to IB, action " + str(action)+", short: " + str(short) + ", quantity: "+str(quantity))
     
-            kwargs['client'].sleep(1.0)
-            if trade.orderStatus.status == 'Filled':
-                fill = trade.fills[-1]
-                logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
-                price=fill.execution.avgPrice     
-                return decimal.Decimal(price), decimal.Decimal(quantity)
-            else:
-                logger_trade.info("order not filled, pending")
-                return decimal.Decimal(1.0), decimal.Decimal(1.0)
+            max_time=20
+            t=0
+            
+            while t<max_time:
+            
+                kwargs['client'].sleep(1.0)
+                t+=1
+
+                if trade.orderStatus.status == 'Filled':
+                    fill = trade.fills[-1]
+                    logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
+                    price=fill.execution.avgPrice     
+                    return decimal.Decimal(price), decimal.Decimal(quantity)
+                
+            logger_trade.info("order not filled, pending")
+            return decimal.Decimal(1.0), decimal.Decimal(1.0)
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
 
@@ -434,9 +436,12 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
                                             action,
                                             short,
                                             quantity=order.quantity*2) #*2 to revert the order
+                logger_trade.info("entering_price: "+ str(new_order.entering_price))
                 new_order.quantity=retrieve_quantity(action)
                 new_order.short=short
                 
+                logger_trade.info("sl" + str(kwargs.get("sl",False)))
+                logger_trade.info("daily sl" + str(kwargs.get("daily_sl",False)))
                 if kwargs.get("sl",False):
                     sl=kwargs.get("sl")
                     if short:
@@ -563,7 +568,9 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                                         action,
                                         short,
                                         order_size=order_size)
-
+                logger_trade.info("entering_price: "+ str(order.entering_price))
+                logger_trade.info("sl" + str(kwargs.get("sl",False)))
+                logger_trade.info("daily sl" + str(kwargs.get("daily_sl",False)))
                 if kwargs.get("sl",False):
                     sl=kwargs.get("sl")
                     if short:
@@ -612,15 +619,15 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
 def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
     def wrapper(*args,**kwargs):
         try: 
-            dic=_settings["DIC_STOCKEX"]
             action=Action.objects.get(symbol=symbol)
+            stock_ex=StockEx.objects.get(name=exchange)
+            strat=Strategy.objects.get(name=strategy)
             
             if (kwargs['client'] and
                _settings["PERFORM_ORDER"] and
-               exchange in dic and
                (not check_if_index(action) or (check_if_index(action) and _settings["ETF_IB_auth"])) and #ETF trading requires too high 
-               dic[exchange]["perform_order"] and  #ETF trading requires too high permissions on IB, XETRA data too expansive
-               _settings["DIC_PERFORM_ORDER"][strategy] and
+               stock_ex.perform_order and  #ETF trading requires too high permissions on IB, XETRA data too expansive
+               strat.perform_order and
                not auto==False):
 
                 auto_checked=True

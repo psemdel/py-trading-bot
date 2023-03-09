@@ -6,13 +6,15 @@ One of the most important features of the bot is the possibility to perform orde
     The API must be enabled [documentation](https://interactivebrokers.github.io/tws-api/initial_setup.html).
 2. You need the permission to receive the data from data for the product you want to order. See [IB Market Data](https://www.interactivebrokers.com/en/pricing/research-news-marketdata.php). 
 
-    As you may want to use an automatic strategy for products where you don't have the right, the bot can still inform you via telegram to perform an order "manually". For this, go in trading_bot/settings.py use the constant IB_STOCKEX_NO_PERMISSION to list the stock exchanges where you don't have permission. You can do the same with stocks with IB_STOCK_NO_PERMISSION. It covers especially complex products, where permission is difficult to get.
+    As you may want to use an automatic strategy for products where you don't have the right, the bot can still inform you via telegram to perform an order "manually". For this go in the admin pannel, and set in the stock exchanges the check "Ib auth" if you have the permission for it. 
+    
+    Additionally, a black list of stocks can be configured in trading_bot/settings.py with IB_STOCK_NO_PERMISSION. It covers especially complex products, where permission is difficult to get.
     
 3. If you want to use a simple strategy for a bunch of actions. Let's say that you want to trade Tesla and Amazon with a RSI with threshold 30 and 70. This strategy is called "normal" in the bot.
     
     Select the actions you want to trade. Go in the admin panel and click on Stratcandidates. There should be an item "normal" (otherwise create it). Click on it and select the actions you want to trade (press ctrl to select several).
     
-    To perform the orders automatically in trading_bot/settings two parameters must be set. PERFORM_ORDER must be true, in addition you need DIC_PERFORM_ORDER={ "normal":True} 
+    To perform the orders automatically, go in the admin panel and first go to the corresponding strategy, here "normal", and check "Perform order". Do the same for the corresponding stock exchange.
     
     The strategy used for this is defined in reporting/models.py in the function perform_normal_strat(). 
     

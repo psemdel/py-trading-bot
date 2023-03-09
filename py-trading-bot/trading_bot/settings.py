@@ -10,40 +10,7 @@ _settings={
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
 
-"DIC_STOCKEX":{
-    "Paris":{"IB_auth":True,"perform_order":False},
-    "XETRA":{"IB_auth":False,"perform_order":False},
-    "Nasdaq":{"IB_auth":True,"perform_order":True},
-    "NYSE":{"IB_auth":True,"perform_order":True},
-    "MONEP":{"IB_auth":True,"perform_order":True},
-    "EUREX":{"IB_auth":False,"perform_order":False},
-    "Milan":{"IB_auth":False,"perform_order":False},
-    "NASDAQ IND":{"IB_auth":False,"perform_order":False},
-    "Chicago":{"IB_auth":False,"perform_order":False},
-    },
 "ETF_IB_auth":False,   
-
-"DIC_PRESEL":{
-    "Paris":["retard_keep","divergence"],
-    "XETRA":["retard_keep","divergence"], 
-    "Nasdaq":["retard_keep","divergence"],
-    "NYSE":[]
-    },
-
-"DIC_PRESEL_SECTOR":{
-    "realestate":[],
-    "industry":[],
-    "it":["retard_keep"],
-    "com":[],
-    "staples":[],
-    "consumer":[],
-    "utilities":[],
-    "energy":[],
-    "fin":[],
-    "materials":[],
-    "healthcare":[],
-    },
-
 "NYSE_SECTOR_TO_SCAN":["it"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\
           #"fin","materials","healthcare"
 
@@ -74,24 +41,7 @@ _settings={
 #if there is enough money on your account, the order will be performed, 
 #without considering how many orders/strategy you want to perform
 "ORDER_SIZE":15000, 
-
-## Can be configured for each strategy separately (depending on how often the strategy will trade)
-## relation is PERFORM_ORDER and DIC_PERFORM_ORDER
-"DIC_PERFORM_ORDER":{
-    "normal":True,
-    "macd_vol":True,
-    "retard":True,
-    "retard_manual":False,
-    "wq7":False,
-    "wq31":False,
-    "wq53":False,
-    "wq54":False,
-    "divergence":True
-    },
-
 ## Configuration of the strategies ##
-
-
 "DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
 "RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
 

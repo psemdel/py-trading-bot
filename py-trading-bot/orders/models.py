@@ -32,13 +32,10 @@ def check_ib_permission(symbols):
             break
         
         a=Action.objects.get(symbol=symbol)      
-        dic=_settings["DIC_STOCKEX"]
-        if a.stock_ex.name in dic:
-            if dic[a.stock_ex.name]["IB_auth"]==False:
-                logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
-                IBok=False
-                break
-            
+        if a.stock_ex.ib_auth==False:
+            logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
+            IBok=False
+            break
     
     return IBok
     
@@ -47,15 +44,15 @@ def get_exchange_actions(exchange,**kwargs):
     cat=ActionCategory.objects.get(short="ACT")
     
     try:
-        stockEx=StockEx.objects.get(name=exchange)
+        stock_ex=StockEx.objects.get(name=exchange)
     except:
         raise ValueError("Stock exchange: "+str(exchange)+" not found, create it in the admin panel")
     
     c1 = Q(category=cat)
-    c2 = Q(stock_ex=stockEx)
+    c2 = Q(stock_ex=stock_ex)
     c3 = Q(delisted=False) #to be removed
     
-    if exchange=="NYSE" and kwargs.get("sec"):
+    if stock_ex.presel_at_sector_level and kwargs.get("sec"):
         action_sector, _=ActionSector.objects.get_or_create(name=kwargs.get("sec"))
         c4 = Q(sector=action_sector)
         actions=Action.objects.filter(c1 & c2 & c3 & c4)
@@ -146,6 +143,13 @@ class Fees(models.Model):
     
     def __str__(self):
         return self.name  
+
+class Strategy(models.Model):
+    name=models.CharField(max_length=100, blank=False)
+    perform_order=models.BooleanField(blank=False,default=False)
+    
+    def __str__(self):
+        return self.name
     
 class StockEx(models.Model):
     name=models.CharField(max_length=100, blank=False)
@@ -154,16 +158,14 @@ class StockEx(models.Model):
     opening_time=models.TimeField(default=datetime.time(9, 00))
     closing_time=models.TimeField(default=datetime.time(17, 00))
     timezone=models.CharField(max_length=60,choices=all_tz, blank=False,default='Europe/Paris')
+    perform_order=models.BooleanField(blank=False,default=False)
+    ib_auth=models.BooleanField(blank=False,default=False)
+    strategies_in_use=models.ManyToManyField(Strategy,blank=True)   # Presel strategies in use, normal/sl/tsl depends on the selected candidates
+    presel_at_sector_level=models.BooleanField(blank=False,default=False)
     
     def __str__(self):
-        return self.name    
-
-class Strategy(models.Model):
-    name=models.CharField(max_length=100, blank=False)
+        return self.name 
     
-    def __str__(self):
-        return self.name  
-
 ### Index is like stock (but it had to be separated, as an index cannot be bought directly
 class Action(models.Model): #Action means stock in French
     symbol=models.CharField(max_length=15, blank=False, primary_key=True)
@@ -240,22 +242,22 @@ def pf_retrieve_all(**kwargs):
     arr=[]
     
     for pf in PF.objects.filter(short=kwargs.get("short",False)):
-        cat=ActionCategory.objects.get(short="ACT")
-        c1 = Q(category=cat)
+        #cat=ActionCategory.objects.get(short="ACT")
+        #c1 = Q(category=cat)
         if kwargs.get("opening")=="9h":
             stockEx1=StockEx.objects.filter(name="Paris")
             stockEx2=StockEx.objects.filter(name="XETRA")
             c2 = Q(stock_ex=stockEx1[0])
             c3 = Q(stock_ex=stockEx2[0])
-            actions=pf.actions.filter(c1 & (c2|c3))
+            actions=pf.actions.filter((c2|c3))#c1 &
         elif kwargs.get("opening")=="15h":
             stockEx1=StockEx.objects.filter(name="Nasdaq")
             stockEx2=StockEx.objects.filter(name="NYSE")
             c2 = Q(stock_ex=stockEx1[0])
             c3 = Q(stock_ex=stockEx2[0])
-            actions=pf.actions.filter(c1 & (c2|c3))
+            actions=pf.actions.filter( (c2|c3)) #c1 &
         else:
-            actions=pf.actions.filter(c1)
+            actions=pf.actions.all() #filter(c1)
         
         for action in actions:
             if not action in arr:
@@ -310,8 +312,13 @@ def get_sub(strategy, exchange,short,**kwargs):
     name=strategy + "_" + exchange
     if short:
         name+="_short"
-        
-    if exchange=="NYSE":
+  
+    try:
+        stock_ex=StockEx.objects.get(name=exchange) 
+    except:
+        raise ValueError("Stock exchange: "+str(exchange)+" not found, create it in the admin panel")
+    
+    if stock_ex.presel_at_sector_level:
         if kwargs.get("sec"):
             sector=kwargs.get("sec") 
             name+="_"+sector
@@ -344,6 +351,7 @@ class ActionCategory(models.Model):
 ###GICS sectors    
 class ActionSector(models.Model):
     name=models.CharField(max_length=100, blank=False)
+    strategies_in_use=models.ManyToManyField(Strategy,blank=True)   
 
     def __str__(self):
         return self.name     
