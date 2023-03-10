@@ -14,7 +14,7 @@ One of the most important features of the bot is the possibility to perform orde
     
     Select the actions you want to trade. Go in the admin panel and click on Stratcandidates. There should be an item "normal" (otherwise create it). Click on it and select the actions you want to trade (press ctrl to select several).
     
-    To perform the orders automatically, go in the admin panel and first go to the corresponding strategy, here "normal", and check "Perform order". Do the same for the corresponding stock exchange.
+    To perform the orders automatically, go in the admin panel and first go to the corresponding strategy, here "normal", and check "Perform order". Do the same for the corresponding stock exchange. Eventually in trading_bot/settings.py PERFORM_ORDER must be set to true.
     
     The strategy used for this is defined in reporting/models.py in the function perform_normal_strat(). 
     
@@ -29,13 +29,9 @@ One of the most important features of the bot is the possibility to perform orde
     
     The normal strategy is easy to understand, but it means that you always trade the same stocks.
     
-4. If you want to first preselect the stocks you want to trade according to some criteria. Let's say you want to use Formulaic Alphas number 7, called in the code wq7, for stocks listed at Paris. Go in trading_bot/settings.py 
-
-    DIC_PRESEL={
-      "Paris":["wq7"],
-    }
+4. If you want to first preselect the stocks you want to trade according to some criteria. Let's say you want to use Formulaic Alphas number 7, called in the code wq7, for stocks listed at Paris. Go in the admin panel, create this strategy. Afterwards go to the stock exchange and select this strategy in the "strategies in use".
     
-   It will add this preselection to the report. To perform the order automatically set DIC_PERFORM_ORDER={"wq7":True} in addition to PERFORM_ORDER=true.
+   It will add this preselection to the report.  
    The other preselection algorithms can be set the same way. The preselection algorithms can be found in core/bt.py (for backtesting) and in core/btP.py (for production, when differing).
    
 5. Additionally, before performing any order, the algorithm will check that there is enough "resources" (money) available. If you want to rely only on your cash balance in IB, or to get started with the bot, you can go in the settings and set: 

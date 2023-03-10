@@ -6,6 +6,7 @@ from trading_bot.settings import _settings
 
 from core import stratP, btP
 from core import indicators as ic
+from core.common import intersection
 import warnings
 import logging
 logger = logging.getLogger(__name__)
@@ -395,23 +396,22 @@ class Report(models.Model):
         normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat)  #.id
         normal_strat_symbols=normal_strat_act.retrieve()
         
-        for symbol in symbols:
-            if symbol in normal_strat_symbols:
-                if math.isnan(stnormal.vol[symbol].values[-1]):
-                    self.concat("symbol " + symbol + " no data")
-                else:
-                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
-                    
-                    #list present status
-                    self.define_ent_ex(
-                        stnormal.entries[symbol_complex_ent_normal].values[-1],
-                        stnormal.exits[symbol_complex_ex_normal].values[-1],
-                        stnormal.entries_short[symbol_complex_ex_normal].values[-1],
-                        stnormal.exits_short[symbol_complex_ent_normal].values[-1],
-                        stnormal.symbols_to_YF[symbol], 
-                        "normal",
-                        exchange,
-                        **kwargs)
+        for symbol in intersection(symbols,normal_strat_symbols):
+            if math.isnan(stnormal.vol[symbol].values[-1]):
+                self.concat("symbol " + symbol + " no data")
+            else:
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                
+                #list present status
+                self.define_ent_ex(
+                    stnormal.entries[symbol_complex_ent_normal].values[-1],
+                    stnormal.exits[symbol_complex_ex_normal].values[-1],
+                    stnormal.entries_short[symbol_complex_ex_normal].values[-1],
+                    stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                    stnormal.symbols_to_YF[symbol], 
+                    "normal",
+                    exchange,
+                    **kwargs)
                     
     def perform_sl_strat(self,symbols, stnormal, exchange, **kwargs):
         if self.it_is_index:
@@ -423,24 +423,23 @@ class Report(models.Model):
         sl_strat_act, _=StratCandidates.objects.get_or_create(name="sl",strategy=sl_strat) 
         sl_strat_symbols=sl_strat_act.retrieve()
         
-        for symbol in symbols:
-            if symbol in sl_strat_symbols:
-                if math.isnan(stnormal.vol[symbol].values[-1]):
-                    self.concat("symbol " + symbol + " no data")
-                else:
-                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
-                    
-                    #list present status
-                    self.define_ent_ex(
-                        stnormal.entries[symbol_complex_ent_normal].values[-1],
-                        stnormal.exits[symbol_complex_ex_normal].values[-1],
-                        stnormal.entries_short[symbol_complex_ex_normal].values[-1],
-                        stnormal.exits_short[symbol_complex_ent_normal].values[-1],
-                        stnormal.symbols_to_YF[symbol], 
-                        "sl",
-                        exchange,
-                        sl=0.005,
-                        **kwargs)   
+        for symbol in intersection(symbols,sl_strat_symbols):
+            if math.isnan(stnormal.vol[symbol].values[-1]):
+                self.concat("symbol " + symbol + " no data")
+            else:
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                
+                #list present status
+                self.define_ent_ex(
+                    stnormal.entries[symbol_complex_ent_normal].values[-1],
+                    stnormal.exits[symbol_complex_ex_normal].values[-1],
+                    stnormal.entries_short[symbol_complex_ex_normal].values[-1],
+                    stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                    stnormal.symbols_to_YF[symbol], 
+                    "sl",
+                    exchange,
+                    sl=0.005,
+                    **kwargs)   
                     
         if self.it_is_index:
             stnormal.stratIndexTSL()
@@ -451,29 +450,27 @@ class Report(models.Model):
         tsl_strat_act, _=StratCandidates.objects.get_or_create(name="tsl",strategy=tsl_strat) 
         tsl_strat_symbols=tsl_strat_act.retrieve()
         
-        for symbol in symbols:
-            if symbol in tsl_strat_symbols:
-                if math.isnan(stnormal.vol[symbol].values[-1]):
-                    self.concat("symbol " + symbol + " no data")
-                else:
-                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
-                    
-                    #list present status
-                    self.define_ent_ex(
-                        stnormal.entries[symbol_complex_ent_normal].values[-1],
-                        stnormal.exits[symbol_complex_ex_normal].values[-1],
-                        stnormal.entries_short[symbol_complex_ex_normal].values[-1],
-                        stnormal.exits_short[symbol_complex_ent_normal].values[-1],
-                        stnormal.symbols_to_YF[symbol], 
-                        "tsl",
-                        exchange,
-                        daily_sl=0.005,
-                        **kwargs)                       
+        for symbol in intersection(symbols,tsl_strat_symbols):
+            if math.isnan(stnormal.vol[symbol].values[-1]):
+                self.concat("symbol " + symbol + " no data")
+            else:
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                
+                #list present status
+                self.define_ent_ex(
+                    stnormal.entries[symbol_complex_ent_normal].values[-1],
+                    stnormal.exits[symbol_complex_ex_normal].values[-1],
+                    stnormal.entries_short[symbol_complex_ex_normal].values[-1],
+                    stnormal.exits_short[symbol_complex_ent_normal].values[-1],
+                    stnormal.symbols_to_YF[symbol], 
+                    "tsl",
+                    exchange,
+                    daily_sl=0.005,
+                    **kwargs)                       
 
     def perform_keep_strat(self,symbols, stnormal, exchange, **kwargs):
         if not self.it_is_index:
-            #stnormal.stratF()
-            
+           
             pf_keep=get_pf("retard_keep",exchange,False,**kwargs)
             pf_short_keep=get_pf("retard_keep",exchange,True,**kwargs)
             
@@ -512,15 +509,13 @@ class Report(models.Model):
             slow_strats_active=[]
             slow_cands={}
             
-            #It is an intersection
-            for s in strats:
-                if s in slow_strats:
-                    slow_strats_active.append(s)
-                    if not self.it_is_index and exchange is not None: 
-                        cand=get_candidates(s.name,exchange)
-                        slow_cands[s.name]=cand.retrieve()
-                    else:
-                        slow_cands[s.name]=[]   
+            for s in intersection(strats,slow_strats):
+                slow_strats_active.append(s)
+                if not self.it_is_index and exchange is not None: 
+                    cand=get_candidates(s.name,exchange)
+                    slow_cands[s.name]=cand.retrieve()
+                else:
+                    slow_cands[s.name]=[]   
                      
             ##Change underlying strategy
             st.call_strat("strat_kama_stoch_matrend_bbands")             
@@ -545,30 +540,29 @@ class Report(models.Model):
         try:
             s=Strategy.objects.get(name="divergence")
             if exchange is not None:
-                stock_ex=StockEx.objects.get(name=exchange)
-                if s in stock_ex.strategies_in_use.all():
-                    pf_div=get_pf("divergence",exchange,False,**kwargs)
-                    self.concat("symbols in divergence: " +str(pf_div.retrieve()))
+                #even if divergence is not anymore used, we should be able to exit
+                pf_div=get_pf("divergence",exchange,False,**kwargs)
+                self.concat("symbols in divergence: " +str(pf_div.retrieve()))
                 ##Change underlying strategy
                 st.call_strat("stratDiv")
                 ##only_exit_substrat
-        
-                for symbol in symbols:
-                    symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
-                    
-                    if s in strats and\
-                            st.symbols_to_YF[symbol] in pf_div.retrieve(): 
-                            logger_trade.info("Divergence exit " + str(st.exits[symbol_complex_ent].values[-1]))    
-                                
-                            self.define_ent_ex(
-                                False,
-                                st.exits[symbol_complex_ent].values[-1],
-                                False,
-                                False,
-                                st.symbols_to_YF[symbol], 
-                                s.name,
-                                exchange,
-                                **kwargs)
+                if len(pf_div.retrieve())>0:
+                    for symbol in symbols:
+                        symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
+                        
+                        if s in strats and\
+                                st.symbols_to_YF[symbol] in pf_div.retrieve(): 
+                                logger_trade.info("Divergence exit " + str(st.exits[symbol_complex_ent].values[-1]))    
+                                    
+                                self.define_ent_ex(
+                                    False,
+                                    st.exits[symbol_complex_ent].values[-1],
+                                    False,
+                                    False,
+                                    st.symbols_to_YF[symbol], 
+                                    s.name,
+                                    exchange,
+                                    **kwargs)
         except:
             print("check that divergence strategy is created")    
             
@@ -579,12 +573,12 @@ class Report(models.Model):
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)
                 if self.stock_ex.presel_at_sector_level:
-                    if kwargs.get("sec"):
+                    if sec:
                         try:
-                            sector=ActionSector.objects.get(name=kwargs.get("sec"))
+                            sector=ActionSector.objects.get(name=sec)
                             strats=sector.strategies_in_use.all()
                         except:
-                            logger.warning("sector not found: " + str(kwargs.get("sec")))
+                            logger.warning("sector not found: " + str(sec))
                             pass
                 else:
                     strats=self.stock_ex.strategies_in_use.all()

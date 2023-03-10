@@ -199,7 +199,7 @@ def get_tradable_contract_ib(action,short,**kwargs):
         logger.info("stock "+action.ib_ticker() + " not found")
         return None
     else:
-        if action.stock_ex.name.ib_auth:
+        if action.stock_ex.ib_auth:
             action=action_to_etf(action,short) #if index replace the index through the corresponding ETF
             return IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,False)
         else:
@@ -259,7 +259,7 @@ def cash_balance(**kwargs):
 def get_last_price(action,**kwargs):
     try:
         if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
-                                 action.stock_ex.name.ib_auth and\
+                                 action.stock_ex.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
@@ -282,7 +282,7 @@ def get_ratio(action,**kwargs):
         cours_ref=0
             
         if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
-                                 action.stock_ex.name.ib_auth and\
+                                 action.stock_ex.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
@@ -373,6 +373,9 @@ def place(buy,action,short,**kwargs):
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
 
+
+#better to have a separate function for reversing. Exit would not buy anything and would lead to double fees
+#entry alone would not close the last order
 @connect_ib 
 def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convention short==True --> we go to short
     try:
@@ -490,12 +493,12 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             orders=Order.objects.filter(c1 & c2)
             if len(orders)==0:
                 order=Order(action=action, pf=pf) #use full if you did the entry order manually...
-                order.quantity, _=retrieve_quantity(action)
                 logger.info("order not found " + str(symbol) + " present position: "+ str(order.quantity))
                 order.save()
             else:
                 order=orders[0]
-
+                
+            order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
             #profit
             if use_IB and order.quantity>0:
                 logger_trade.info("place exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))

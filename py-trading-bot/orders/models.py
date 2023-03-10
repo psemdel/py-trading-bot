@@ -175,7 +175,6 @@ class Action(models.Model): #Action means stock in French
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
     category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
     sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
-    #strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
     delisted=models.BooleanField(blank=False,default=False)
     etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
     etf_short=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_short2',blank=True,null=True)
@@ -242,8 +241,6 @@ def pf_retrieve_all(**kwargs):
     arr=[]
     
     for pf in PF.objects.filter(short=kwargs.get("short",False)):
-        #cat=ActionCategory.objects.get(short="ACT")
-        #c1 = Q(category=cat)
         if kwargs.get("opening")=="9h":
             stockEx1=StockEx.objects.filter(name="Paris")
             stockEx2=StockEx.objects.filter(name="XETRA")

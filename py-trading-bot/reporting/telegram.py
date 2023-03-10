@@ -209,11 +209,6 @@ class MyScheduler():
                             op_text+="Opening "
                         self.telegram_bot.send_message_to_all(op_text+"Alert, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                         
-                        #if opening: #immediately recover
-                        #    this_alert.active=False
-                        #    this_alert.alarm=False
-                        #    this_alert.recovery_date=timezone.now()
-                        #    this_alert.save()
                     else:
                         if not this_alert.alarm and alarming:
                             this_alert.alarm=alarming
@@ -310,7 +305,6 @@ class MyScheduler():
             pass
 
     def check_sl(self,actions,**kwargs):
-        print(actions)
         for action in actions:
             if self.check_stock_open(action):
                 c1 = Q(action=action)
@@ -320,12 +314,11 @@ class MyScheduler():
                 
                 if len(order)>0:
                     o=order[0]
-                    print(o)
                     if o.sl_threshold is not None:
                         cours_pres=get_last_price(action)
                         if (not o.short and cours_pres<o.sl_threshold) or\
                         (o.short and cours_pres>o.sl_threshold):
-
+                            
                             exit_order(action.symbol,
                                        o.pf.strategy.name, 
                                        o.pf.stock_ex.name,
@@ -336,11 +329,9 @@ class MyScheduler():
                         
                     if o.daily_sl_threshold is not None:
                         ratio=get_ratio(action)
-                        print(ratio)
-                        print((1-o.daily_sl_threshold)*100)
-                        print(ratio<(1-o.daily_sl_threshold)*100)
-                        if (not o.short and ratio<(1-o.daily_sl_threshold)*100) or\
-                        (o.short and ratio>(1+o.daily_sl_threshold)*100):
+                        
+                        if (not o.short and ratio<-o.daily_sl_threshold*100) or\
+                        (o.short and ratio>o.daily_sl_threshold*100):
 
                             exit_order(action.symbol,
                                        o.pf.strategy.name, 

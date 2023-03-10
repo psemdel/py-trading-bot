@@ -90,4 +90,8 @@ def empty_append(x, v, axis, **kwargs):
         print("error by append " +str(msg))
         print("shape x: " + str(np.shape(x)))
         print("shape v: " + str(np.shape(v)))
-        return x     
+        return x  
+    
+def intersection(lst1, lst2):
+    lst3 = [value for value in lst1 if value in lst2]
+    return lst3   
