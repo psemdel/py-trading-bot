@@ -28,7 +28,8 @@ else:
 from reporting.models import Report, Alert, ListOfActions
 
 from orders.ib import retrieve_ib_pf, get_last_price, get_ratio, exit_order
-from orders.models import Action, StockEx, Order, ActionCategory, pf_retrieve_all
+from orders.models import Action, StockEx, Order, ActionCategory, pf_retrieve_all,\
+                          exchange_to_index_symbol
 from core import constants
 
 from trading_bot.settings import _settings
@@ -102,9 +103,9 @@ class MyScheduler():
             self.do_weekday(time(9,3,tzinfo=tz_Paris), self.check_index, opening="9h")
             self.do_weekday(time(9,33,tzinfo=tz_NY), self.check_index, opening="15h")       
         if self.report_17h: #round 15 min before closing
-            self.do_weekday(time(17,15,tzinfo=tz_Paris),self.daily_report_17h)
+            self.do_weekday(time(17,15,tzinfo=tz_Paris),self.daily_report,short_name="17h",key="17h_stock_exchanges")
         if self.report_22h: #round 15 min before closing
-            self.do_weekday(time(15,45,tzinfo=tz_NY),self.daily_report_22h)
+            self.do_weekday(time(15,45,tzinfo=tz_NY),self.daily_report,short_name="22h",key="22h_stock_exchanges")
         if self.heartbeat:
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
         if self.heartbeat_ib:
@@ -112,26 +113,20 @@ class MyScheduler():
         if self.cleaning:
             self.do_weekday(time(16,2,tzinfo=tz_NY),self.cleaning_f)
 
-        if (self.pf_check    or
-            self.index_check or
-            self.report_17h  or
-            self.report_22h  or
-            self.heartbeat):
-            
-            #the "background is created by celery"
-            #OOTB vbt start_in_background does not seem to be compatible with django
-            if not kwargs.get("test",False):
-                self.manager.start() 
-            self.telegram_bot.send_message_to_all( 
-                                "Scheduler started in background, settings:"
-                               +"\n pf " + str(self.pf_check) 
-                               +"\n index " + str(self.index_check)
-                               +"\n 17h " + str(self.report_17h)
-                               +"\n 22h " + str(self.report_22h)
-                               +"\n heartbeat " + str(self.heartbeat)
-                               +"\n heartbeat IB " + str(self.heartbeat_ib)
-                               +"\n cleaning " + str(self.cleaning) 
-                               )   
+        #the "background is created by celery"
+        #OOTB vbt start_in_background does not seem to be compatible with django
+        if not kwargs.get("test",False):
+            self.manager.start() 
+        self.telegram_bot.send_message_to_all( 
+                            "Scheduler started in background, settings:"
+                           +"\n pf " + str(self.pf_check) 
+                           +"\n index " + str(self.index_check)
+                           +"\n 17h " + str(self.report_17h)
+                           +"\n 22h " + str(self.report_22h)
+                           +"\n heartbeat " + str(self.heartbeat)
+                           +"\n heartbeat IB " + str(self.heartbeat_ib)
+                           +"\n cleaning " + str(self.cleaning) 
+                           )   
 
     #no trade the weekend
     def do_weekday(self, strh, f, **kwargs):
@@ -262,17 +257,17 @@ class MyScheduler():
             cat=ActionCategory.objects.get(short="IND")
             c3=Q(category=cat)
             if kwargs.get("opening")=="9h":
-                stockEx1=StockEx.objects.get(name="Paris")
-                stockEx2=StockEx.objects.get(name="XETRA")
-                
-                c1 = Q(stock_ex=stockEx1)
-                c2 = Q(stock_ex=stockEx2)
-                
-                indexes = Action.objects.filter((c1|c2)&c3)
+                c=None
+                for exchange in _settings["17h_stock_exchanges"]:
+                    c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
+                    c=c|c1
+                indexes = Action.objects.filter(c&c3)
             elif kwargs.get("opening")=="15h":
-                stockEx1=StockEx.objects.get(name="Nasdaq")
-                c1 = Q(stock_ex=stockEx1)
-                indexes = Action.objects.filter(c1&c3)
+                c=None
+                for exchange in _settings["22h_stock_exchanges"]:
+                    c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
+                    c=c|c1
+                indexes = Action.objects.filter(c&c3)
             else:
                 indexes = Action.objects.filter(c3)
 
@@ -289,8 +284,9 @@ class MyScheduler():
             actions_short=pf_retrieve_all(short=True,**kwargs)
             ib_pf, ib_pf_short=retrieve_ib_pf()
             
-            actions.extend(x for x in ib_pf if x not in actions)
-            actions_short.extend(x for x in ib_pf_short if x not in actions_short)
+            if ib_pf is not None:
+                actions.extend(x for x in ib_pf if x not in actions)
+                actions_short.extend(x for x in ib_pf_short if x not in actions_short)
             
             if len(actions)>0:
                 self.check_sl(actions)
@@ -354,77 +350,43 @@ class MyScheduler():
 
         if report.text:
              self.telegram_bot.send_message_to_all(report.text)       
-        
-    def daily_report_17h(self):
-        try:
-            print("writting daily report 17h")
-            report1=Report()
-            report1.save()
-
-            st=report1.daily_report_action("Paris")
-            if st is None:
-                raise ValueError("The creation of the strategy failed, report creation interrupted")
-                
-            report1.presel(st,"Paris")
-            report1.presel_wq(st,"Paris")
-            self.send_order(report1)
-            
-            report2=Report()
-            report2.save()            
-
-            st=report2.daily_report_action("XETRA")
-            if st is None:
-                raise ValueError("The creation of the strategy failed, report creation interrupted")
-                
-            report2.presel(st,"XETRA")
-            report2.presel_wq(st,"XETRA")
-            self.send_order(report2)
-            
-            report3=Report()
-            report3.save()    
-
-            report3.daily_report_index(["^FCHI","^GDAXI"]) # "BZ=F" issue
-            self.send_order(report3)
-
-            self.telegram_bot.send_message_to_all("Daily report 17h ready")
-            
-        except ValueError as e:
-            logger.error(e, stack_info=True, exc_info=True)  
-        except Exception as e:
-            logger.error(e, stack_info=True, exc_info=True)
-            pass
     
-    def daily_report_22h(self):
-        try:
-            print("writting daily report 22h")
-            report1=Report()
-            report1.save()
+    def daily_report_sub(self,exchange,**kwargs):
+        report1=Report()
+        report1.save()
+        
+        st=report1.daily_report_action(exchange,**kwargs)
+        if st is None:
+            raise ValueError("The creation of the strategy failed, report creation interrupted")
+            
+        report1.presel(st,exchange,**kwargs)
+        report1.presel_wq(st,exchange,**kwargs)
+        self.send_order(report1)
+        
+    def daily_report_index_sub(self,indexes):
+        report3=Report()
+        report3.save()    
 
-            st=report1.daily_report_action("Nasdaq") 
-            if st is None:
-                raise ValueError("The creation of the strategy failed, report creation interrupted")
+        report3.daily_report_index(indexes) # "BZ=F" issue
+        self.send_order(report3)
+
+    def daily_report(self, **kwargs):
+        try:
+            short_name=kwargs.get("short_name")
+            key=kwargs.get("key")
+            print("writting daily report "+short_name)
+            for exchange in _settings[key]:
+                if exchange=="NYSE":
+                    for s in _settings["NYSE_SECTOR_TO_SCAN"]:  
+                        print("starting report " + s)
+                        self.daily_report_sub("NYSE",sec=s)
+                else:
+                    self.daily_report_sub(exchange)
+
+            indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
+            self.daily_report_index_sub(indexes)
             
-            report1.presel(st,"Nasdaq")
-            report1.presel_wq(st,"Nasdaq")
-            self.send_order(report1)
-            
-            for s in _settings["NYSE_SECTOR_TO_SCAN"]:  
-                print("starting report " + s)
-                report=Report()
-                report.save()
-            
-                st=report.daily_report_action("NYSE",sec=s) 
-                report.presel(st,"NYSE",sec=s)
-                report.presel_wq(st,"NYSE",sec=s)
-                self.send_order(report)
-            
-            report2=Report()
-            report2.save()            
-            report2.daily_report_index(["^IXIC"])
-            self.send_order(report2)
-             
-            self.telegram_bot.send_message_to_all( 
-                             "Daily report 22h ready")  
+            self.telegram_bot.send_message_to_all("Daily report "+short_name+" ready")
             
         except ValueError as e:
             logger.error(e, stack_info=True, exc_info=True)  

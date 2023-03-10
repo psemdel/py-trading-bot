@@ -4,7 +4,7 @@ from reporting.telegram import start
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, ListOfActions
 from core import bt, btP
-from orders.models import ActionCategory, StockEx, Action, get_exchange_actions
+from orders.models import ActionCategory, StockEx, Action, get_exchange_actions, exchange_to_index_symbol
 from trading_bot.settings import _settings
 
 from .filter import ReportFilter
@@ -47,79 +47,52 @@ def start_bot(request):
     return redirect('reporting:reports')
 
 #For testing purpose
-def trigger_17h(request):
-    try:
-        report1=Report()
-        report1.save()
+def daily_report_sub(exchange,**kwargs):
+    report1=Report()
+    report1.save()
     
-        st=report1.daily_report_action("Paris")
+    st=report1.daily_report_action(exchange,**kwargs)
+    if st is None:
+        raise ValueError("The creation of the strategy failed, report creation interrupted")
         
-        if st is None:
-            raise ValueError("The creation of the strategy failed, report creation interrupted")
-        
-        report1.presel(st,"Paris")
-        report1.presel_wq(st,"Paris")
-        send_order_test(report1)
-        
-        report2=Report()
-        report2.save()            
+    report1.presel(st,exchange,**kwargs)
+    report1.presel_wq(st,exchange,**kwargs)
+    send_order_test(report1)
     
-        st=report2.daily_report_action("XETRA")
-        
-        if st is None:
-            raise ValueError("The creation of the strategy failed, report creation interrupted")
-            
-        report2.presel(st,"XETRA")
-        report2.presel_wq(st,"XETRA")
-        send_order_test(report2)
-        
-        report3=Report()
-        report3.save()    
-    
-        report3.daily_report_index(["^FCHI","^GDAXI"]) #"CL=F",
-        send_order_test(report3)
-    
-        return HttpResponse("report written")
-    except ValueError as msg:
-        print(msg)
+def daily_report_index_sub(indexes):
+    report3=Report()
+    report3.save()    
 
-#For testing purpose
-def trigger_22h(request):
+    report3.daily_report_index(indexes) # "BZ=F" issue
+    send_order_test(report3)
+
+def daily_report(**kwargs):
     try:
-        report1=Report()
-        report1.save()
-    
-        st=report1.daily_report_action("Nasdaq") 
-        
-        if st is None:
-            raise ValueError("The creation of the strategy failed, report creation interrupted")
-            
-        report1.presel(st,"Nasdaq")
-        report1.presel_wq(st,"Nasdaq")
-        send_order_test(report1)
-        
-        for s in _settings["NYSE_SECTOR_TO_SCAN"]:
-            print("starting report " + s)      
-            report=Report()
-            report.save()
-        
-            st=report.daily_report_action("NYSE",sec=s) 
-            if st is None:
-                raise ValueError("The creation of the strategy failed, report creation interrupted")
-            
-            report.presel(st,"NYSE",sec=s)
-            report.presel_wq(st,"NYSE",sec=s)
-            send_order_test(report)
-    
-        report2=Report()
-        report2.save()            
-        report2.daily_report_index(["^DJI","^IXIC"])
-        send_order_test(report2)
+        short_name=kwargs.get("short_name")
+        key=kwargs.get("key")
+        print("writting daily report "+short_name)
+        for exchange in _settings[key]:
+            if exchange=="NYSE":
+                for s in _settings["NYSE_SECTOR_TO_SCAN"]:  
+                    print("starting report " + s)
+                    daily_report_sub("NYSE",sec=s)
+            else:
+               daily_report_sub(exchange)
+
+        indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
+        daily_report_index_sub(indexes)
         
         return HttpResponse("report written")
+
+    except Exception as e:
+        print(e)
+        pass
+
+def trigger_17h(request):
+    return daily_report(short_name="17h",key="17h_stock_exchanges")
     
-    except ValueError as msg:
-        print(msg)
+def trigger_22h(request):
+    return daily_report(short_name="22h",key="22h_stock_exchanges")
 
 def send_order_test(report):
     for auto in [False, True]:
@@ -135,7 +108,7 @@ def send_order_test(report):
     if report.text:
          print(report.text)      
     
-def send_entry_exit_msg_test(symbol,entry,short, auto)      :
+def send_entry_exit_msg_test(symbol,entry,short, auto):
     if auto:
         part1=""
         part2=""
@@ -218,7 +191,7 @@ def test_order(request):
 
 def test(request):
     from ib_insync import Stock
-    import vectorbt as vbt
+    import vectorbtpro as vbt
         
     import logging
     from orders.ib import place

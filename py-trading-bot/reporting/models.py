@@ -539,6 +539,11 @@ class Report(models.Model):
     def perform_divergence(self,symbols,exchange, st, strats, **kwargs):
         try:
             s=Strategy.objects.get(name="divergence")
+        except:
+            print("check that divergence strategy is created") 
+            pass
+        
+        try: 
             if exchange is not None:
                 #even if divergence is not anymore used, we should be able to exit
                 pf_div=get_pf("divergence",exchange,False,**kwargs)
@@ -563,8 +568,9 @@ class Report(models.Model):
                                     s.name,
                                     exchange,
                                     **kwargs)
-        except:
-            print("check that divergence strategy is created")    
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
+            pass   
             
     def daily_report(self,actions,exchange,use_IB,**kwargs): #for one exchange and one sector
         try: 

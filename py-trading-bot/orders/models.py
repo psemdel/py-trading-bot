@@ -99,21 +99,18 @@ def interval_YF_to_ib(interval):
     return res
 
 ### Data retrieval ###
-
 def exchange_to_index_symbol(exchange):
-    exchange_to_symbol_dic={
-        "SBF":["CAC40","^FCHI"],
-        "MONEP":["CAC40","^FCHI"],
-        "IBIS":["DAX","^GDAXI"],
-        "NASDAQ":["COMP","^IXIC"], #COMP
-        "NYSE":["SPX","^DJI"],    #should be INDU actually, but no permission
-        "default":["COMP","^IXIC"],
-        }    
-    
-    if exchange in exchange_to_symbol_dic:
-        return exchange_to_symbol_dic[exchange]
+    if type(exchange)==str:
+        stock_ex=StockEx.objects.get(name=exchange)
+    elif type(exchange)==StockEx:
+        stock_ex=exchange
     else:
-        return exchange_to_symbol_dic["default"]
+        raise ValueError("exchange has the wrong type")
+    
+    if stock_ex.main_index is None:
+        return ["COMP","^IXIC"]
+    else:
+        return [stock_ex.main_index.ib_ticker(),stock_ex.main_index.symbol]
     
 def action_to_etf(action,short):
     if action.category==ActionCategory.objects.get(short="IND"):
@@ -162,6 +159,7 @@ class StockEx(models.Model):
     ib_auth=models.BooleanField(blank=False,default=False)
     strategies_in_use=models.ManyToManyField(Strategy,blank=True)   # Presel strategies in use, normal/sl/tsl depends on the selected candidates
     presel_at_sector_level=models.BooleanField(blank=False,default=False)
+    main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=0)
     
     def __str__(self):
         return self.name 
@@ -174,7 +172,7 @@ class Action(models.Model): #Action means stock in French
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
     category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=None)
     delisted=models.BooleanField(blank=False,default=False)
     etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
     etf_short=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_short2',blank=True,null=True)

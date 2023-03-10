@@ -30,32 +30,12 @@ from orders.models import (Action, Order, ActionCategory, StockEx, Excluded, Str
                            exchange_to_index_symbol
                            )
 #Module to handle IB connection
-
-##Part of the code that should be in _settings.py in vbt
-'''        
-#from vectorbtpro.utils.config import ChildDict, Config, FrozenConfig                   
-data = ChildDict(
-    custom=Config(
-        # Synthetic
-        ib=FrozenConfig(
-            localhost=IB_LOCALHOST,
-            port=IB_PORT,
-            ),
-    ),
-)
-'''
 ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
 ib_global={"connected":False, "client":None}
 
-###Part of the code that should be in data/custom.py in vbt
-
 class IBData(RemoteData):
-    #_setting_keys: tp.SettingsKeys = dict(custom="data.custom.ib")
-    
     @classmethod
     def connect(cls):
-        #ib_cfg = cls.get_settings(key_id="custom")
-        
         if not cls.client.isConnected():
             clientID=1
             while clientID<=100:
@@ -72,9 +52,6 @@ class IBData(RemoteData):
             
     @classmethod
     def resolve_client(cls, client: tp.Optional[tp.Any] = None, **client_config) -> tp.Any:
-        
-        #from vectorbtpro.utils.opt_packages import assert_can_import
-        #assert_can_import("ib_insync")
         from ib_insync import IB
         import asyncio
 
@@ -90,13 +67,16 @@ class IBData(RemoteData):
                 cls.client=ib_global["client"]
         elif client is not None:
             cls.client=client
-
+        #check everytime
+        if cls.client.isConnected():
+            ib_global["connected"]=True
+        else:
+            ib_global["connected"]=False
+        
         return cls.client
 
     @classmethod 
     def get_contract_ib(cls, symbol,exchange,index):
-        #resolve client???
-        
         from ib_insync import Stock, Index
         if index:
             return Index(exchange=exchange,symbol=symbol)
@@ -120,8 +100,6 @@ class IBData(RemoteData):
         exchanges: tp.Optional[dict] = None,
         ) -> tp.Any:
 
-        #from vectorbtpro.utils.opt_packages import assert_can_import
-        #assert_can_import("ib_insync")
         from ib_insync import util
         
         exchange="SMART" #default
@@ -208,7 +186,7 @@ def get_tradable_contract_ib(action,short,**kwargs):
 
 @connect_ib
 def retrieve_quantity(in_action, **kwargs):
-    if kwargs['client']:
+    if kwargs['client'] and ib_global["connected"]:
         for pos in kwargs['client'].positions():
             contract=pos.contract
             if in_action.ib_ticker()==contract.localSymbol:
@@ -217,7 +195,7 @@ def retrieve_quantity(in_action, **kwargs):
                     
 @connect_ib
 def retrieve_ib_pf(**kwargs):
-    if kwargs['client']:
+    if kwargs['client'] and ib_global["connected"]:
         print("myIB retrieve")
         action=None
         pf=[]
@@ -247,7 +225,7 @@ def retrieve_ib_pf(**kwargs):
 
 @connect_ib        
 def cash_balance(**kwargs):
-    if kwargs['client']:
+    if kwargs['client'] and ib_global["connected"]:
         for v in kwargs['client'].accountSummary():
             if v.tag == 'CashBalance':
                 return float(v.value)
@@ -258,8 +236,9 @@ def cash_balance(**kwargs):
 @connect_ib
 def get_last_price(action,**kwargs):
     try:
-        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
-                                 action.stock_ex.ib_auth and\
+        if kwargs['client'] and ib_global["connected"] and\
+            (_settings["USE_IB_FOR_DATA"]["alerting"] and\
+                               action.stock_ex.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
             contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
@@ -274,14 +253,16 @@ def get_last_price(action,**kwargs):
 
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
-        
+
+#For alerting and TSL check        
 @connect_ib  
 def get_ratio(action,**kwargs):
     try:
         cours_pres=0
         cours_ref=0
-            
-        if kwargs['client'] and (_settings["USE_IB_FOR_DATA"]["alerting"] and\
+
+        if ib_global["connected"] and kwargs['client']  and\
+              (_settings["USE_IB_FOR_DATA"]["alerting"] and\
                                  action.stock_ex.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
@@ -327,56 +308,56 @@ def get_ratio(action,**kwargs):
 @connect_ib  
 def place(buy,action,short,**kwargs): 
     try:
-        contract =get_tradable_contract_ib(action,short)
-        
-        if contract is None:
-            return "", decimal.Decimal(1.0), decimal.Decimal(0.0)
-        else:
-            kwargs['client'].qualifyContracts(contract)
-            quantity=kwargs.get("quantity",0)
+        if kwargs['client'] and ib_global["connected"]:
+            contract =get_tradable_contract_ib(action,short)
             
-            if buy:
-                if quantity==0:
-                    order_size=kwargs.get("order_size",0)
-                    last_price=IBData.get_last_price(contract)
-                    quantity=math.floor(order_size/last_price)
-                
-                if short:
-                    order = MarketOrder('SELL', quantity)
-                else:
-                    order = MarketOrder('BUY', quantity)
+            if contract is None:
+                return "", decimal.Decimal(1.0), decimal.Decimal(0.0)
             else:
+                kwargs['client'].qualifyContracts(contract)
+                quantity=kwargs.get("quantity",0)
                 
-                if short:
-                    order = MarketOrder('BUY', quantity)
+                if buy:
+                    if quantity==0:
+                        order_size=kwargs.get("order_size",0)
+                        last_price=IBData.get_last_price(contract)
+                        quantity=math.floor(order_size/last_price)
+                    
+                    if short:
+                        order = MarketOrder('SELL', quantity)
+                    else:
+                        order = MarketOrder('BUY', quantity)
                 else:
-                    order = MarketOrder('SELL', quantity)
-            trade = kwargs['client'].placeOrder(contract, order)
-            logger_trade.info("order sent to IB, action " + str(action)+", short: " + str(short) + ", quantity: "+str(quantity))
-    
-            max_time=20
-            t=0
-            
-            while t<max_time:
-            
-                kwargs['client'].sleep(1.0)
-                t+=1
-
-                if trade.orderStatus.status == 'Filled':
-                    fill = trade.fills[-1]
-                    logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
-                    price=fill.execution.avgPrice     
-                    return decimal.Decimal(price), decimal.Decimal(quantity)
+                    
+                    if short:
+                        order = MarketOrder('BUY', quantity)
+                    else:
+                        order = MarketOrder('SELL', quantity)
+                trade = kwargs['client'].placeOrder(contract, order)
+                logger_trade.info("order sent to IB, action " + str(action)+", short: " + str(short) + ", quantity: "+str(quantity))
+        
+                max_time=20
+                t=0
                 
-            logger_trade.info("order not filled, pending")
-            return decimal.Decimal(1.0), decimal.Decimal(1.0)
+                while t<max_time:
+                
+                    kwargs['client'].sleep(1.0)
+                    t+=1
+    
+                    if trade.orderStatus.status == 'Filled':
+                        fill = trade.fills[-1]
+                        logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
+                        price=fill.execution.avgPrice     
+                        return decimal.Decimal(price), decimal.Decimal(quantity)
+                    
+                logger_trade.info("order not filled, pending")
+                return decimal.Decimal(1.0), decimal.Decimal(1.0)
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
 
 
 #better to have a separate function for reversing. Exit would not buy anything and would lead to double fees
 #entry alone would not close the last order
-@connect_ib 
 def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convention short==True --> we go to short
     try:
         #type check necessary for indexes
@@ -404,7 +385,8 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         else:
             order=orders[0]
             
-        order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
+        if use_IB:    
+            order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
         
         order.save()
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
@@ -476,7 +458,6 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         logger.error(str(e) + "symbol: "+str(symbol), stack_info=True, exc_info=True)
         pass        
 
-@connect_ib  
 def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):   
     #type check necessary for indexes
     try:
@@ -497,8 +478,9 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                 order.save()
             else:
                 order=orders[0]
-                
-            order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
+            
+            if use_IB:    
+                order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
             #profit
             if use_IB and order.quantity>0:
                 logger_trade.info("place exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
@@ -529,7 +511,6 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         logger.error(e, stack_info=True, exc_info=True)
         pass
     
-@connect_ib 
 def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): 
     try:
         #type check necessary for indexes
@@ -625,8 +606,13 @@ def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
             action=Action.objects.get(symbol=symbol)
             stock_ex=StockEx.objects.get(name=exchange)
             strat=Strategy.objects.get(name=strategy)
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
+            logger.error("action: " + symbol + ", stock_ex: "+exchange + ", strat: " + strategy + " not found")
             
-            if (kwargs['client'] and
+        try:
+
+            if (kwargs['client'] and ib_global["connected"] and
                _settings["PERFORM_ORDER"] and
                (not check_if_index(action) or (check_if_index(action) and _settings["ETF_IB_auth"])) and #ETF trading requires too high 
                stock_ex.perform_order and  #ETF trading requires too high permissions on IB, XETRA data too expansive
@@ -640,20 +626,20 @@ def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
             
             return func(symbol,strategy, exchange,short,auto_checked,**kwargs), auto_checked
         except Exception as e:
+            
              logger.error(e, stack_info=True, exc_info=True)
              return False, False
     
     return wrapper(symbol,strategy, exchange,short,auto,**kwargs)     
-     
-@connect_ib 
+@connect_ib     
 def reverse_order(symbol,strategy, exchange,short,auto,**kwargs):
     return check_auto_manual(reverse_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
-        
-@connect_ib 
+
+@connect_ib       
 def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
     return check_auto_manual(entry_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
 
-@connect_ib     
+@connect_ib
 def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
     return check_auto_manual(exit_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
 
@@ -665,6 +651,7 @@ def check_if_index(action):
  
 # All symbols must be from same stock exchange
 #IB need a ticker, an exchange and information about the type of product to find the correct contract
+@connect_ib 
 def retrieve_data_ib(actions,period,**kwargs):
     try:
         period=period_YF_to_ib(period)
@@ -684,7 +671,7 @@ def retrieve_data_ib(actions,period,**kwargs):
             index_symbol=ib_symbols[0]
             all_symbols=ib_symbols
         else:
-            index_symbol_ib, index_symbol=exchange_to_index_symbol(actions[0].stock_ex.ib_ticker) 
+            index_symbol_ib, index_symbol=exchange_to_index_symbol(actions[0].stock_ex) 
             all_symbols= ib_symbols+[index_symbol_ib]
             indexes[index_symbol_ib]=True
             action=Action.objects.get(symbol=index_symbol)
@@ -727,7 +714,7 @@ def retrieve_data_YF(actions,period,**kwargs):
             index_symbol=symbols[0]
             all_symbols=symbols
         else:
-            _, index_symbol=exchange_to_index_symbol(actions[0].stock_ex.ib_ticker)  
+            _, index_symbol=exchange_to_index_symbol(actions[0].stock_ex)  
             all_symbols=symbols+[index_symbol]
             
         #res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
