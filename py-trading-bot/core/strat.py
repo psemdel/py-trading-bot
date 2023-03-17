@@ -239,9 +239,15 @@ class Strat(VBTfunc):
             self.symbols_complex=self.exits.columns.values
         
         for ii, e in enumerate(self.symbols_complex):
-            if e[-1]==symbol_simple: #9
-                return e
- 
+            if type(e)==tuple:
+                if e[-1]==symbol_simple: #9
+                    return e
+            elif type(e)==str:
+                if e==symbol_simple: #9
+                    return e                
+        raise ValueError("symbols_simple_to_complex not found for symbol: "+str(symbol_simple) +\
+                         " columns available: "+str(self.symbols_complex))
+    
     def save(self):
         save_vbt_both(self.close, 
                  self.entries, 
@@ -262,7 +268,10 @@ class Strat(VBTfunc):
         #benchmark_return makes sense only for bull
         delta=pf.total_return().values[0]
         return delta
-
+    
+    def call_strat(self,name,**kwargs):
+        meth=getattr(self,name)
+        meth(**kwargs)
 ########## Strats ##############
 # Example of simple strategy for pedagogic purposes
     def stratRSI(self,**kwargs):

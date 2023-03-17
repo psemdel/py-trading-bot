@@ -12,9 +12,10 @@ import logging
 logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
+from django.db.models import Q
 from orders.ib import exit_order, entry_order, reverse_order
 
-from orders.models import Action, get_pf, get_candidates,\
+from orders.models import Action, Order, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission, filter_intro_action
@@ -54,7 +55,7 @@ class Report(models.Model):
         
         for symbol in symbols:
             actions.append(Action.objects.get(symbol=symbol))
-        
+
         return self.daily_report(actions,None,use_IB,index=True)  #exchange is none
         
     def daily_report_action(self,exchange,**kwargs):
@@ -71,9 +72,9 @@ class Report(models.Model):
     def retard(self,presel,exchange,st,**kwargs):
         #key="retard"+"_"+exchange
         if _settings["RETARD_MACRO"]:
-            presel.call_strat("preselect_retard_macro")
+            presel.call_strat("preselect_retard_macro",**kwargs) #for sec
         else:
-            presel.call_strat("preselect_retard")
+            presel.call_strat("preselect_retard",**kwargs) #for sec
         
         candidates, candidates_short=presel.get_candidates()
         
@@ -148,6 +149,15 @@ class Report(models.Model):
                     action=Action.objects.get(symbol=symbol)
                     pf_keep.append(action) #move the symbol from retard to keep pf
                     pf.remove(action)
+                    
+                    #tsl part
+                    c1 = Q(action=action)
+                    c2 = Q(active=True)
+                    order=Order.objects.filter(c1 & c2)
+                    
+                    if len(order)>0:
+                        order[0].daily_sl_threshold=0.005
+                        order[0].save()
                 else:
                     ex, auto=exit_order(symbol,key, exchange,short,auto, **kwargs)
                     self.order_nosubstrat_sub(symbol, short, ex, auto)
@@ -270,40 +280,47 @@ class Report(models.Model):
 
     def define_ent_ex(self,entries,exits,entries_short,exits_short,symbol, 
                       strategy, exchange, **kwargs):
-        ent=False
-        ex=False
-        auto=False
-        short=False
-        
-        if entries and exits_short:
-            ent, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
-        elif entries_short and exits:
-            short=True
-            ex, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
-        else:   
-            if (entries_short and not exits_short) or (exits_short and not entries_short):
-                short=True
-            #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
-            if (entries and not exits) or (entries_short and not exits_short):
-                ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs) #YF symbol expected here
-            if (exits and not entries) or (exits_short and not entries_short):  
-                ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs) #YF symbol expected here
+        try:
+            ent=False
+            ex=False
+            auto=False
+            short=False
+            action=Action.objects.get(symbol=symbol)
+            if exchange is None: #for index
+                exchange=action.stock_ex.name
             
-        action=Action.objects.get(symbol=symbol)
-        if ent or ex:
-            logger_trade.info("define_ent_ex, Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
-            ent_ex_symbols, _=ListOfActions.objects.get_or_create(
-                report=self,
-                entry=ent,
-                short=short,
-                auto=auto
-                )
-            ent_ex_symbols.actions.add(action)
+            if entries and exits_short:
+                ent, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
+            elif entries_short and exits:
+                short=True
+                ex, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
+            else:   
+                if (entries_short and not exits_short) or (exits_short and not entries_short):
+                    short=True
+                #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
+                if (entries and not exits) or (entries_short and not exits_short):
+                    ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs) #YF symbol expected here
+                if (exits and not entries) or (exits_short and not entries_short):  
+                    ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs) #YF symbol expected here
+                
+            if ent or ex:
+                logger_trade.info("define_ent_ex, Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
+                ent_ex_symbols, _=ListOfActions.objects.get_or_create(
+                    report=self,
+                    entry=ent,
+                    short=short,
+                    auto=auto
+                    )
+                ent_ex_symbols.actions.add(action)
+        except Exception as e:
+            print(e)
+            logger.error(e, stack_info=True, exc_info=True)    
             
     def populate_report(self, symbols, symbols_to_YF,stnormal, st, sk, sma, sp):
         for symbol in symbols:
             if math.isnan(st.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
+                
             else:
                 with warnings.catch_warnings():
                     #Necessary because of the presence of NaN
@@ -373,24 +390,24 @@ class Report(models.Model):
                             if st.min_ind[symbol_complex_ent][-1]!=0:
                                 self.concat(" Index " + symbol + " V minimum detected!")                            
                     ar.save()  
-        
+  
         
     def display_last_decision(self,symbol,stnormal):
         symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
         symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
         decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
         if decision==1:
-            self.concat(symbol + " present decision : sell")
+            self.concat(symbol + " present decision for normal strategy : sell")
         elif decision==-1:
-            self.concat(symbol + " present decision : buy")
+            self.concat(symbol + " present decision for normal strategy : buy")
         return symbol_complex_ent_normal, symbol_complex_ex_normal
             
     #for a group of predefined actions, determine the signals    
     def perform_normal_strat(self,symbols, stnormal, exchange, **kwargs):
         if self.it_is_index:
-            stnormal.stratIndexB()
+            stnormal.call_strat(_settings["STRATEGY_NORMAL_INDEX"])
         else:
-            stnormal.stratG()
+            stnormal.call_strat(_settings["STRATEGY_NORMAL_STOCKS"])
         
         normal_strat, _=Strategy.objects.get_or_create(name="normal")
         normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat)  #.id
@@ -415,9 +432,9 @@ class Report(models.Model):
                     
     def perform_sl_strat(self,symbols, stnormal, exchange, **kwargs):
         if self.it_is_index:
-            stnormal.stratIndexSL()
+            stnormal.call_strat(_settings["STRATEGY_SL_INDEX"])
         else:
-            stnormal.stratSL()
+            stnormal.call_strat(_settings["STRATEGY_SL_STOCKS"])
         
         sl_strat, _=Strategy.objects.get_or_create(name="sl")
         sl_strat_act, _=StratCandidates.objects.get_or_create(name="sl",strategy=sl_strat) 
@@ -442,9 +459,9 @@ class Report(models.Model):
                     **kwargs)   
                     
         if self.it_is_index:
-            stnormal.stratIndexTSL()
+            stnormal.call_strat(_settings["STRATEGY_TSL_INDEX"])
         else:
-            stnormal.stratTSL()
+            stnormal.call_strat(_settings["STRATEGY_TSL_STOCKS"])
         
         tsl_strat, _=Strategy.objects.get_or_create(name="tsl")
         tsl_strat_act, _=StratCandidates.objects.get_or_create(name="tsl",strategy=tsl_strat) 
@@ -470,7 +487,8 @@ class Report(models.Model):
 
     def perform_keep_strat(self,symbols, stnormal, exchange, **kwargs):
         if not self.it_is_index:
-           
+            stnormal.call_strat(_settings["STRATEGY_RETARD_KEEP"])
+
             pf_keep=get_pf("retard_keep",exchange,False,**kwargs)
             pf_short_keep=get_pf("retard_keep",exchange,True,**kwargs)
             
@@ -544,21 +562,24 @@ class Report(models.Model):
             pass
         
         try: 
-            if exchange is not None:
+            if not self.it_is_index and exchange is not None: #index
                 #even if divergence is not anymore used, we should be able to exit
                 pf_div=get_pf("divergence",exchange,False,**kwargs)
                 self.concat("symbols in divergence: " +str(pf_div.retrieve()))
                 ##Change underlying strategy
                 st.call_strat("stratDiv")
+                st.entries.columns.values
+                
                 ##only_exit_substrat
                 if len(pf_div.retrieve())>0:
                     for symbol in symbols:
-                        symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")                            
+                        symbol_complex_ent=st.symbols_simple_to_complex(symbol,"ent")  
                         
                         if s in strats and\
-                                st.symbols_to_YF[symbol] in pf_div.retrieve(): 
+                                st.symbols_to_YF[symbol] in pf_div.retrieve() and st.exits[symbol_complex_ent].values[-1]: 
+    
                                 logger_trade.info("Divergence exit " + str(st.exits[symbol_complex_ent].values[-1]))    
-                                    
+ 
                                 self.define_ent_ex(
                                     False,
                                     st.exits[symbol_complex_ent].values[-1],
@@ -606,7 +627,7 @@ class Report(models.Model):
 
                 ##Perform a single strategy on predefined actions
                 self.perform_normal_strat(stnormal.symbols, stnormal, exchange, **kwargs)
-                self.perform_keep_strat(stnormal.symbols, stnormal, exchange, **kwargs)
+                
                 ##Populate a report with different statistics
                 sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
                 sma=ic.VBTMA.run(stnormal.close)
@@ -631,13 +652,13 @@ class Report(models.Model):
 
                 if _settings["CALCULATE_TREND"]:
                     st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
-                
+
                 self.populate_report(stnormal.symbols, stnormal.symbols_to_YF, stnormal,st, sk, sma, sp)
                 logger.info("Strat daily report written " +(exchange or ""))
-                
-                
-                self.perform_sl_strat(stnormal.symbols, stnormal, exchange, **kwargs)
 
+                self.perform_sl_strat(stnormal.symbols, stnormal, exchange, **kwargs)
+                #using tsl strategy
+                self.perform_keep_strat(stnormal.symbols, stnormal, exchange, **kwargs)
                 ##Perform strategies that rely on the regular preselection of a candidate
                 self.perform_slow_strats(stnormal.symbols, strats, exchange, st, **kwargs)
                 
@@ -653,6 +674,7 @@ class Report(models.Model):
         except ValueError as e:
             logger.error(e, stack_info=True, exc_info=True)
         except Exception as e:
+            print(e)
             logger.error(e, stack_info=True, exc_info=True)
             pass 
     

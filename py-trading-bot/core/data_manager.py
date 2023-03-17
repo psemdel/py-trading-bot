@@ -8,10 +8,10 @@ Created on Sat May 14 21:28:42 2022
 
 import vectorbtpro as vbt
 import math
-from trading_bot.settings import BASE_DIR
 import os
 
 if __name__ != '__main__':
+    from trading_bot.settings import BASE_DIR
     from core import constants
 
 ###Prepare and save data for local usage
@@ -59,6 +59,8 @@ def retrieve(index, period):
         ind_sym="GDAXI"
     elif index=="NASDAQ":
         ind_sym="IXIC"
+    elif index=="Brent":
+        ind_sym="Brent"
     else:
         ind_sym="DJI"
 
@@ -74,9 +76,9 @@ def retrieve(index, period):
 if __name__ == '__main__':
     import constants
     
-    selector="materials"
+    selector="Brent"
     start_date='2007-01-01'
-    end_date='2022-08-30'
+    end_date='2023-03-01'
     
     if selector=="CAC40":
         all_symbols=constants.CAC40
@@ -90,6 +92,9 @@ if __name__ == '__main__':
     elif selector=="NYSE": #too big!
         all_symbols=constants.NYSE
         index="^DJI"
+    elif selector=="Brent":
+        all_symbols=["BZ=F"]
+        index="BZ=F"
     elif selector in ["realestate","industry","it","com","staples","consumer","energy","utilities",
                       "fin","healthcare","materials"]:
         index="^DJI"

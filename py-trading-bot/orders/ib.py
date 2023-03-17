@@ -387,6 +387,11 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             
         if use_IB:    
             order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
+        else:
+            if order.short:
+                sign=-1
+            else:
+                sign=1
         
         order.save()
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
@@ -586,6 +591,7 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
         
         action=Action.objects.get(symbol=symbol)
         action=action_to_etf(action,short)
+
         #accountSummary
         if action.symbol in pf.retrieve():
             c1 = Q(action=action)
@@ -608,7 +614,7 @@ def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
             strat=Strategy.objects.get(name=strategy)
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
-            logger.error("action: " + symbol + ", stock_ex: "+exchange + ", strat: " + strategy + " not found")
+            logger.error("action: " + str(symbol) + ", stock_ex: "+str(exchange) + ", strat: " + str(strategy) + " not found")
             
         try:
 

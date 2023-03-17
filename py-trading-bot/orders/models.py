@@ -303,6 +303,10 @@ class PF(models.Model):
             pass    
 
 def get_sub(strategy, exchange,short,**kwargs):
+    if type(strategy)!=str or type(exchange)!=str:
+        raise ValueError("get sub got non str input, strategy: "+str(strategy)+ " "+str(type(strategy)) + \
+                         ", exchange: "+str(exchange) + " " + str(type(exchange)))
+    
     sector="undefined"
     name=strategy + "_" + exchange
     if short:

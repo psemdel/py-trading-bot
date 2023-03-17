@@ -40,7 +40,7 @@ _settings={
     
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
-"PERFORM_ORDER":True, #test or use IB to perform orders
+"PERFORM_ORDER":False, #test or use IB to perform orders
 "BYPASS_ORDERCAPITAL_IF_IB":False, #bypass the restriction linked to order capital if using IB. with other words, 
 #if there is enough money on your account, the order will be performed, 
 #without considering how many orders/strategy you want to perform
@@ -48,6 +48,14 @@ _settings={
 ## Configuration of the strategies ##
 "DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
 "RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
+
+"STRATEGY_NORMAL_STOCKS":"stratIndexB",
+"STRATEGY_NORMAL_INDEX":"stratG",
+"STRATEGY_SL_STOCKS":"stratSL",
+"STRATEGY_SL_INDEX":"stratIndexSL",
+"STRATEGY_TSL_STOCKS":"stratTSL",
+"STRATEGY_TSL_INDEX":"stratIndexTSL",
+"STRATEGY_RETARD_KEEP":"stratTSL",
 
 # Frequency is the number of days between successive candidates actualisation
 "DAILY_REPORT_PERIOD":3, #in year
