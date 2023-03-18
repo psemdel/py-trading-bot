@@ -16,6 +16,21 @@ class TestStrat(unittest.TestCase):
         self.st=strat.Strat("CAC40","2007_2022_08","test") 
         self.st_legacy=strat_legacy.StratLegacy("CAC40","2007_2022_08","test") 
         
+    def test_symbols_simple_to_complex(self):
+        self.st.stratDiv() #only simple strat
+        symbol_complex1=self.st.symbols_simple_to_complex('AI',"ent")
+        self.assertEqual(symbol_complex1,"AI")
+        symbol_complex2=self.st.symbols_simple_to_complex('AI',"ex")
+        self.assertEqual(symbol_complex2,"AI")
+        
+        self.st.stratG() #only simple strat
+        symbol_complex1=self.st.symbols_simple_to_complex('AI',"ent")
+        self.assertFalse(symbol_complex1=="AI")
+        self.assertTrue(type(symbol_complex1)==tuple)        
+        symbol_complex2=self.st.symbols_simple_to_complex('AI',"ex")
+        self.assertFalse(symbol_complex2=="AI")
+        self.assertTrue(type(symbol_complex2)==tuple)       
+    
     def test_ext_major(self):
         t=macro.VBTMACROTREND.run(self.st.close)
         
@@ -307,6 +322,7 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),407.78)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),75398.95)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),37324.82) 
+    
         
 if __name__ == '__main__':
     unittest.main()        

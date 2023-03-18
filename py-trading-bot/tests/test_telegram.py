@@ -23,9 +23,9 @@ class TestTelegram(TestCase):
     def setUp(self):
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         
-        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
+        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
         self.e=e
-        e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
+        e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
         c=Currency.objects.create(name="euro")
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         strategy=Strategy.objects.create(name="none")

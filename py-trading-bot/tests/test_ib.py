@@ -21,15 +21,16 @@ from django.test import TestCase
 from orders import ib
 from orders import models as m
 from trading_bot.settings import _settings  
+from datetime import datetime, timedelta
 
 class TestIB(TestCase):
     def setUp(self):
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
         
-        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
-        self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
-        self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP")
-        self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE")
+        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
+        self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
+        self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
+        self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
         c=m.Currency.objects.create(name="euro")
         c2=m.Currency.objects.create(name="US")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
@@ -103,9 +104,9 @@ class TestIB(TestCase):
             sector=self.s,
             )   
 
-        m.Action.objects.create(
+        self.a5=m.Action.objects.create(
             symbol='^FCHI',
-            #ib_ticker='AC',
+            ib_ticker_explicit='CAC40',
             name='Cac40',
             stock_ex=self.e3,
             currency=c,
@@ -114,6 +115,9 @@ class TestIB(TestCase):
             etf_short=etf1,
             sector=self.s
             ) 
+        
+        self.e.main_index=self.a5
+        self.e.save()
         
         self.actions=[self.a, self.a2, self.a3]
         m.Excluded.objects.create(name="all",strategy=self.strategy)
@@ -194,8 +198,29 @@ class TestIB(TestCase):
         #to see the contract details
         t=Stock("IBM","SMART", primaryExchange='NYSE')
         print(ib.IBData.client.reqContractDetails(t))
+        
+    def test_check_hold_duration(self):
+        st_retard=m.Strategy.objects.create(name="retard")
+        pf=m.PF.objects.create(name="retard_Paris",short=False,strategy=st_retard,stock_ex=self.e,sector=self.s)
+        pf.append(self.a.symbol)
+        d=datetime.now()
+        o=m.Order.objects.create(action=self.a, pf=pf, short=False,entering_date=d) 
+        
+        self.assertEqual(ib.check_hold_duration(self.a.symbol,st_retard.name, self.e.name,False,sector=self.s),0)
 
+        d2=d- timedelta(days=10)
+        o2=m.Order.objects.create(action=self.a2, pf=pf, short=False) 
+        o2.entering_date=d2
+        o2.save()
+        pf.append(self.a2.symbol)
+        self.assertEqual(ib.check_hold_duration(self.a2.symbol,st_retard.name, self.e.name,False,sector=self.s),10)         
+        
+     #   check_hold_duration
+    #def test_retrieve_quantity(self):
+    #    retrieve_quantity()
 
+if __name__ == '__main__':
+    unittest.main() 
 ####!!!Those functions will cause real orders to be performed, as the _settings["PERFORM_ORDER"] is entry_order but not in entry_order_sub!!
 #Use it only outside of trade time!
 '''
@@ -233,5 +258,4 @@ class TestIB(TestCase):
         self.assertTrue(order.exiting_date is not None)
 '''
         
-if __name__ == '__main__':
-    unittest.main() 
+

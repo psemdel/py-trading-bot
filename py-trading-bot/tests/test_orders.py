@@ -38,11 +38,15 @@ class TestOrders(TestCase):
     def setUp(self):
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
         
-        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
-        self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
+        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
+        self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
+        self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
+        self.e4=m.StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=False)
         c=m.Currency.objects.create(name="euro")
+        self.c=c
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
+        self.cat2=cat2
         self.strategy=m.Strategy.objects.create(name="none")
         self.s=m.ActionSector.objects.create(name="undefined")
         
@@ -89,14 +93,39 @@ class TestOrders(TestCase):
             
             )
         
+        self.a5=m.Action.objects.create(
+            symbol='^FCHI',
+            ib_ticker_explicit='CAC40',
+            name='Cac40',
+            stock_ex=self.e3,
+            currency=c,
+            category=cat2,
+            sector=self.s
+            ) 
+        
+        self.e.main_index=self.a5
+        self.e.save()
+        
+        self.a6=m.Action.objects.create(
+            symbol='^GDAXI',
+            ib_ticker_explicit='DAX',
+            name='DAX',
+            stock_ex=self.e4,
+            currency=c,
+            category=cat2,
+            sector=self.s
+            ) 
+        
+        self.e2.main_index=self.a6
+        self.e2.save()        
+
         self.actions=[self.a, self.a2, self.a3]
         m.Excluded.objects.create(name="all",strategy=self.strategy)
  
     def test_exchange_to_symbol(self):
-        self.assertEqual(m.exchange_to_index_symbol("SBF"),["CAC40","^FCHI"])
-        self.assertEqual(m.exchange_to_index_symbol("IBIS"),["DAX","^GDAXI"])
-        self.assertEqual(m.exchange_to_index_symbol("wrong"),["COMP","^IXIC"])
-        
+        self.assertEqual(m.exchange_to_index_symbol("Paris"),["CAC40","^FCHI"])
+        self.assertEqual(m.exchange_to_index_symbol("XETRA"),["DAX","^GDAXI"])
+
     def test_get_exchange_actions(self):
         use_IB, t=m.get_exchange_actions("Paris")
         self.assertEqual(len(t),3)

@@ -49,7 +49,7 @@ class Report(models.Model):
 
     def daily_report_index(self,symbols):
         use_IB=False
-        if _settings["USE_IB_FOR_DATA"]:
+        if _settings["USE_IB_FOR_DATA"]["reporting"]:
             use_IB=check_ib_permission(symbols)
         actions=[]
         

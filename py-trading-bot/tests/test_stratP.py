@@ -18,7 +18,8 @@ class TestStratP(TestCase):
     def setUp(self):
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         
-        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
+        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
+        e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
         c=Currency.objects.create(name="euro")
         cat=ActionCategory.objects.create(name="actions")
         strategy=Strategy.objects.create(name="none")
@@ -54,6 +55,36 @@ class TestStratP(TestCase):
             #strategy=strategy,
             sector=s,
             )
+        
+        cat2=ActionCategory.objects.create(name="index",short="IND")
+        cat3=ActionCategory.objects.create(name="ETF",short="ETF")
+        
+        etf1=Action.objects.create(
+            symbol='BNP.PA',
+            #ib_ticker='AC',
+            name="bbs",
+            stock_ex=e,
+            currency=c,
+            category=cat3,
+            #strategy=strategy,
+            sector=s,
+            ) 
+        
+        self.a5=Action.objects.create(
+            symbol='^FCHI',
+            ib_ticker_explicit='CAC40',
+            name='Cac40',
+            stock_ex=e3,
+            currency=c,
+            category=cat2,
+            etf_long=etf1,
+            etf_short=etf1,
+            sector=s
+            ) 
+        
+        e.main_index=self.a5
+        e.save()
+        
         self.actions=[self.a, self.a2, self.a3]
         self.st=stratP.StratPRD(False,actions1=self.actions,period1="1y")
         

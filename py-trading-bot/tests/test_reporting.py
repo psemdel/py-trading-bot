@@ -23,12 +23,13 @@ class TestReporting(TestCase):
     def setUp(self):
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         
-        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
+        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
         self.e=e
-        e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS")
-        e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART")
-        e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE")
-        e5=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP")
+        e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
+        e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
+        e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
+        e5=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
+        e6=StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=True)
         
         c=Currency.objects.create(name="euro")
         c2=Currency.objects.create(name="dollar")
@@ -47,6 +48,7 @@ class TestReporting(TestCase):
         strategy9=Strategy.objects.create(name="wq53")
         strategy10=Strategy.objects.create(name="wq54")
         strategy11=Strategy.objects.create(name="retard_keep")
+        strategy12=Strategy.objects.create(name="hist_slow")
         
         StratCandidates.objects.create(name="normal",strategy=strategy2)
         s=ActionSector.objects.create(name="undefined")
@@ -217,9 +219,9 @@ class TestReporting(TestCase):
             sector=s,
             )   
 
-        Action.objects.create(
+        self.a5=Action.objects.create(
             symbol='^FCHI',
-            #ib_ticker='AC',
+            ib_ticker_explicit='CAC40',
             name='Cac40',
             stock_ex=e5,
             currency=c,
@@ -228,20 +230,20 @@ class TestReporting(TestCase):
             etf_short=etf1,
             sector=s
             ) 
-        Action.objects.create(
+        self.a6=Action.objects.create(
             symbol='^GDAXI',
-            #ib_ticker='AC',
+            ib_ticker_explicit='DAX',
             name='DAX',
-            stock_ex=e2,
+            stock_ex=e6,
             currency=c,
             category=cat3,
             etf_long=etf1,
             etf_short=etf1,
             sector=s,
             )  
-        Action.objects.create(
+        self.a7=Action.objects.create(
             symbol='^IXIC',
-            #ib_ticker='AC',
+            ib_ticker_explicit='COMP',
             name='Nasdaq',
             stock_ex=e3,
             currency=c2,
@@ -251,10 +253,10 @@ class TestReporting(TestCase):
             sector=s,
             )         
         
-        Action.objects.create(
+        self.a8=Action.objects.create(
             symbol='^DJI',
-            #ib_ticker='AC',
             name='Dow Jones',
+            ib_ticker_explicit='INDU',
             stock_ex=e4,
             currency=c2,
             category=cat3,
@@ -284,18 +286,69 @@ class TestReporting(TestCase):
         self.report1.save()
         
         _settings["PERFORM_ORDER"]=False #avoid to perform orders
-        _settings["DIC_PRESEL"]={
-                "Paris":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"],
-                "XETRA":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"], 
-                "Nasdaq":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"],
-                "NYSE":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid","retard_keep"]
-                }
-      
-        _settings["DIC_PRESEL_SECTOR"]={
-                "it":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"],
-                "fin":["retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"],
-
-                }
+        
+        e.main_index=self.a5
+        e.strategies_in_use.add(strategy3)
+        e.strategies_in_use.add(strategy4)
+        e.strategies_in_use.add(strategy5)
+        e.strategies_in_use.add(strategy6)
+        e.strategies_in_use.add(strategy7)
+        e.strategies_in_use.add(strategy8)
+        e.strategies_in_use.add(strategy9)
+        e.strategies_in_use.add(strategy10)
+        e.strategies_in_use.add(strategy11)
+        e.save()
+        
+        e2.main_index=self.a6
+        e2.strategies_in_use.add(strategy3)
+        e2.strategies_in_use.add(strategy4)
+        e2.strategies_in_use.add(strategy5)
+        e2.strategies_in_use.add(strategy6)
+        e2.strategies_in_use.add(strategy7)
+        e2.strategies_in_use.add(strategy8)
+        e2.strategies_in_use.add(strategy9)
+        e2.strategies_in_use.add(strategy10)
+        e2.strategies_in_use.add(strategy11)
+        e2.save() 
+        
+        e3.main_index=self.a7
+        e3.strategies_in_use.add(strategy3)
+        e3.strategies_in_use.add(strategy4)
+        e3.strategies_in_use.add(strategy5)
+        e3.strategies_in_use.add(strategy6)
+        e3.strategies_in_use.add(strategy7)
+        e3.strategies_in_use.add(strategy8)
+        e3.strategies_in_use.add(strategy9)
+        e3.strategies_in_use.add(strategy10)
+        e3.strategies_in_use.add(strategy11)
+        e3.save()         
+        
+        e4.main_index=self.a8
+        e4.presel_at_sector_level=True
+        e4.save()   
+        
+        s2.strategies_in_use.add(strategy3)
+        s2.strategies_in_use.add(strategy4)
+        s2.strategies_in_use.add(strategy5)
+        s2.strategies_in_use.add(strategy6)
+        s2.strategies_in_use.add(strategy7)
+        s2.strategies_in_use.add(strategy8)
+        s2.strategies_in_use.add(strategy9)
+        s2.strategies_in_use.add(strategy10)
+        s2.strategies_in_use.add(strategy11)
+        s2.save() 
+        
+        s3.strategies_in_use.add(strategy3)
+        s3.strategies_in_use.add(strategy4)
+        s3.strategies_in_use.add(strategy5)
+        s3.strategies_in_use.add(strategy6)
+        s3.strategies_in_use.add(strategy7)
+        s3.strategies_in_use.add(strategy8)
+        s3.strategies_in_use.add(strategy9)
+        s3.strategies_in_use.add(strategy10)
+        s3.strategies_in_use.add(strategy11)
+        s3.save()         
+        
         
     def test_concat(self):
         self.report1.concat("test")

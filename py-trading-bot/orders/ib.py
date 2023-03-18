@@ -84,7 +84,6 @@ class IBData(RemoteData):
             return Stock(symbol,"SMART", primaryExchange=exchange)
         else:
             return Stock(symbol,exchange)
-        return None
 
     @classmethod
     def fetch_symbol(
@@ -588,7 +587,6 @@ def check_hold_duration(symbol,strategy, exchange,short,**kwargs):
         #type check necessary for indexes
     try:
         pf= get_pf(strategy, exchange,short,**kwargs)
-        
         action=Action.objects.get(symbol=symbol)
         action=action_to_etf(action,short)
 

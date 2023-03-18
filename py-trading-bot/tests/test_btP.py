@@ -19,7 +19,8 @@ class TestbtP(TestCase):
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         strategy=Strategy.objects.create(name="none")
-        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF")
+        e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
+        e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
         self.e=e
         c=Currency.objects.create(name="euro")
         s=ActionSector.objects.create(name="sec")
@@ -55,8 +56,37 @@ class TestbtP(TestCase):
             #strategy=strategy,
             sector=s,
             )
-        self.actions=[self.a, self.a2, self.a3]        
-  
+        self.actions=[self.a, self.a2, self.a3]   
+        
+        cat2=ActionCategory.objects.create(name="index",short="IND")
+        cat3=ActionCategory.objects.create(name="ETF",short="ETF")
+        
+        etf1=Action.objects.create(
+            symbol='BNP.PA',
+            #ib_ticker='AC',
+            name="bbs",
+            stock_ex=self.e,
+            currency=c,
+            category=cat3,
+            #strategy=strategy,
+            sector=s,
+            ) 
+        
+        self.a5=Action.objects.create(
+            symbol='^FCHI',
+            ib_ticker_explicit='CAC40',
+            name='Cac40',
+            stock_ex=e3,
+            currency=c,
+            category=cat2,
+            etf_long=etf1,
+            etf_short=etf1,
+            sector=s
+            ) 
+        
+        e.main_index=self.a5
+        e.save()
+        
   #hist slow does not need code here
     def test_actualize_hist_vol_slow(self):
         use_IB, actions=get_exchange_actions("Paris")

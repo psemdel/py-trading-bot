@@ -159,7 +159,7 @@ class StockEx(models.Model):
     ib_auth=models.BooleanField(blank=False,default=False)
     strategies_in_use=models.ManyToManyField(Strategy,blank=True)   # Presel strategies in use, normal/sl/tsl depends on the selected candidates
     presel_at_sector_level=models.BooleanField(blank=False,default=False)
-    main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=0)
+    main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=None)
     
     def __str__(self):
         return self.name 
