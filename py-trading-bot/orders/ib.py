@@ -437,15 +437,16 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
                         new_order.sl_threshold=order.entering_price*(1+sl)
                     else:
                         new_order.sl_threshold=order.entering_price*(1-sl)
-                if kwargs.get("daily_sl",False):
-                    new_order.daily_sl_threshold=kwargs.get("daily_sl")
-                    
+                
                 if new_order.entering_price is not None and order.entering_price is not None: 
                     order.profit=new_order.entering_price-order.entering_price
                     if order.entering_price != 0:
                         order.profit_percent=(new_order.entering_price/order.entering_price-1)*100
             else:
-                new_order.entering_price=1.0              
+                new_order.entering_price=1.0 
+                
+            if kwargs.get("daily_sl",False):
+                new_order.daily_sl_threshold=kwargs.get("daily_sl")
             
             order.exiting_date=timezone.now()
             order.active=False

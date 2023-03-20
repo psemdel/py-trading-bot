@@ -130,6 +130,9 @@ class Currency(models.Model):
     name=models.CharField(max_length=100, blank=False)
     symbol=models.CharField(max_length=100, blank=False,default="A")
     
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name
     
@@ -145,6 +148,9 @@ class Strategy(models.Model):
     name=models.CharField(max_length=100, blank=False)
     perform_order=models.BooleanField(blank=False,default=False)
     
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name
     
@@ -160,6 +166,9 @@ class StockEx(models.Model):
     strategies_in_use=models.ManyToManyField(Strategy,blank=True)   # Presel strategies in use, normal/sl/tsl depends on the selected candidates
     presel_at_sector_level=models.BooleanField(blank=False,default=False)
     main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=None)
+    
+    class Meta:
+        ordering = ["name"]
     
     def __str__(self):
         return self.name 
@@ -269,6 +278,9 @@ class PF(models.Model):
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=0)
     
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name
     
@@ -343,7 +355,7 @@ def get_pf(strategy, exchange,short,**kwargs):
 class ActionCategory(models.Model):
     short=models.CharField(max_length=15, blank=False, default="AAA", primary_key=True)
     name=models.CharField(max_length=100, blank=False)
-
+        
     def __str__(self):
         return self.name 
 
@@ -351,7 +363,10 @@ class ActionCategory(models.Model):
 class ActionSector(models.Model):
     name=models.CharField(max_length=100, blank=False)
     strategies_in_use=models.ManyToManyField(Strategy,blank=True)   
-
+    
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name     
     
@@ -364,7 +379,10 @@ class OrderCapital(models.Model):
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
     sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
-    
+
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name 
 
