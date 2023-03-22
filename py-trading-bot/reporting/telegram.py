@@ -11,7 +11,6 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.models import Q
 from django.db.models.query import QuerySet
-
 #from telegram.ext import CommandHandler
 import logging
 logger = logging.getLogger(__name__)
@@ -28,14 +27,17 @@ else:
 from reporting.models import Report, Alert, ListOfActions
 
 from orders.ib import retrieve_ib_pf, get_last_price, get_ratio, exit_order
-from orders.models import Action, StockEx, Order, ActionCategory, pf_retrieve_all,\
-                          exchange_to_index_symbol
+from orders.models import Action, StockEx, Order, ActionCategory, Job,\
+                          pf_retrieve_all,exchange_to_index_symbol,\
+                          get_exchange_actions   
+                 
 from core import constants
+from core import btP
 
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
 
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 ''' Contains the logic for:
  - Telegram bot
  - Sending alert if the market price variation exceeds a certain threshold
@@ -89,6 +91,7 @@ class MyScheduler():
         self.report_22h=_settings["REPORT_22h"]
         self.heartbeat=_settings["HEARTBEAT"] # to test if telegram is working ok
         self.heartbeat_ib=_settings["HEARTBEAT_IB"]
+        self.update_slow =_settings["UPDATE_SLOW_STRAT"]
         self.cleaning=True
         
         tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
@@ -96,12 +99,12 @@ class MyScheduler():
                         
         if self.pf_check:
             self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf)
-            self.do_weekday(time(9,3,tzinfo=tz_Paris), self.check_pf, opening="9h")
-            self.do_weekday(time(9,33,tzinfo=tz_NY), self.check_pf, opening="15h")
+            self.do_weekday(time(9,35,tzinfo=tz_Paris), self.check_pf, opening="9h")
+            self.do_weekday(time(9,35,tzinfo=tz_NY), self.check_pf, opening="15h")
         if self.index_check:
             self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_index)
-            self.do_weekday(time(9,3,tzinfo=tz_Paris), self.check_index, opening="9h")
-            self.do_weekday(time(9,33,tzinfo=tz_NY), self.check_index, opening="15h")       
+            self.do_weekday(time(9,35,tzinfo=tz_Paris), self.check_index, opening="9h")
+            self.do_weekday(time(9,35,tzinfo=tz_NY), self.check_index, opening="15h")       
         if self.report_17h: #round 15 min before closing
             self.do_weekday(time(17,15,tzinfo=tz_Paris),self.daily_report,short_name="17h",key="17h_stock_exchanges")
         if self.report_22h: #round 15 min before closing
@@ -112,6 +115,8 @@ class MyScheduler():
             self.manager.every(10, 'seconds').do(self.heartbeat_ib_f)
         if self.cleaning:
             self.do_weekday(time(16,2,tzinfo=tz_NY),self.cleaning_f)
+        if self.update_slow:
+            self.do_weekday(time(10,00,tzinfo=tz_Paris), self.update_slow_strat) #performed away from the opening
 
         #the "background is created by celery"
         #OOTB vbt start_in_background does not seem to be compatible with django
@@ -307,35 +312,40 @@ class MyScheduler():
                 c2 = Q(active=True)
                 order=Order.objects.filter(c1 & c2)
                 auto=True
+                today=timezone.now().strftime('%Y-%m-%d')
                 
                 if len(order)>0:
                     o=order[0]
-                    if o.sl_threshold is not None:
-                        cours_pres=get_last_price(action)
-                        if (not o.short and cours_pres<o.sl_threshold) or\
-                        (o.short and cours_pres>o.sl_threshold):
+                    e=o.entering_date.strftime('%Y-%m-%d')
+                    if e<today: #avoid exiting order performed today
+                        if o.sl_threshold is not None:
+                            cours_pres=get_last_price(action)
+                            if (not o.short and cours_pres<o.sl_threshold) or\
+                            (o.short and cours_pres>o.sl_threshold):
+                                
+                                ex, auto=exit_order(action.symbol,
+                                           o.pf.strategy.name, 
+                                           o.pf.stock_ex.name,
+                                           o.short,
+                                           auto,
+                                           **kwargs)
+                                if ex:
+                                    self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="stop loss") 
+                        
+                        if o.daily_sl_threshold is not None:
+                            ratio=get_ratio(action)
                             
-                            exit_order(action.symbol,
-                                       o.pf.strategy.name, 
-                                       o.pf.stock_ex.name,
-                                       o.short,
-                                       auto,
-                                       **kwargs)
-                            self.send_entry_exit_msg(action.symbol,False,False,True,suffix="stop loss") 
-                        
-                    if o.daily_sl_threshold is not None:
-                        ratio=get_ratio(action)
-                        
-                        if (not o.short and ratio<-o.daily_sl_threshold*100) or\
-                        (o.short and ratio>o.daily_sl_threshold*100):
-
-                            exit_order(action.symbol,
-                                       o.pf.strategy.name, 
-                                       o.pf.stock_ex.name,
-                                       o.short,
-                                       auto,
-                                       **kwargs)
-                            self.send_entry_exit_msg(action.symbol,False,False,True,suffix="daily stop loss")                        
+                            if (not o.short and ratio<-o.daily_sl_threshold*100) or\
+                            (o.short and ratio>o.daily_sl_threshold*100):
+    
+                                ex, auto=exit_order(action.symbol,
+                                           o.pf.strategy.name, 
+                                           o.pf.stock_ex.name,
+                                           o.short,
+                                           auto,
+                                           **kwargs)
+                                if ex:
+                                    self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="daily stop loss")                        
                 
     def send_order(self,report):
         for auto in [False, True]:
@@ -345,6 +355,7 @@ class MyScheduler():
                         ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
                         for a in ent_ex_symbols.actions.all():
                             self.send_entry_exit_msg(a.symbol,entry,short,auto) 
+                        self.telegram_bot.send_message_to_all(ent_ex_symbols.text)
                     except:
                         pass
 
@@ -423,5 +434,23 @@ class MyScheduler():
         a=Action.objects.get(symbol="AAPL")
         t=get_last_price(a)
         self.telegram_bot.send_message_to_all("Apple current price: " + str(t))
-
         
+    def update_slow_strat(self):
+        jobs=Job.objects.all()
+        today=timezone.now()
+        
+        for j in jobs:
+            if today>(timedelta(days=j.frequency_days)+j.last_execution):
+                actualize_job(j.strategy.name, j.period_year, j.stock_ex.name)
+                j.last_execution=today
+                j.save()
+        
+def actualize_job(strategy, period_year, exchange):
+    use_IB, actions=get_exchange_actions(exchange)
+    presel=btP.Presel(use_IB,actions1=actions,period1=str(period_year)+"y",exchange=exchange)
+    
+    if strategy=="hist_vol":
+        presel.actualize_hist_vol_slow(exchange)
+    elif strategy=="realmadrid":
+        presel.actualize_realmadrid(exchange)
+

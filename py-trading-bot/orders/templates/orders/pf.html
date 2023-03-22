@@ -29,9 +29,17 @@
                 {% endfor %}
             {% endif %}
         {% endfor %}
-</table>      
+</table>   
 
-<p><a href="{% url 'reporting:reports' %}">Daylies</a></p>
-<p><a href="{% url 'orders:portfolio' %}">Portfolio</a></p>
-<p><a href="{% url 'reporting:alerts' %}">Alerts</a></p>
-<p><a href="{% url 'reporting:start_bot' %}">Start bot</a></p>
+<h1>Manual order entry</h1>
+<form method="post">
+{% csrf_token %}
+{{form.as_table }}
+<br/><br/>
+<input type="submit" value="Manual opening order performed" name="opening" id="opening">
+<input type="submit" value="Manual closing order performed" name="closing" id="closing">
+
+</form>       
+
+<p><a href="{% url 'reporting:reports' %}">Main page</a></p>
+

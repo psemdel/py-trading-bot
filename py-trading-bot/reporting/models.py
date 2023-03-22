@@ -28,6 +28,12 @@ class ListOfActions(models.Model):
     short=models.BooleanField(blank=False,default=False)
     auto=models.BooleanField(blank=False,default=False)
     actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
+    text=models.TextField(blank=True)
+    
+    def concat(self,text):
+        print(text)     
+        self.text+=text +"\n"
+        self.save()    
 
 class Report(models.Model):
     date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #) default=timezone.now()
@@ -138,7 +144,7 @@ class Report(models.Model):
 
         for symbol in pf_inv.retrieve(): 
             if symbol not in candidates:
-                ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs)
+                ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs) #not short?
                 self.order_nosubstrat_sub(symbol, short, ex, auto)
 
         #sell
@@ -312,6 +318,7 @@ class Report(models.Model):
                     auto=auto
                     )
                 ent_ex_symbols.actions.add(action)
+                ent_ex_symbols.concat("define_ent_ex, Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
         except Exception as e:
             print(e)
             logger.error(e, stack_info=True, exc_info=True)    
@@ -392,14 +399,14 @@ class Report(models.Model):
                     ar.save()  
   
         
-    def display_last_decision(self,symbol,stnormal):
+    def display_last_decision(self,symbol,stnormal, key):
         symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
         symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
         decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
         if decision==1:
-            self.concat(symbol + " present decision for normal strategy : sell")
+            self.concat(symbol + " present decision for "+str(key)+" strategy : sell")
         elif decision==-1:
-            self.concat(symbol + " present decision for normal strategy : buy")
+            self.concat(symbol + " present decision for "+str(key)+" strategy : buy")
         return symbol_complex_ent_normal, symbol_complex_ex_normal
             
     #for a group of predefined actions, determine the signals    
@@ -417,7 +424,7 @@ class Report(models.Model):
             if math.isnan(stnormal.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal, "normal")
                 
                 #list present status
                 self.define_ent_ex(
@@ -444,7 +451,7 @@ class Report(models.Model):
             if math.isnan(stnormal.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"sl")
                 
                 #list present status
                 self.define_ent_ex(
@@ -471,7 +478,7 @@ class Report(models.Model):
             if math.isnan(stnormal.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"tsl")
                 
                 #list present status
                 self.define_ent_ex(
@@ -495,7 +502,7 @@ class Report(models.Model):
             for symbol in symbols:
                 if symbol in pf_keep.retrieve():
                     self.concat("symbol presently in keep: "+symbol)
-                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"keep")
 
                     self.define_ent_ex(
                         False, #only exit
@@ -508,7 +515,7 @@ class Report(models.Model):
                         **kwargs)
                 if symbol in pf_short_keep.retrieve(): 
                     self.concat("symbol presently in keep short: "+symbol)
-                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"keep")
                     self.define_ent_ex(
                         False, #only exit
                         False,

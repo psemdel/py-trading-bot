@@ -10,6 +10,7 @@ admin.site.register(Strategy)
 admin.site.register(Candidates)
 admin.site.register(Excluded)
 admin.site.register(StratCandidates)
+admin.site.register(Job)
 
 class OrderAdmin(admin.ModelAdmin):
     list_filter = ('active',)
@@ -18,7 +19,7 @@ admin.site.register(Order, OrderAdmin)
 
 class PFAdmin(admin.ModelAdmin):
     list_filter = ('stock_ex', 'strategy','short','sector')
-    
+   
 admin.site.register(PF, PFAdmin)
 
 class OrderCapitalAdmin(admin.ModelAdmin):

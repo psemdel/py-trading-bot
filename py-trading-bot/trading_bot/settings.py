@@ -25,6 +25,7 @@ _settings={
 "REPORT_22h":True, #for Nasdaq and Nyse
 "HEARTBEAT":False, # to test telegram
 "HEARTBEAT_IB":False, # to test telegram
+"UPDATE_SLOW_STRAT":True, 
 
 "ALERT_THRESHOLD":3, #in %
 "ALARM_THRESHOLD":5, #in %
@@ -34,13 +35,13 @@ _settings={
 
 ## Order settings ##
 "USE_IB_FOR_DATA":{
-    "alerting":os.environ.get("USE_IB_FOR_DATA_ALERTING",True), #use IB for Data or YF, for alerting
-    "reporting":os.environ.get("USE_IB_FOR_DATA_REPORTING",False), #use IB for Data or YF, for the generation of the reports
+    "alerting":os.environ.get("USE_IB_FOR_DATA_ALERTING",True), #use IB for Data if true (otherwise YF), for alerting
+    "reporting":os.environ.get("USE_IB_FOR_DATA_REPORTING",False), #use IB for Data if true (otherwise YF), for the generation of the reports
     },
     
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
-"PERFORM_ORDER":False, #test or use IB to perform orders
+"PERFORM_ORDER":True, #test or use IB to perform orders
 "BYPASS_ORDERCAPITAL_IF_IB":False, #bypass the restriction linked to order capital if using IB. with other words, 
 #if there is enough money on your account, the order will be performed, 
 #without considering how many orders/strategy you want to perform

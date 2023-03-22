@@ -292,6 +292,11 @@ def get_ratio(action,**kwargs):
                     
             if kwargs.get("opening",False):
                 cours_open=cours.get("Open")
+                logger.info("cours open")
+                logger.info(cours_open)
+                logger.info("cours close")
+                logger.info(cours_close)
+                
                 cours_pres=cours_open[action.symbol].iloc[-1]
             else:
                 cours_pres=cours_close[action.symbol].iloc[-1]
@@ -426,7 +431,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
                                             short,
                                             quantity=order.quantity*2) #*2 to revert the order
                 logger_trade.info("entering_price: "+ str(new_order.entering_price))
-                new_order.quantity=retrieve_quantity(action)
+                new_order.quantity, _=retrieve_quantity(action)
                 new_order.short=short
                 
                 logger_trade.info("sl" + str(kwargs.get("sl",False)))
@@ -444,6 +449,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
                         order.profit_percent=(new_order.entering_price/order.entering_price-1)*100
             else:
                 new_order.entering_price=1.0 
+                logger_trade.info("Manual reverse order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 
             if kwargs.get("daily_sl",False):
                 new_order.daily_sl_threshold=kwargs.get("daily_sl")
@@ -454,8 +460,6 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             new_order.save()
             pf.append(action.symbol)
             pf_inv.remove(action.symbol)
-            pf.save()
-            pf_inv.save()
             return True
         return False
     
@@ -498,6 +502,8 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                     order.profit=order.exiting_price-order.entering_price
                     if order.entering_price != 0:
                         order.profit_percent=(order.exiting_price/order.entering_price-1)*100
+            else:
+                logger_trade.info("Manual exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 
             order.exiting_date=timezone.now()
             order.active=False
@@ -506,7 +512,6 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             ocap.capital+=1
             ocap.save()
             pf.remove(symbol)
-            pf.save()
             return True
         else:
             logger.info(str(symbol) + " not found in portfolio for exit order")
@@ -566,15 +571,15 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                         order.sl_threshold=order.entering_price*(1+sl)
                     else:
                         order.sl_threshold=order.entering_price*(1-sl)
-                if kwargs.get("daily_sl",False):
-                    order.daily_sl_threshold=kwargs.get("daily_sl")
-                
             else:
-                order.entering_price=1.0                    
-            
+                order.entering_price=1.0   
+                logger_trade.info("Manual entry order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
+                 
+            if kwargs.get("daily_sl",False):
+                order.daily_sl_threshold=kwargs.get("daily_sl")
+                
             order.save()
             pf.append(action.symbol)
-            pf.save()
             ocap.capital-=1
             ocap.save()
             return True
