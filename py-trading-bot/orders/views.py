@@ -7,7 +7,7 @@ from django.http import HttpResponse
 
 def pf_view(request):
     form=ManualOrderForm(request.POST or None)
-    context={'pfs':PF.objects.all(),"form":form}
+    
     if request.method == 'POST':
         if form.is_valid():
             action=form.cleaned_data["action"]
@@ -53,10 +53,23 @@ def pf_view(request):
                 
             elif "opening" in request.POST:    
                 o=Order.objects.create(short=form.cleaned_data["short"], action=action, pf=pf)
+                if (form.cleaned_data["sl_threshold"] is not None and form.cleaned_data["sl_threshold"]!=0):
+                    o.sl_threshold=form.cleaned_data["sl_threshold"]
+                    o.save()
+
+                if (form.cleaned_data["daily_sl_threshold"] is not None and form.cleaned_data["daily_sl_threshold"]!=0):
+                    print(form.cleaned_data["daily_sl_threshold"])
+                    o.daily_sl_threshold=form.cleaned_data["daily_sl_threshold"]
+                    
+                    o.save()
                 pf.append(action.symbol) 
                 
                 if oc is not None:
                     oc.capital-=1
                     oc.save()
+    else:
+        form = ManualOrderForm(initial={'sl_threshold': 0, "daily_sl_threshold":0})
+    
+    context={'pfs':PF.objects.all(),"form":form}            
     
     return render(request, 'orders/pf.html', context)

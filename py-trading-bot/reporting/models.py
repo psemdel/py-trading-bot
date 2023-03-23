@@ -417,7 +417,7 @@ class Report(models.Model):
             stnormal.call_strat(_settings["STRATEGY_NORMAL_STOCKS"])
         
         normal_strat, _=Strategy.objects.get_or_create(name="normal")
-        normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat)  #.id
+        normal_strat_act, _=StratCandidates.objects.get_or_create(strategy=normal_strat)  #.id
         normal_strat_symbols=normal_strat_act.retrieve()
         
         for symbol in intersection(symbols,normal_strat_symbols):
@@ -444,7 +444,7 @@ class Report(models.Model):
             stnormal.call_strat(_settings["STRATEGY_SL_STOCKS"])
         
         sl_strat, _=Strategy.objects.get_or_create(name="sl")
-        sl_strat_act, _=StratCandidates.objects.get_or_create(name="sl",strategy=sl_strat) 
+        sl_strat_act, _=StratCandidates.objects.get_or_create(strategy=sl_strat) 
         sl_strat_symbols=sl_strat_act.retrieve()
         
         for symbol in intersection(symbols,sl_strat_symbols):
@@ -471,7 +471,7 @@ class Report(models.Model):
             stnormal.call_strat(_settings["STRATEGY_TSL_STOCKS"])
         
         tsl_strat, _=Strategy.objects.get_or_create(name="tsl")
-        tsl_strat_act, _=StratCandidates.objects.get_or_create(name="tsl",strategy=tsl_strat) 
+        tsl_strat_act, _=StratCandidates.objects.get_or_create(strategy=tsl_strat) 
         tsl_strat_symbols=tsl_strat_act.retrieve()
         
         for symbol in intersection(symbols,tsl_strat_symbols):

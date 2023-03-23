@@ -18,3 +18,7 @@ class ManualOrderForm(forms.Form):
         )
     short = forms.ChoiceField(choices=TrueFalse)
     sector= forms.ModelChoiceField(queryset=ActionSector.objects.all())
+    sl_threshold=forms.DecimalField(max_digits=100, decimal_places=5) #as price
+    daily_sl_threshold=forms.DecimalField(max_digits=100, decimal_places=5) #as pu
+    
+    
