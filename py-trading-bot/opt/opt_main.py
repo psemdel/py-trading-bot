@@ -8,8 +8,10 @@ import numpy as np
 import gc
 import copy
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
+from core.common import remove_multi
 import itertools
 import pandas as pd
+
 
 #Script to optimize the combination of patterns/signals used for a given strategy
 
@@ -211,16 +213,6 @@ class OptMain(VBTfunc):
         self.exs_short={}
         self.defi("ex")
         
-    def remove_multi(self,t2):
-        if type(t2)==pd.core.frame.DataFrame:
-            multi=t2.columns #does not work for indexes...
-            l=len(multi[0])
-
-            for ii in range(l-2,-1,-1):
-                multi=multi.droplevel(ii)
-            t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
-        return t2
-    
     def defi(self,ent_or_ex):
         try:
             for ind in self.indexes: #CAC, DAX, NASDAQ
@@ -241,7 +233,7 @@ class OptMain(VBTfunc):
                             t=self.all_t_exs[ind][ii]
                         
                         t2=ic.VBTSUM.run(t,arr=arr[ii]).out #equivalent to if arr[ii]: then consider self.all_t_ents[ind][ii]
-                        t2=self.remove_multi(t2)
+                        t2=remove_multi(t2)
                         
                         if self.shift:
                             t_shift=ic.VBTSUM.run(t2.shift(periods=1, fill_value=0),self.shift_arr[0]).out

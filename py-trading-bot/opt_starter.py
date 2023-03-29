@@ -52,7 +52,7 @@ if True:
    
 if False:
     #optimize bt
-    from opt.opt_bt import Opt
+    from opt.opt_presel import Opt
    
     #only for predefined
     a_bull=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,

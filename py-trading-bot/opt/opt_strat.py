@@ -1,16 +1,16 @@
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
-import itertools
 from opt.opt_main import OptMain
-#Script to optimize the combination of patterns/signals used for a given strategy
+"""
+Script to optimize the combination of patterns/signals used for a given strategy
 
-#The optimization takes place on the actions from CAC40, DAX and Nasdaq
-#Parameters very good on some actions but very bad for others should not be selected
+The optimization takes place on the actions from CAC40, DAX and Nasdaq
+Parameters very good on some actions but very bad for others should not be selected
 
-#The optimization algorithm calculates one point, look for the points around it and select the best one
-#As it can obviously lead to local maximum, the starting point is selected in a random manner
-
+The optimization algorithm calculates one point, look for the points around it and select the best one
+As it can obviously lead to local maximum, the starting point is selected in a random manner
+"""
 vbt.settings['caching']=Config(
     disable=True,
     disable_whitelist=True,

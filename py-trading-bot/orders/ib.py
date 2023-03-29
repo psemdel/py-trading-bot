@@ -278,28 +278,13 @@ def get_ratio(action,**kwargs):
                 if len(bars)!=0:
                     df=util.df(bars)
                     cours_ref=df.iloc[0]["close"] #closing price of the day before
-                    cours_open=df.iloc[-1]["open"]
-
-                if kwargs.get("opening",False):
-                    cours_pres=cours_open
-                else:
                     cours_pres=IBData.get_last_price(contract)
    
         else: #YF
             cours=vbt.YFData.fetch([action.symbol], period="2d")
             cours_close=cours.get("Close")
             cours_ref=cours_close[action.symbol].iloc[0]
-                    
-            if kwargs.get("opening",False):
-                cours_open=cours.get("Open")
-                logger.info("cours open")
-                logger.info(cours_open)
-                logger.info("cours close")
-                logger.info(cours_close)
-                
-                cours_pres=cours_open[action.symbol].iloc[-1]
-            else:
-                cours_pres=cours_close[action.symbol].iloc[-1]
+            cours_pres=cours_close[action.symbol].iloc[-1]
                 
         if cours_pres!=0 and cours_ref!=0:
             return rel_dif(cours_pres,cours_ref)*100

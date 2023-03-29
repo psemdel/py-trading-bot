@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from orders.models import PF, Order, OrderCapital
+from orders.models import PF, Order, OrderCapital, StratCandidates
 from orders.form import ManualOrderForm
 from django.db.models import Q
 from django.http import HttpResponse
@@ -60,15 +60,19 @@ def pf_view(request):
                 if (form.cleaned_data["daily_sl_threshold"] is not None and form.cleaned_data["daily_sl_threshold"]!=0):
                     print(form.cleaned_data["daily_sl_threshold"])
                     o.daily_sl_threshold=form.cleaned_data["daily_sl_threshold"]
-                    
                     o.save()
                 pf.append(action.symbol) 
                 
                 if oc is not None:
                     oc.capital-=1
                     oc.save()
+                
+                sc=StratCandidates.objects.filter(strategy=form.cleaned_data["strategy"]) #keep consistency
+                if len(sc)>0:
+                    if action not in sc[0].actions:
+                        sc[0].actions.add(action)
     else:
-        form = ManualOrderForm(initial={'sl_threshold': 0, "daily_sl_threshold":0})
+        form = ManualOrderForm(initial={'sl_threshold': 0, "daily_sl_threshold":0, "short":False})
     
     context={'pfs':PF.objects.all(),"form":form}            
     

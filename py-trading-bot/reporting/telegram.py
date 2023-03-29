@@ -31,8 +31,7 @@ from orders.models import Action, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
                           get_exchange_actions   
                  
-from core import constants
-from core import btP
+from core import constants, preselP
 
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
@@ -185,9 +184,8 @@ class MyScheduler():
                 #must be the same direction otherwise as the criterium depends on it
                 c3 = Q(short=short) 
                 c4 = Q(opportunity=opportunity)
-                c5 = Q(opening=opening)
                 
-                alerts=Alert.objects.filter(c1 & c2 & c3 & c4 & c5)
+                alerts=Alert.objects.filter(c1 & c2 & c3 & c4)
                 
                 op_text=""
                 if opportunity:
@@ -447,7 +445,7 @@ class MyScheduler():
         
 def actualize_job(strategy, period_year, exchange):
     use_IB, actions=get_exchange_actions(exchange)
-    presel=btP.Presel(use_IB,actions1=actions,period1=str(period_year)+"y",exchange=exchange)
+    presel=preselP.PreselPRD(use_IB,actions1=actions,period1=str(period_year)+"y",exchange=exchange)
     
     if strategy=="hist_vol":
         presel.actualize_hist_vol_slow(exchange)

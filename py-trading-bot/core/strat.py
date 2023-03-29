@@ -17,9 +17,12 @@ import pandas as pd
 
 import logging
 logger = logging.getLogger(__name__)
-### Strategies on one action, no preselection ###
-#So it determines entries and exits for one action to optimize the return
- 
+"""
+Strategies on one action, no preselection
+
+So it determines entries and exits for one action to optimize the return
+"""
+
 def defi_i_fast_sub(all_t_ent,t, calc_arrs, jj):
     try:
         for ii in range(len(calc_arrs)):
@@ -270,10 +273,16 @@ class Strat(VBTfunc):
         return delta
     
     def call_strat(self,name,**kwargs):
-        meth=getattr(self,name)
-        meth(**kwargs)
+        getattr(self,name)(**kwargs)
 ########## Strats ##############
 # Example of simple strategy for pedagogic purposes
+    def stratHold(self):
+        t=ic.VBTVERYBULL.run(self.close)
+        self.entries=t.entries
+        self.exits=t.exits
+        self.entries_short=t.exits
+        self.exits_short=t.exits
+
     def stratRSI(self,**kwargs):
         t=vbt.RSI.run(self.close,wtype='simple')
         self.entries=t.rsi_crossed_below(20)

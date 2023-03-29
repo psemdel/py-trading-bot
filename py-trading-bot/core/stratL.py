@@ -9,7 +9,7 @@ import vectorbtpro as vbt
 import core.indicators as ic
 
 from core.strat import Strat
-from core.bt import BT, WQ
+from core.presel import Presel, WQ
 from core import common, constants
 import numpy as np
 import pandas as pd
@@ -55,7 +55,7 @@ class StratLIVE(Strat):
 
 #Same as bt but for recent data
 #Only import with strat supported
-class btLIVE(BT):
+class PreselLIVE(Presel):
     def __init__(self,longshort,**kwargs):
         st=kwargs.get("st")
         self.st=st
@@ -142,7 +142,7 @@ def scan_presel(presel_dic, key,**kwargs):
     restriction=kwargs.get("restriction",None) 
     
     for p in presel_dic:
-        bti=btLIVE("long",st=st) #has to be recalculated everytime, otherwise it caches
+        bti=PreselLIVE("long",st=st) #has to be recalculated everytime, otherwise it caches
         if p=="vol":
             bti.preselect_vol()
         elif p=="retard":

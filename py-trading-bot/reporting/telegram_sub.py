@@ -1,16 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jan 24 08:15:59 2023
-
-@author: maxime
-"""
-
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Messaging using Python Telegram Bot."""
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("telegram")
 
@@ -21,6 +13,10 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.requests_ import text_to_giphy_url
+
+__all__ = [
+    "TelegramBot",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +67,7 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
         Defaults,
     )
     from telegram.utils.helpers import effective_message_type
+
     class LogHandler(Handler):
         """Handler to log user updates."""
 
@@ -293,7 +290,6 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
 
         def send_to_all(self, kind: str, *args, **kwargs) -> None:
             """Send message of any kind to all in `TelegramBot.chat_ids`."""
-            #chat_id=self.chat_ids[1]
             for chat_id in self.chat_ids:
                 self.send(kind, chat_id, *args, **kwargs)
 
@@ -384,8 +380,6 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
             return self.updater.running
 
 else:
-    print("Telegram else")
-    
     import asyncio
     import platform
     import signal

@@ -80,8 +80,7 @@ class StratPRD(Strat):
             logger.error(e, stack_info=True, exc_info=True)
             
     def call_strat(self,name,**kwargs):
-        meth=getattr(self,name)
-        meth(prd=True,**kwargs)
+        getattr(self,name)(prd=True,**kwargs)
         
     def get_last_decision(self, symbol_complex_ent, symbol_complex_ex):
         for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):

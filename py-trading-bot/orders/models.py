@@ -55,7 +55,7 @@ def get_exchange_actions(exchange,**kwargs):
     if stock_ex.presel_at_sector_level and kwargs.get("sec"):
         action_sector, _=ActionSector.objects.get_or_create(name=kwargs.get("sec"))
         c4 = Q(sector=action_sector)
-        actions=Action.objects.filter(c1 & c2 & c3 & c4)
+        actions=Action.objects.filter(c1 & c3 & c4) #c2 & no actual reason, but I use mix of Nasdaq and NYSE for sector
     else:
         actions=Action.objects.filter(c1 & c2 & c3)
         

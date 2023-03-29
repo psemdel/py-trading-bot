@@ -9,6 +9,7 @@ import math
 import numpy as np
 from datetime import datetime
 from core.constants import INTRO
+import pandas as pd
 
 from core.data_manager import retrieve
 
@@ -95,3 +96,14 @@ def empty_append(x, v, axis, **kwargs):
 def intersection(lst1, lst2):
     lst3 = [value for value in lst1 if value in lst2]
     return lst3   
+
+def remove_multi(t2):
+    if type(t2)==pd.core.frame.DataFrame:
+        multi=t2.columns 
+        if type(multi)==pd.core.indexes.multi.MultiIndex:
+            l=len(multi[0])
+    
+            for ii in range(l-2,-1,-1):
+                multi=multi.droplevel(ii)
+            t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
+    return t2

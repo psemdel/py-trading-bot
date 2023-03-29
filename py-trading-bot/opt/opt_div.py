@@ -58,7 +58,7 @@ class Opt(OptMain):
         ret_arr=[]
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            self.bti[ind].overwrite_ex_strat11(self.exs[ind])
+            self.bti[ind].overwrite_ex_strat_underlying(self.exs[ind])
             self.bti[ind].preselect_divergence()
 
             pf=vbt.Portfolio.from_signals(self.bti[ind].close, 

@@ -4,7 +4,7 @@ import math
 
 from trading_bot.settings import _settings
 
-from core import stratP, btP
+from core import stratP, preselP
 from core import indicators as ic
 from core.common import intersection
 import warnings
@@ -162,6 +162,7 @@ class Report(models.Model):
                     order=Order.objects.filter(c1 & c2)
                     
                     if len(order)>0:
+                        order[0].pf=pf_keep
                         order[0].daily_sl_threshold=0.005
                         order[0].save()
                 else:
@@ -200,7 +201,7 @@ class Report(models.Model):
                     to_calculate=True
         
         if to_calculate:
-            wq=btP.WQPRD(st.use_IB,st=st,exchange=exchange)
+            wq=preselP.WQPRD(st.use_IB,st=st,exchange=exchange)
             
             for nb in range(102):
                 key="wq"+str(nb)
@@ -217,7 +218,7 @@ class Report(models.Model):
 ### Preselected actions strategy    
     def presel_sub(self,use_IB,l,st, exchange,**kwargs):
         if len(l)!=0:
-            presel=btP.Presel(use_IB,st=st,exchange=exchange)
+            presel=preselP.PreselPRD(use_IB,st=st,exchange=exchange)
             #hist slow does not need code here
             if Strategy.objects.get(name="retard") in l: 
                 self.retard(presel,exchange,st,**kwargs)
@@ -631,7 +632,7 @@ class Report(models.Model):
                 #calculats everything used afterwards
                 #also used for "normal strat"
                 stnormal=stratP.StratPRD(use_IB,actions1=actions,period1=str(_settings["DAILY_REPORT_PERIOD"])+"y",**kwargs)
-
+                
                 ##Perform a single strategy on predefined actions
                 self.perform_normal_strat(stnormal.symbols, stnormal, exchange, **kwargs)
                 
