@@ -10,6 +10,7 @@ from core.macro import VBTMACROTRENDPRD
 from core.stratP import StratPRD
 import core.indicators as ic
 from core.presel import Presel, WQ
+from core.common import copy_attr
 
 from orders.ib import retrieve_data,check_hold_duration
 from orders.models import  get_candidates, Excluded, Strategy
@@ -32,26 +33,12 @@ class PreselPRD(Presel):
         if kwargs.get("st",False):
             st=kwargs.get("st")
             self.st=st
-            
-            self.high=st.high
-            self.low=st.low
-            self.close=st.close
-            self.open=st.open
-            self.volume=st.volume
-            self.high_ind=st.high_ind
-            self.low_ind=st.low_ind
-            self.close_ind=st.close_ind
-            self.open_ind=st.open_ind
-            self.volume_ind=st.volume_ind
-            
-            #self.symbols=self.close.columns.values
+            copy_attr(self,st)
         else:
             self.actions=kwargs.get("actions1")
             self.period=kwargs.get("period1")
             
-            self.high, self.low, self.close, self.open,self.volume,\
-            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB,\
-            self.symbols_undef=retrieve_data(self.actions,self.period,use_IB )
+            use_IB, symbols=retrieve_data(self,self.actions,self.period,use_IB )
                 
         self.candidates=[[] for ii in range(len(self.close))]
         self.candidates_short=[[] for ii in range(len(self.close))]
@@ -187,26 +174,13 @@ class WQPRD(WQ):
         if kwargs.get("st",False):
             st=kwargs.get("st")
             self.st=st
-            
-            self.high=st.high
-            self.low=st.low
-            self.close=st.close
-            self.open=st.open
-            self.volume=st.volume
-            self.high_ind=st.high_ind
-            self.low_ind=st.low_ind
-            self.close_ind=st.close_ind
-            self.open_ind=st.open_ind
-            self.volume_ind=st.volume_ind
-            
-            #self.symbols=self.close.columns.values
+            copy_attr(self,st)
+
         else:
             self.actions=kwargs.get("actions1")
             self.period=kwargs.get("period1")
             
-            self.high, self.low, self.close, self.open,self.volume,\
-            self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind\
-            =retrieve_data(self.actions,self.period,use_IB )
+            use_IB, symbols=retrieve_data(self,self.actions,self.period,use_IB )
                 
         self.candidates=[[] for ii in range(len(self.close))]
         self.trend=ic.VBTBBANDSTREND.run(self.close_ind).trend  

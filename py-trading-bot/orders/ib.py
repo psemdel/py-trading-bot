@@ -733,9 +733,10 @@ def retrieve_data_YF(actions,period,**kwargs):
                symbols,\
                index_symbol    
     except Exception as e:
+         print(e)
          logger.error(e, stack_info=True, exc_info=True)
         
-def retrieve_data(actions,period,use_IB,**kwargs):
+def retrieve_data(o,actions,period,use_IB,**kwargs):
     if actions is None or len(actions)==0:
         raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:
@@ -748,27 +749,18 @@ def retrieve_data(actions,period,use_IB,**kwargs):
         if not use_IB:
             cours, symbols, index_symbol=retrieve_data_YF(actions,period,**kwargs)
 
-        cours_action=cours.select(symbols)
-        cours_open =cours_action.get('Open')
-        cours_high=cours_action.get('High')
-        cours_low=cours_action.get('Low')
-        cours_close=cours_action.get('Close')
-        cours_volume=cours_action.get('Volume')
-        logger.info("number of days retrieved: " + str(np.shape(cours_close)[0]))
+        o.data=cours.select(symbols)
+        o.data_ind=cours.select(index_symbol)
         
-        cours_index=cours.select(index_symbol)
-        cours_open_ind =cours_index.get('Open')
-        cours_high_ind=cours_index.get('High')
-        cours_low_ind=cours_index.get('Low')
-        cours_close_ind=cours_index.get('Close')
-        cours_volume_ind=cours_index.get('Volume')
-        
-        if len(cours_open_ind)==0 or len(cours_open)==0:
+        for l in ["Close","Open","High","Low","Volume"]:
+            setattr(o,l.lower(),o.data.get(l))
+            setattr(o,l.lower()+"_ind",o.data_ind.get(l))
+            
+        logger.info("number of days retrieved: " + str(np.shape(o.close)[0]))
+        if len(o.open_ind)==0 or len(o.open_ind)==0:
             raise ValueError("Retrieve data failed and returned empty Dataframe, check the symbols")
-        
-        return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
-               cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind, use_IB, symbols
+
+        return use_IB, symbols
                
                
                

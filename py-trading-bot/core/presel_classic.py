@@ -16,11 +16,12 @@ from numba import njit
 import logging
 logger = logging.getLogger(__name__)
 """
-Classic portfolio optimization does not really require a bot, as the balancing takes place once a month or a year. T
-The interest to keep a bot running all the time is only to provide some alerts. 
+Classic portfolio optimization
 
 This file explore the possibility to use classic portfolio optimizations to preselect the 
-actions (like in presel.py) and them apply on them some "one action" strategy.
+actions (like in presel.py) and them apply on them some "one action" strategy on some "slow" (once a month
+or once a year) and periodic strategies. For strategies that are already "fast" like OLMAR, no
+"one action" strategy is implemented.
 
 This file is for backtesting.
 """
@@ -65,8 +66,8 @@ SIGNALTOSIZE = vbt.IF(
  )       
 
 class PreselClassic(Presel):
-    def __init__(self,symbol_index,period,suffix,longshort,**kwargs):
-        super().__init__(symbol_index,period,suffix,longshort,**kwargs)
+    def __init__(self,symbol_index,period,**kwargs):
+        super().__init__(symbol_index,period,**kwargs)
         self.pf_opt=None 
         self.cands={}
     
@@ -142,6 +143,10 @@ class PreselClassic(Presel):
             cash_sharing=True 
             )
         return pf
+    
+    def apply_no_underlying_strat(self):
+        pf=self.pf_opt.simulate(self.close,freq="1d")
+        return pf
         
     def max_sharpeY(self):
         self.pf_opt = vbt.PortfolioOptimizer.from_pypfopt(
@@ -157,5 +162,10 @@ class PreselClassic(Presel):
             target="optimize",
             optimizer="hrp",
         )
-
-    
+        
+    #require universal-portfolio, pip install universal-portfolios, be careful it downgrades plotly. Reupgrade afterwards, as vectorbt requires higher version. 
+    def Universal(self, key): #OLMAR, Anticor, WMAMR
+        self.pf_opt = vbt.PortfolioOptimizer.from_universal_algo(  
+            key,
+            self.close,
+        )

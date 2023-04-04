@@ -209,7 +209,7 @@ def strat_wrapper_macro(open_,high, low, close, a_bull, a_bear, a_uncertain,
 
 ### For backtesting ###
 class Strat(VBTfunc):
-    def __init__(self,symbol_index,period,suffix,**kwargs):
+    def __init__(self,symbol_index,period,**kwargs):
         super().__init__(symbol_index,period)
         
         if kwargs.get("index",False):
@@ -221,7 +221,11 @@ class Strat(VBTfunc):
         else:
             #self.only_index=False
             self.symbols_simple=self.close.columns.values
-        self.suffix="_" + suffix
+            
+        if kwargs.get("suffix"):
+            self.suffix="_" + kwargs.get("suffix")
+        else:
+            self.suffix=""
         
     def get_output(self,s):
         self.entries=s.entries

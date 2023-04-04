@@ -14,7 +14,7 @@ import vectorbtpro as vbt
 class TestIndicator(unittest.TestCase):
     @classmethod
     def setUpClass(self):   
-        self.st=strat.Strat("CAC40","2007_2009","test")    
+        self.st=strat.Strat("CAC40","2007_2009")    
     
     def test_rel_dif(self):
         self.assertEqual(ic.rel_dif(float('nan'),1),0)

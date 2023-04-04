@@ -26,12 +26,12 @@ class Opt(OptStrat):
     
         for ind in self.indexes: #CAC, DAX, NASDAQ
             if kwargs.get("sl"):
-                pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
+                pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
                                               short_entries=self.ents_short[ind],
                                               short_exits=self.exs_short[ind],
                                               freq="1d",fees=self.fees,tsl_stop=kwargs.get("sl"),stop_exit_price="close")
             else:
-                pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
+                pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
                                               short_entries=self.ents_short[ind],
                                              short_exits=self.exs_short[ind],
                                                freq="1d",fees=self.fees)

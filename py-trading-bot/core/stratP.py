@@ -40,16 +40,15 @@ class StratPRD(Strat):
                         actions.append(Action.objects.get(symbol=symbol))
             
             if kwargs.get("close") is not None:
-                self.open=kwargs.get("open_")
-                self.high=kwargs.get("high")
-                self.low=kwargs.get("low")
-                self.close=kwargs.get("close")
-                self.volume=kwargs.get("volume")
-                self.open_ind=kwargs.get("open_ind")
-                self.high_ind=kwargs.get("high_ind")
-                self.low_ind=kwargs.get("low_ind")
-                self.close_ind=kwargs.get("close_ind")
-                self.volume_ind=kwargs.get("volume_ind")
+                for l in ["close","high","low","volume","data"]:
+                    setattr(self,l,kwargs.get(l))
+                    if kwargs.get(l) is None:
+                        raise ValueError(l+" no value found in StratPRD")
+                    setattr(self,l+"_ind",kwargs.get(l+"_ind"))
+                    if kwargs.get(l+"_ind") is None:
+                        raise ValueError(l+"_ind no value found in StratPRD")
+                setattr(self,"open",kwargs.get("open_")) 
+                setattr(self,"open_ind",kwargs.get("open_ind"))
                 
                 for a in actions:
                     if use_IB:
@@ -63,10 +62,7 @@ class StratPRD(Strat):
                 if period is None:
                     raise ValueError("StratPRD, no period provided")
                 
-                self.high, self.low, self.close, self.open,self.volume,\
-                self.high_ind, self.low_ind, self.close_ind, self.open_ind, self.volume_ind, use_IB,\
-                self.symbols_undef\
-                =retrieve_data(actions,period,use_IB)
+                use_IB, self.symbols_undef=retrieve_data(self,actions,period,use_IB)
                 
                 self.symbols=self.symbols_undef #the symbols as output are then the YF symbols
                 for s in self.symbols:
@@ -77,6 +73,7 @@ class StratPRD(Strat):
             self.actions=actions
                 
         except ValueError as e:
+            print(e)
             logger.error(e, stack_info=True, exc_info=True)
             
     def call_strat(self,name,**kwargs):

@@ -12,7 +12,7 @@ import numpy as np
 from core.strat import Strat
 from core.macro import VBTMACROTREND
 import core.indicators as ic
-from core.common import VBTfunc#, save_vbt_both
+from core.common import VBTfunc, copy_attr#, save_vbt_both
 
 from trading_bot.settings import _settings
 import logging
@@ -29,29 +29,23 @@ Those strategies are home made (even though quite similar to classic one). For c
 """
 
 class Presel(VBTfunc):
-    def __init__(self,symbol_index,period,suffix,longshort,**kwargs):
+    def __init__(self,symbol_index,period,**kwargs):
         self.period=period
         self.symbol_index=symbol_index
-        self.st=Strat(symbol_index,period,suffix)
+        self.st=Strat(symbol_index,period,**kwargs)
         
-        self.high=self.st.high
-        self.low=self.st.low
-        self.close=self.st.close
-        self.open=self.st.open
-        self.volume=self.st.volume
-        self.high_ind=self.st.high_ind
-        self.low_ind=self.st.low_ind
-        self.close_ind=self.st.close_ind
-        self.open_ind=self.st.open_ind
-        self.volume_ind=self.st.volume_ind
+        copy_attr(self,self.st)
         
-        self.suffix="_" + suffix
+        if kwargs.get("suffix"):
+            self.suffix="_" + kwargs.get("suffix")
+        else:
+            self.suffix=""
         
         self.start_capital=10000
         self.order_size=self.start_capital
         self.capital=self.start_capital
         
-        self.longshort=longshort
+        self.longshort=kwargs.get("longshort","long")
         
         self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
@@ -337,7 +331,7 @@ class Presel(VBTfunc):
                     self.excluded.remove(symbol)
    
         res=sorted(v.items(), key=lambda tup: tup[1], reverse=not short)
-        
+            
         for e in res:
             symbol=e[0]
             if kwargs.get("PRD",False):
@@ -521,7 +515,7 @@ class Presel(VBTfunc):
         
         self.dur=ic.VBTKAMATREND.run(self.close).duration
         self.macro_trend=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
-        
+                
         if kwargs.get("PRD",False) and not kwargs.get("reset_excluded",False):
             short=(self.macro_trend.values[-1]==1)
             res=self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)
@@ -552,6 +546,7 @@ class Presel(VBTfunc):
        # if not short:
         for symbol in self.divergence.columns:
             v[symbol]=self.divergence[symbol].values[ii]
+            
         res=sorted(v.items(), key=lambda tup: tup[1], reverse=short)
 
         for e in res:

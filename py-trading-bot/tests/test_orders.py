@@ -134,31 +134,31 @@ class TestOrders(TestCase):
         self.assertEqual(len(t),1)     
         
     def test_get_pf(self):
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf2= m.get_pf("none", "Paris",False)
         
         self.assertEqual(pf,pf2)
         #test auto creation
         pf3= m.get_pf("none", "XETRA",False)
-        m.PF.objects.get(name="none_XETRA",short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
+        m.PF.objects.get(short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
         
     def test_pf_retrieve(self):
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         self.assertEqual(pf.retrieve(),[])      
         pf.actions.add(self.a)
         self.assertEqual(pf.retrieve(),[self.a.symbol])        
         
     def test_pf_retrieve_all(self):
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append(self.a.symbol)
         pf.save()
-        pf2=m.PF.objects.create(name="none_XETRA",short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
+        pf2=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
         pf2.append(self.a3.symbol)
         
         self.assertEqual(m.pf_retrieve_all(),[self.a, self.a3])      
 
     def test_pf_append(self):
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append(self.a.symbol)
         
         self.assertEqual(pf.retrieve(),[self.a.symbol])  
@@ -168,14 +168,14 @@ class TestOrders(TestCase):
         self.assertEqual(pf.retrieve(),[self.a2.symbol,self.a.symbol])  
         
     def test_pf_remove(self):
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append(self.a.symbol)
         pf.remove(self.a.symbol)
         
         self.assertEqual(pf.retrieve(),[])          
         
     def test_get_order_capital(self):
-        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         ocap2=m.get_order_capital("none","Paris")
         
         self.assertEqual(ocap,ocap2)

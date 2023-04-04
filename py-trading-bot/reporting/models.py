@@ -639,7 +639,7 @@ class Report(models.Model):
                 ##Populate a report with different statistics
                 sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
                 sma=ic.VBTMA.run(stnormal.close)
-                
+
                 sp=None
                 if _settings["CALCULATE_PATTERN"]:
                     sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
@@ -651,12 +651,14 @@ class Report(models.Model):
                                         low=stnormal.low,
                                         close=stnormal.close,
                                         volume=stnormal.volume,
+                                        data=stnormal.data,
                                         open_ind=stnormal.open_ind,
                                         high_ind=stnormal.high_ind,
                                         low_ind=stnormal.low_ind,
                                         close_ind=stnormal.close_ind, 
                                         volume_ind=stnormal.volume_ind,
-                                       **kwargs)
+                                        data_ind=stnormal.data_ind,
+                                        **kwargs)
 
                 if _settings["CALCULATE_TREND"]:
                     st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend

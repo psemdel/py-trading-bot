@@ -14,7 +14,7 @@ import vectorbtpro as vbt
 
 class TestBT(unittest.TestCase):
     def setUp(self):
-        self.bti=presel.Presel("CAC40","2007_2022_08","test","long")
+        self.bti=presel.Presel("CAC40","2007_2022_08")
         
     def test_preselect_vol(self):
         self.bti.preselect_vol()
@@ -119,7 +119,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),13.35) 
+        self.assertEqual(round(pf.get_total_return(),2),26.76) 
 
     def test_preselect_divergence_blocked(self):
         self.bti.preselect_divergence_blocked()
@@ -209,7 +209,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),-0.26) 
+         self.assertEqual(round(pf.get_total_return(),2),-0.61) 
 
     def test_preselect_hist_vol_slow(self):
          self.bti.preselect_hist_vol_slow()
@@ -238,7 +238,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),0.73)  
+         self.assertEqual(round(pf.get_total_return(),2),3.86)  
            
 if __name__ == '__main__':
     unittest.main()        

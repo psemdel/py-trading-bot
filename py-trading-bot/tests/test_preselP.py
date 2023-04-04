@@ -95,7 +95,7 @@ class TestbtP(TestCase):
         self.presel=preselP.PreselPRD(use_IB,actions1=actions,period1="1y",exchange="Paris")
         
         strategy=Strategy.objects.create(name="hist_slow")
-        Candidates.objects.create(name="hist_slow", strategy=strategy,stock_ex=self.e)
+        Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.presel.actualize_hist_vol_slow("Paris")
         #cand=get_candidates("hist_slow","Paris")
         
@@ -108,10 +108,10 @@ class TestbtP(TestCase):
                       macro_trend_bear="both"
                       ) 
         
-        self.presel=preselP.PreselP(use_IB,st=self.st,exchange="Paris")
+        self.presel=preselP.PreselPRD(use_IB,st=self.st,exchange="Paris")
         
         strategy=Strategy.objects.create(name="hist_slow")
-        Candidates.objects.create(name="hist_slow", strategy=strategy,stock_ex=self.e)
+        Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.presel.actualize_hist_vol_slow("Paris")
         #cand=get_candidates("hist_slow","Paris")
         
@@ -121,7 +121,7 @@ class TestbtP(TestCase):
         
         strategy=Strategy.objects.create(name="realmadrid")
         Excluded.objects.create(name="realmadrid", strategy=strategy)
-        Candidates.objects.create(name="realmadrid", strategy=strategy,stock_ex=self.e)
+        Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.presel.actualize_realmadrid("Paris")
         cand=get_candidates("realmadrid","Paris")
         self.assertEqual(len(cand.retrieve()),2)
@@ -140,7 +140,7 @@ class TestbtP(TestCase):
         
         strategy=Strategy.objects.create(name="realmadrid")
         Excluded.objects.create(name="realmadrid", strategy=strategy)
-        Candidates.objects.create(name="realmadrid", strategy=strategy,stock_ex=self.e)
+        Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.presel.actualize_realmadrid("Paris")
         cand=get_candidates("realmadrid","Paris")
         self.assertEqual(len(cand.retrieve()),2)        

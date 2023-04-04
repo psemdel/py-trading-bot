@@ -43,6 +43,7 @@ def log(text):
 class OptMain(VBTfunc):
     def __init__(self,period,**kwargs):
         
+        self.data_dic={}
         self.close_dic={}
         self.open_dic={}
         self.low_dic={}
@@ -58,11 +59,13 @@ class OptMain(VBTfunc):
                 self.open_dic[ind]=self.open_ind
                 self.low_dic[ind]=self.low_ind
                 self.high_dic[ind]=self.high_ind
+                self.data_dic[ind]=self.data_ind
             else:
                 self.close_dic[ind]=self.close
                 self.open_dic[ind]=self.open
                 self.low_dic[ind]=self.low
-                self.high_dic[ind]=self.high        
+                self.high_dic[ind]=self.high    
+                self.data_dic[ind]=self.data
         
         self.out={}
         

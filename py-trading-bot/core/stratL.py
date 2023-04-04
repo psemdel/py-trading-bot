@@ -11,6 +11,7 @@ import core.indicators as ic
 from core.strat import Strat
 from core.presel import Presel, WQ
 from core import common, constants
+from core.common import copy_attr
 import numpy as np
 import pandas as pd
 
@@ -25,51 +26,64 @@ class StratLIVE(Strat):
         self.retrieve_live()
         
         if kwargs.get("index",False):
-            self.close=self.close_ind
-            self.open=self.open_ind
-            self.low=self.low_ind
-            self.high=self.high_ind
+            for l in ["close","open","high","low","volume","data"]:
+                setattr(self,l,getattr(self,l+"_ind"))
         
     ##to plot the last days for instance
     def retrieve_live(self):
         all_symbols=self.symbols+[self.index_symbol]
         
         cours=vbt.YFData.fetch(all_symbols, period=self.period,missing_index='drop')
-        cours_action=cours.select(self.symbols)
-        self.open =cours_action.get('Open')
-        self.high=cours_action.get('High')
-        self.low=cours_action.get('Low')
-        self.close=cours_action.get('Close')
-        self.volume=cours_action.get('Volume')
-        print("number of days retrieved: " + str(np.shape(self.close)[0]))
+        self.data=cours.select(self.symbols)
+        self.data_ind=cours.select(self.index_symbol)
+        for l in ["Close","Open","High","Low","Volume"]:
+            setattr(self,l.lower(),self.data.get(l))
+            setattr(self,l.lower()+"_ind",self.data_ind.get(l))
         
-        #assuming all actions in the same exchange here:
-        #cours_ind=vbt.YFData.fetch(index_symbol, period=period,missing_index='drop',**kwargs)
-        cours_index=cours.select(self.index_symbol)
-        self.open_ind =cours_index.get('Open')
-        self.high_ind=cours_index.get('High')
-        self.low_ind=cours_index.get('Low')
-        self.close_ind=cours_index.get('Close')
-        self.volume_ind=cours_index.get('Volume')
+        print("number of days retrieved: " + str(np.shape(self.close)[0]))
 
+def scan_strat(strat_dic, key,**kwargs):
+    res=kwargs.get('res',{})
+    res[key]={}
+    st=kwargs.get("st")
+    fees=kwargs.get("fees",0)
+    #limit the range for the calculation of the return to x market days, 
+    #set your period to be significantly longer than the restriction to avoid calculation errors
+    restriction=kwargs.get("restriction",None) 
+    
+    for p in strat_dic:
+        getattr(st,p)()
+        if restriction is not None and type(restriction)==int:
+            pf=vbt.Portfolio.from_signals(st.close[-restriction:], 
+                                          st.entries[-restriction:],
+                                          st.exits[-restriction:],
+                                          short_entries=st.entries_short[-restriction:],
+                                          short_exits  =st.exits_short[-restriction:],
+                                          freq="1d",
+                                          call_seq='auto',
+                                          fees=fees
+                                 )            
+        else:
+            pf=vbt.Portfolio.from_signals(st.close, 
+                                          st.entries,
+                                          st.exits,
+                                          short_entries=st.entries_short,
+                                          short_exits  =st.exits_short,
+                                          freq="1d",
+                                          call_seq='auto',
+                                          cash_sharing=True,
+                                          fees=fees
+                                 )
+    res[key][p]=pf.get_total_return()
+    return res        
 
 #Same as bt but for recent data
 #Only import with strat supported
 class PreselLIVE(Presel):
-    def __init__(self,longshort,**kwargs):
+    def __init__(self,**kwargs):
         st=kwargs.get("st")
         self.st=st
-        
-        self.high=st.high
-        self.low=st.low
-        self.close=st.close
-        self.open=st.open
-        self.volume=st.volume
-        self.high_ind=st.high_ind
-        self.low_ind=st.low_ind
-        self.close_ind=st.close_ind
-        self.open_ind=st.open_ind
-        self.volume_ind=st.volume_ind
+        copy_attr(self,st)
         
         self.symbols=self.close.columns.values
     
@@ -77,7 +91,7 @@ class PreselLIVE(Presel):
         self.order_size=self.start_capital
         self.capital=self.start_capital
      
-        self.longshort=longshort
+        self.longshort=kwargs.get("longshort","long")
      
         self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
@@ -143,34 +157,12 @@ def scan_presel(presel_dic, key,**kwargs):
     
     for p in presel_dic:
         bti=PreselLIVE("long",st=st) #has to be recalculated everytime, otherwise it caches
-        if p=="vol":
-            bti.preselect_vol()
-        elif p=="retard":
-            bti.preselect_retard()
-        elif p=="macd_vol":
-            bti.preselect_macd_vol()
-        elif p=="hist_vol":
-            bti.preselect_hist_vol()
-        elif p=="divergence":
-            bti.preselect_divergence()
-        elif p=="macd_vol_macro":
-            bti.preselect_macd_vol_macro()
-        elif p=="retard_macro":
-            bti.preselect_retard_macro()
-        elif p=="divergence_blocked":
-            bti.preselect_divergence_blocked()
-        elif p=="macd_vol_slow":
-            bti.preselect_macd_vol_slow()
-        elif p=="realmadrid":
-            bti.preselect_realmadrid()
-        elif p=="macd_vol_slow":
-            bti.preselect_macd_vol_slow()
-        elif p=="hist_vol_slow":
-            bti.preselect_hist_vol_slow() 
-        elif type(p)==int:
+        if type(p)==int:
             bti=WQLIVE(p,st=st)
             bti.def_cand()
             bti.calculate(nostrat11=True)
+        else:
+            getattr(bti,"preselect_"+p)()
             
         if restriction is not None and type(restriction)==int:
             pf=vbt.Portfolio.from_signals(bti.close[-restriction:], 
@@ -201,18 +193,8 @@ def scan_presel(presel_dic, key,**kwargs):
 class WQLIVE(WQ):
     def __init__(self, nb,**kwargs):
         st=kwargs.get("st")
-        
-        self.high=st.high
-        self.low=st.low
-        self.close=st.close
-        self.open=st.open
-        self.volume=st.volume
-        self.high_ind=st.high_ind
-        self.low_ind=st.low_ind
-        self.close_ind=st.close_ind
-        self.open_ind=st.open_ind
-        self.volume_ind=st.volume_ind        
-        
+        copy_attr(self,st)
+
         self.candidates=[[] for ii in range(len(self.close))]
         self.pf=[]
         

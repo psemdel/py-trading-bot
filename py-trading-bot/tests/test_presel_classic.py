@@ -14,7 +14,7 @@ import numpy as np
 
 class TestPreselClassic(TestCase):
     def setUp(self):
-        self.bti=presel_classic.PreselClassic("CAC40","2007_2022_08","test","long")
+        self.bti=presel_classic.PreselClassic("CAC40","2007_2022_08")
         
         
     def test_hold(self):
@@ -30,7 +30,7 @@ class TestPreselClassic(TestCase):
         self.assertEqual(round(pf_ref.get_total_return(),2),round(pf_test.get_total_return(),2))
         
     def test_one_action(self):
-        st=strat.Strat("CAC40","2007_2022_08","test")
+        st=strat.Strat("CAC40","2007_2022_08")
         st.stratG()
         pf_ref=vbt.Portfolio.from_signals(st.close[509:], st.entries[509:],st.exits[509:],
                               short_entries=st.entries_short[509:],short_exits  =st.exits_short[509:],
@@ -66,7 +66,7 @@ class TestPreselClassic(TestCase):
         self.assertTrue(abs(round(pf_ref.get_total_return()[1],2)-round(pf_test.get_total_return(),2))<0.1)   
         
     def test_two_action(self):
-        st=strat.Strat("CAC40","2007_2022_08","test")
+        st=strat.Strat("CAC40","2007_2022_08")
         st.stratG()
         
         window_start=509

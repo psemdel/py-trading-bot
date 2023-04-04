@@ -50,7 +50,7 @@ class TestReporting(TestCase):
         strategy11=Strategy.objects.create(name="retard_keep")
         strategy12=Strategy.objects.create(name="hist_slow")
         
-        StratCandidates.objects.create(name="normal",strategy=strategy2)
+        StratCandidates.objects.create(strategy=strategy2)
         s=ActionSector.objects.create(name="undefined")
         s2=ActionSector.objects.create(name="it")
         s3=ActionSector.objects.create(name="fin")
@@ -272,15 +272,15 @@ class TestReporting(TestCase):
        
         Excluded.objects.create(name="retard", strategy=strategy4)
         Excluded.objects.create(name="all",strategy=strategy)
-        OrderCapital.objects.create(capital=1,name="divergence_Paris",strategy=strategy3,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="retard_Paris",strategy=strategy4,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="macd_vol_Paris",strategy=strategy5,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="realmadrid_Paris",strategy=strategy6,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="wq7_Paris",strategy=strategy7,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="wq31_Paris",strategy=strategy8,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="wq53_Paris",strategy=strategy9,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="wq54_Paris",strategy=strategy10,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,name="retard_keep",strategy=strategy11,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy3,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy4,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy5,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy6,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy7,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy8,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy9,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy10,stock_ex=e,sector=s)
+        OrderCapital.objects.create(capital=1,strategy=strategy11,stock_ex=e,sector=s)
         
         self.report1=m.Report(sector=s)
         self.report1.save()
@@ -359,6 +359,8 @@ class TestReporting(TestCase):
 
     def test_presel(self):
         self.st=self.report1.daily_report_action("Paris")   
+        print("non")
+        print(self.st)
         self.report1.presel(self.st,"Paris")
         
     def test_presel_wq(self):
