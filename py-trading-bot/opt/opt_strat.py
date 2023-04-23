@@ -51,7 +51,7 @@ class Opt(OptMain):
             p=(m_rr)/ 0.1*np.sign(m_rb)   
         else:
             p=(m_rr- m_rb )/ abs(m_rb)
-      
+
         return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed
   
     def manual_calculate_pf(self,ind,*args): #the order is bull/bear/uncertain
@@ -62,9 +62,11 @@ class Opt(OptMain):
         self.defi_ent()
         self.defi_ex()
         self.macro_mode()
-        pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
+        pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
                                       short_entries=self.ents_short[ind],
                                       short_exits=self.exs_short[ind],
+                                      tsl_stop=self.tsl,
+                                      sl_stop=self.sl,
                                       freq="1d",fees=self.fees)
 
         print("equivalent return " + str(self.calculate_eq_ret(pf)))
@@ -83,10 +85,12 @@ class Opt(OptMain):
             ret=0
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
+            pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
                                           short_entries=self.ents_short[ind],
                                           short_exits=self.exs_short[ind],
-                                          freq="1d",fees=self.fees,sl_stop=self.sl,
+                                          freq="1d",fees=self.fees,
+                                          tsl_stop=self.tsl,
+                                          sl_stop=self.sl,
                                           ) #stop_exit_price="close"
             
             if self.index:

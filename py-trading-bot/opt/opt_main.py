@@ -92,6 +92,7 @@ class OptMain(VBTfunc):
         
         self.fees=kwargs.get("fees",0.0005)
         self.sl=kwargs.get("sl")
+        self.tsl=kwargs.get("tsl")
         
         self.best_arrs=np.zeros((self.loops*40,self.nb_macro_modes,self.len_ent+self.len_ex))
         self.best_arrs_ret=np.zeros(self.loops*40)

@@ -156,7 +156,7 @@ def scan_presel(presel_dic, key,**kwargs):
     restriction=kwargs.get("restriction",None) 
     
     for p in presel_dic:
-        bti=PreselLIVE("long",st=st) #has to be recalculated everytime, otherwise it caches
+        bti=PreselLIVE(st=st) #has to be recalculated everytime, otherwise it caches
         if type(p)==int:
             bti=WQLIVE(p,st=st)
             bti.def_cand()

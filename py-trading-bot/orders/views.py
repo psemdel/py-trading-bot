@@ -69,7 +69,7 @@ def pf_view(request):
                 
                 sc=StratCandidates.objects.filter(strategy=form.cleaned_data["strategy"]) #keep consistency
                 if len(sc)>0:
-                    if action not in sc[0].actions:
+                    if action not in sc[0].actions.all():
                         sc[0].actions.add(action)
     else:
         form = ManualOrderForm(initial={'sl_threshold': 0, "daily_sl_threshold":0, "short":False})

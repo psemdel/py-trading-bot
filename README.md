@@ -16,7 +16,7 @@ There are many similar tools out there, that have similar purposes that are cert
 
 # Structure
 - core contains the strategies and all backstaging logic supported by vectorbt. Its indicator factory is extensively used (for more information read https://vectorbt.pro/tutorials/superfast-supertrend/)
-- saved_cours contains some pre-saved data to perform backtesting. The jupyter notebooks in the root are there to perform this backtesting
+- saved_cours contains some pre-saved data to perform backtesting. The jupyter notebooks are there to perform this backtesting
 - orders contains the Django models relative to orders and financial products. IB communication is handled also there
 - reporting contains the Django models relative to reports
 - trading_bot contains Django configuration

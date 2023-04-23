@@ -14,7 +14,7 @@ _settings={
 
 "17h_stock_exchanges":["Paris","XETRA"], #exchange to scan at 17h
 "22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h
-"NYSE_SECTOR_TO_SCAN":["it"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\
+"NYSE_SECTOR_TO_SCAN":["it","fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\
           #"fin","materials","healthcare"
           
           
@@ -56,7 +56,7 @@ _settings={
 "STRATEGY_SL_INDEX":"stratIndexSL",
 "STRATEGY_TSL_STOCKS":"stratTSL",
 "STRATEGY_TSL_INDEX":"stratIndexTSL",
-"STRATEGY_RETARD_KEEP":"stratTSL",
+"STRATEGY_RETARD_KEEP":"stratG",
 
 # Frequency is the number of days between successive candidates actualisation
 "DAILY_REPORT_PERIOD":3, #in year

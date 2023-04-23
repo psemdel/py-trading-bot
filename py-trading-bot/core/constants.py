@@ -123,7 +123,6 @@ DAX=[
     "BNR.DE",
     "CBK.DE",
     "CON.DE",
-    "DB",
     "DB1.DE",
     "DBK.DE",
     "DHER.DE",
@@ -168,6 +167,7 @@ DAX_INTRO={
     "ZAL.DE":"2014-10-01",
     "PAH3.DE":"2009-02-01",
     "BNR.DE":"2010-05-01",
+    "VNA.DE":"2013-08-01"
     }
   
 NASDAQ=[
@@ -200,6 +200,7 @@ NASDAQ=[
     "CSX",
     "CTAS",
     "CTSH",
+    "DB",
     "DDOG", 
     "DLTR",
     "DOCU",
