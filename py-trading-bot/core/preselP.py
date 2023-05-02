@@ -16,7 +16,6 @@ from orders.ib import retrieve_data,check_hold_duration
 from orders.models import  get_candidates, Excluded, Strategy
 
 from trading_bot.settings import _settings
-
 """
 Strategies with preselection
 a) It select one, two,... actions
@@ -29,7 +28,6 @@ The orders are handled somewhere else, only the candidates need to be determined
 
 class PreselPRD(Presel):
     def __init__(self,use_IB,**kwargs):
- 
         if kwargs.get("st",False):
             st=kwargs.get("st")
             self.st=st
@@ -77,8 +75,9 @@ class PreselPRD(Presel):
         self.symbols_simple=self.close.columns.values
         self.symbols_complex=self.ent11.columns.values 
         self.exchange=kwargs.get("exchange")
-        self.excluded=None
-        self.start_capital=0 #required for overwrite_strat11
+        
+        self.init_sub()
+        
          
     def call_strat(self,name,**kwargs):
         meth=getattr(self,name)
@@ -131,42 +130,6 @@ class PreselPRD(Presel):
                  symbol=e[0]
                  if symbol not in self.excluded.retrieve():
                      cand.append(symbol)  
-
-    def check_dur(self, symbol,strategy, exchange,short,**kwargs):
-        dur=check_hold_duration(symbol,strategy, exchange,short,**kwargs)
-        if dur > _settings["RETARD_MAX_HOLD_DURATION"]: #max duration
-            print("Retard: excluding " + symbol + " max duration exceeded")
-            self.excluded.append(symbol)
-
-    def preselect_retard_sub(self,ii,short,**kwargs):
-        if self.excluded is None:
-            retard_strat, _=Strategy.objects.get_or_create(name="retard")
-            self.excluded, _=Excluded.objects.get_or_create(name="retard",strategy=retard_strat) 
-            #can be the same for all exchange, no need for excluded short, as action cannot be in both
-            # categories at the same time
-        
-        v={}       
-        for symbol in self.symbols_simple:
-            v[symbol]=self.dur[symbol].loc[self.close.index[ii]]
-            if symbol in self.get_exclu_list(**kwargs): #if exclude take the next
-                if v[symbol]==0: #trend change
-                    self.excluded.remove(symbol)
-     
-        res=sorted(v.items(), key=lambda tup: tup[1], reverse=not short)
-        
-        for e in res:
-            symbol=e[0]
-            if kwargs.get("PRD",False):
-                self.check_dur(symbol,"retard", self.exchange,short,**kwargs)
-            if symbol not in self.get_exclu_list(**kwargs):
-                if short:
-                    self.candidates_short[ii].append(symbol)
-                    break 
-                else:   
-                    self.candidates[ii].append(symbol)
-                    break
-
-        return res
 
 #As WQ but for production
 class WQPRD(WQ):

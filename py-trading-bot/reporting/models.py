@@ -621,7 +621,11 @@ class Report(models.Model):
                 self.stock_ex=StockEx.objects.get(name="Paris") #convention
                 strats=[]
   
-            if len(actions)!=0:
+            if len(actions)==0:
+                print("No actions found for exchange: "+exchange)
+                logger.info("No actions found for exchange: "+exchange)
+                return None
+            else:
                 if self.pk is None:
                     self.save()
                     

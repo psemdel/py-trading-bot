@@ -124,7 +124,7 @@ DAX=[
     "CBK.DE",
     "CON.DE",
     "DB1.DE",
-    "DBK.DE",
+    "DBK.DE", #DB
     "DHER.DE",
     "DPW.DE",
     "DTE.DE", 

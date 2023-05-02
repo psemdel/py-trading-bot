@@ -59,11 +59,17 @@ def get_exchange_actions(exchange,**kwargs):
     else:
         actions=Action.objects.filter(c1 & c2 & c3)
         
+    if len(actions)==0: #fallback for EUREX for instance
+        cat=ActionCategory.objects.get(short="IND")
+        c1 = Q(category=cat)
+        actions=Action.objects.filter(c1 & c2 & c3)
+
     #actions=filter_intro_action( actions,None)  
     use_IB=False
     if _settings["USE_IB_FOR_DATA"]["reporting"]:
         use_IB=check_ib_permission([a.symbol for a in actions])
    
+    
     return use_IB, actions
 
 ### Conversion between input from YF and IB

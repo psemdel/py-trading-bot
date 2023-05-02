@@ -40,13 +40,18 @@ class Presel(VBTfunc):
             self.suffix="_" + kwargs.get("suffix")
         else:
             self.suffix=""
-        
-        self.start_capital=10000
-        self.order_size=self.start_capital
-        self.capital=self.start_capital
-        
+
         self.longshort=kwargs.get("longshort","long")
         
+        self.pf=[]
+        self.pf_short=[]
+        self.pf_keep=[]
+        self.pf_short_keep=[]
+        
+        self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
+        self.init_sub()
+        
+    def init_sub(self):
         self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         
@@ -59,20 +64,18 @@ class Presel(VBTfunc):
         self.exits_short2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         self.entries_short2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
         
-        self.pf=[]
-        self.pf_short=[]
-        self.pf_keep=[]
-        self.pf_short_keep=[]
-        
-        self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
-
-        self.excluded=[]
-        self.hold_dur=0
+        self.symbols_simple=self.close.columns.values
         
         self.candidates=[[] for ii in range(len(self.close))]
         self.candidates_short=[[] for ii in range(len(self.close))]
         
-        self.symbols_simple=self.close.columns.values
+        self.excluded=[]
+        self.hold_dur=0
+        
+        self.start_capital=10000
+        self.order_size=self.start_capital
+        self.capital=self.start_capital
+        
         self.last_order_dir="long"
     
     def reinit(self):
@@ -216,9 +219,9 @@ class Presel(VBTfunc):
                         self.last_order_dir="long"
     
     def get_exclu_list(self, **kwargs):
-        if kwargs.get("PRD",False):
-            return self.excluded.retrieve()
-        else:
+        #if kwargs.get("PRD",False):
+        #    return self.excluded.retrieve()
+        #else:
             return self.excluded
         
     #same with hold_dur and exclusion
@@ -334,8 +337,8 @@ class Presel(VBTfunc):
             
         for e in res:
             symbol=e[0]
-            if kwargs.get("PRD",False):
-                print("retard for production is defined in BtP")
+            #if kwargs.get("PRD",False):
+            #    print("retard for production is defined in BtP")
                 #self.check_dur(symbol,**kwargs)
             if symbol not in self.get_exclu_list(**kwargs):
                 if short:
@@ -516,21 +519,22 @@ class Presel(VBTfunc):
         self.dur=ic.VBTKAMATREND.run(self.close).duration
         self.macro_trend=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
                 
-        if kwargs.get("PRD",False) and not kwargs.get("reset_excluded",False):
-            short=(self.macro_trend.values[-1]==1)
-            res=self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)
-        else:    
-            if kwargs.get("reset_excluded",False):
-                self.excluded.reset()
+        #if kwargs.get("PRD",False) and not kwargs.get("reset_excluded",False):
+            #short=(self.macro_trend.values[-1]==1)
+            #res=self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)
+        #else:    
+        if kwargs.get("reset_excluded",False):
+            self.excluded.reset()
 
-            for ii in range(len(self.close.index)):
-                short=(self.macro_trend.values[ii]==1)
-                
-                if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
-                    self.excluded.append(self.pf[0])
+        for ii in range(len(self.close.index)):
+            short=(self.macro_trend.values[ii]==1)
+            
+            if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
+                self.excluded.append(self.pf[0])
 
-                res=self.preselect_retard_sub(ii,short,**kwargs)           
-                self.calculate_retard(ii,short,**kwargs)
+            res=self.preselect_retard_sub(ii,short,**kwargs)  
+            
+            self.calculate_retard(ii,short,**kwargs)
         self.out=res #last one    
         self.last_short=short
         #return res #for display

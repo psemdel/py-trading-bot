@@ -12,7 +12,7 @@ _settings={
 
 "ETF_IB_auth":False,   
 
-"17h_stock_exchanges":["Paris","XETRA"], #exchange to scan at 17h
+"17h_stock_exchanges":["Paris","XETRA","EUREX"], #exchange to scan at 17h  
 "22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h
 "NYSE_SECTOR_TO_SCAN":["it","fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\
           #"fin","materials","healthcare"
