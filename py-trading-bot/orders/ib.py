@@ -224,9 +224,11 @@ def retrieve_ib_pf(**kwargs):
 
 @connect_ib        
 def cash_balance(**kwargs):
+    currency=kwargs.get('currency',"EUR")
+
     if kwargs['client'] and ib_global["connected"]:
-        for v in kwargs['client'].accountSummary():
-            if v.tag == 'CashBalance':
+        for v in kwargs['client'].accountValues():
+            if v.tag == 'CashBalance' and v.currency==currency:
                 return float(v.value)
     else:
         return 0
@@ -363,7 +365,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         
         if use_IB:
             order_size=_settings["ORDER_SIZE"]
-            balance=cash_balance()
+            balance=cash_balance(currency=action.currency.symbol)
         else:
             order_size=1
             balance=10 #to get true
@@ -511,18 +513,18 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         #type check necessary for indexes
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
+        action=Action.objects.get(symbol=symbol)
         
         if use_IB:
             order_size=_settings["ORDER_SIZE"]
-            balance=cash_balance()
+            balance=cash_balance(currency=action.currency.symbol)
         else:
             order_size=1
             balance=10 #to get true
         
         if balance<order_size and balance>0.9*order_size: #tolerance on order side
             order_size=balance
-        
-        action=Action.objects.get(symbol=symbol)
+
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
         excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
         if (symbol in pf.retrieve() ):

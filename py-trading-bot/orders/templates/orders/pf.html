@@ -31,7 +31,7 @@
         {% endfor %}
 </table>   
 
-<h1>Manual order entry</h1>
+<h1>Manual order entry</h1> 
 <p>If you performed an order manually, insert it into the bot, with the form below. Stop loss is optional and makes sense only for opening (leave 0 otherwise).</p>
 <form method="post">
 {% csrf_token %}
@@ -39,6 +39,7 @@
 <br/><br/>
 <input type="submit" value="Manual opening order performed" name="opening" id="opening">
 <input type="submit" value="Manual closing order performed" name="closing" id="closing">
+<input type="submit" value="Reverse order performed" name="reverse" id="reverse">
 
 </form>       
 
