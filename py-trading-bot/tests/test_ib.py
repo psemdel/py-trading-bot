@@ -150,7 +150,11 @@ class TestIB(TestCase):
         ib.get_last_price(self.a4)       
         
     def test_cash_balance(self):
-        self.assertTrue(ib.cash_balance()>=0)       
+        self.assertTrue(ib.cash_balance()>=0)   
+        self.assertTrue(ib.cash_balance(currency="USD")>=0)   
+
+    def test_check_enough_cash(self):
+        self.assertTrue(ib.check_enough_cash(10000,currency="USD"))        
 
     def test_entry_order_manual(self):
         pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)

@@ -688,7 +688,11 @@ class Report(models.Model):
         except ValueError as e:
             logger.error(e, stack_info=True, exc_info=True)
         except Exception as e:
+            import sys
+            _, e_, exc_tb = sys.exc_info()
             print(e)
+            print("line " + str(exc_tb.tb_lineno))
+            logger.error("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
             logger.error(e, stack_info=True, exc_info=True)
             pass 
     

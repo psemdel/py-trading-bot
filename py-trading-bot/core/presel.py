@@ -42,12 +42,7 @@ class Presel(VBTfunc):
             self.suffix=""
 
         self.longshort=kwargs.get("longshort","long")
-        
-        self.pf=[]
-        self.pf_short=[]
-        self.pf_keep=[]
-        self.pf_short_keep=[]
-        
+
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
         self.init_sub()
         
@@ -77,6 +72,11 @@ class Presel(VBTfunc):
         self.capital=self.start_capital
         
         self.last_order_dir="long"
+        
+        self.pf=[]
+        self.pf_short=[]
+        self.pf_keep=[]
+        self.pf_short_keep=[]
     
     def reinit(self):
         self.capital=self.start_capital        

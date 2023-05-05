@@ -13,8 +13,8 @@ _settings={
 "ETF_IB_auth":False,   
 
 "17h_stock_exchanges":["Paris","XETRA","EUREX"], #exchange to scan at 17h  
-"22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h
-"NYSE_SECTOR_TO_SCAN":["it","fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\
+"22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h   
+"NYSE_SECTOR_TO_SCAN":["it", "fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\ 
           #"fin","materials","healthcare"
           
           
@@ -50,8 +50,8 @@ _settings={
 "DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
 "RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
 
-"STRATEGY_NORMAL_STOCKS":"stratIndexB",
-"STRATEGY_NORMAL_INDEX":"stratG",
+"STRATEGY_NORMAL_STOCKS":"stratG",
+"STRATEGY_NORMAL_INDEX":"stratIndexB",
 "STRATEGY_SL_STOCKS":"stratSL",
 "STRATEGY_SL_INDEX":"stratIndexSL",
 "STRATEGY_TSL_STOCKS":"stratTSL",

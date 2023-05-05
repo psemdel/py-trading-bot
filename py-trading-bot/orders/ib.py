@@ -222,6 +222,17 @@ def retrieve_ib_pf(**kwargs):
     else:
         return None, None
 
+@connect_ib   
+def check_enough_cash(order_size,**kwargs):
+    if cash_balance(**kwargs)>=order_size:
+        return True
+    else:
+        kwargs["currency"]="EUR" #fallback, if there is enough EUR, IB will convert
+        if cash_balance(**kwargs)>=order_size:
+            return True
+        else:
+            return False
+        
 @connect_ib        
 def cash_balance(**kwargs):
     currency=kwargs.get('currency',"EUR")
@@ -365,10 +376,9 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         
         if use_IB:
             order_size=_settings["ORDER_SIZE"]
-            balance=cash_balance(currency=action.currency.symbol)
+            enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
         else:
-            order_size=1
-            balance=10 #to get true
+            enough_cash=True
         
         if len(orders)==0: #necessary for the first trade of a stock for instance, or if it was closed on a stop loss
             order=Order(action=action, pf=pf, short=short) #use full if you did the entry order manually...
@@ -389,12 +399,12 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         
         if (symbol in pf.retrieve() ):
             logger.info(str(symbol) + " already in portfolio")
-        if order_size>balance and not short:
+        if not enough_cash and not short:
             logger.info(str(symbol) + " order not executed, not enough cash available")
         
         if (symbol not in pf.retrieve() and 
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
-            order_size<=balance or short):
+            enough_cash or short):
             
             #pf should be enough, but it is a double security
             if (short and sign<0) or (not short and sign>0):
@@ -517,13 +527,9 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         
         if use_IB:
             order_size=_settings["ORDER_SIZE"]
-            balance=cash_balance(currency=action.currency.symbol)
+            enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
         else:
-            order_size=1
-            balance=10 #to get true
-        
-        if balance<order_size and balance>0.9*order_size: #tolerance on order side
-            order_size=balance
+            enough_cash=True
 
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
         excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
@@ -533,13 +539,13 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             logger.info(str(symbol) + " excluded")    
         #if (ocap.capital==0):
             #print(symbol + " order not executed, no order capital available: " + ocap.name)
-        if order_size>balance and not short:
+        if not enough_cash and not short:
             logger.info(str(symbol) + " order not executed, not enough cash available")
         
         if (symbol not in pf.retrieve() and 
             symbol not in excluded.retrieve() and  
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
-            order_size<=balance or short):
+            enough_cash or short):
 
             order=Order(action=action, pf=pf, short=short)
 
@@ -716,10 +722,33 @@ def retrieve_data_YF(actions,period,**kwargs):
             
         #res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
         ok=False
+        first_round=True
+        #look for anomaly
+        if len(all_symbols)>2:
+            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            avg=np.average(
+                [len(vbt.YFData.fetch(all_symbols[0], period=period,**kwargs).get('Open')),
+                len(vbt.YFData.fetch(all_symbols[1], period=period,**kwargs).get('Open')),
+                len(vbt.YFData.fetch(all_symbols[-1], period=period,**kwargs).get('Open'))]
+                )
+            
+            if len(res.get('Open'))<avg-10:
+                print("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
+                
+                res_nodrop=vbt.YFData.fetch(all_symbols, period=period,**kwargs)
+                nb_nan={}
+                for c in res.get('Open').columns:
+                    nb_nan[c]=np.count_nonzero(np.isnan(res_nodrop.get('Open')[c]))
+
+                nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
+                print("Number of nan in each column: "+str(nb_nan))
+        else:
+            first_round=False
         
         #test if the symbols were downloaded
         while not ok and len(symbols)>=0:
-            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            if not first_round:
+                res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
             ok=True
             o=res.get('Open')
             for s in symbols:
