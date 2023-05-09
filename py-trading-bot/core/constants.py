@@ -121,9 +121,10 @@ DAX=[
     "BEI.DE", 
     "BMW.DE",
     "BNR.DE",
+    "CBK.DE",
     "CON.DE",
     "DB1.DE",
-    "DBK.DE",
+    "DBK.DE", #DB
     "DHER.DE",
     "DPW.DE",
     "DTE.DE", 
@@ -166,6 +167,7 @@ DAX_INTRO={
     "ZAL.DE":"2014-10-01",
     "PAH3.DE":"2009-02-01",
     "BNR.DE":"2010-05-01",
+    "VNA.DE":"2013-08-01"
     }
   
 NASDAQ=[
@@ -198,6 +200,7 @@ NASDAQ=[
     "CSX",
     "CTAS",
     "CTSH",
+    "DB",
     "DDOG", 
     "DLTR",
     "DOCU",
@@ -460,7 +463,7 @@ NYSE=["MMM",
       "FRT",
       "FDX",
       "FITB",
-      "FRC",
+      #"FRC",
       "FE",
       "FIS",
       "FLT",
@@ -806,7 +809,7 @@ ENERGY=["APA","BKR","CVX","COP","CTRA","DVN","FANG","EOG","XOM","HAL","HES","KMI
 UTILITIES=["AES","LNT","AEE","AEP","AWK","ATO","CNP","CMS","ED","CEG","D","DTE","DUK","EIX","ETR","EVRG",
            "ES","EXC","FE","NEE","NI","NRG","PNW","PPL","PEG","SRE","SO","WEC","XEL"]
 FIN=["AFL","ALL","AXP","AIG","AMP","AON","AJG","AIZ","BAC","WRB","BRK-B","BLK","BK","BRO","COF","CBOE",
-    "SCHW","CB","CINF","C","CFG","CME","CMA","DFS","RE","FDS","FITB","FRC","BEN","GL","GS","HIG","HBAN",
+    "SCHW","CB","CINF","C","CFG","CME","CMA","DFS","RE","FDS","FITB","BEN","GL","GS","HIG","HBAN",
     "ICE","IVZ","JPM","KEY","LNC","L","MTB","MKTX","MMC","MET","MCO","MS","MSCI","NDAQ","NTRS","PNC",
     "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SIVB","SYF","TROW","TRV","TFC","USB","WFC","WTW",
     "ZION"]

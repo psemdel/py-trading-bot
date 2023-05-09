@@ -37,22 +37,14 @@ def save_data(symbols, index, action_symbols, start_date, end_date):
                                  timeframe='1d',missing_index="drop")    
     
     #splitting index from the other actions
-    data_index=data.select(index)
-    data_index.to_hdf(file_path="index.h5")
+    data_ind=data.select(index)
+    data_ind.to_hdf(file_path="index.h5")
     
     data_others=data.select(action_symbols)
     data_others.to_hdf(file_path="actions.h5")
 
 ### Read local data
-def retrieve(index, period):
-    data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+index+'_' + period+'.h5'))
-    
-    close=data.get("Close")
-    open_=data.get("Open")
-    high=data.get("High")
-    low=data.get("Low")
-    volume=data.get("Volume")
-      
+def retrieve(o, index, period):
     if index=="CAC40":
         ind_sym="FCHI"
     elif index=="DAX":
@@ -63,22 +55,19 @@ def retrieve(index, period):
         ind_sym="Brent"
     else:
         ind_sym="DJI"
-
-    data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+ind_sym+'_' + period+'.h5'))
-    close_ind=data.get("Close")
-    open_ind=data.get("Open")
-    high_ind=data.get("High")
-    low_ind=data.get("Low")
-    volume_ind=data.get("Volume")
-    
-    return high, low, close, open_, volume, high_ind, low_ind, close_ind, open_ind, volume_ind
+        
+    o.data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+index+'_' + period+'.h5'))
+    o.data_ind=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+ind_sym+'_' + period+'.h5'))
+    for l in ["Close","Open","High","Low","Volume"]:
+        setattr(o,l.lower(),o.data.get(l))
+        setattr(o,l.lower()+"_ind",o.data_ind.get(l))
 
 if __name__ == '__main__':
     import constants
     
-    selector="Brent"
+    selector="DAX"
     start_date='2007-01-01'
-    end_date='2023-03-01'
+    end_date='2023-01-01'
     
     if selector=="CAC40":
         all_symbols=constants.CAC40

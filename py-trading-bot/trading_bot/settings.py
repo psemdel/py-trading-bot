@@ -12,9 +12,9 @@ _settings={
 
 "ETF_IB_auth":False,   
 
-"17h_stock_exchanges":["Paris","XETRA"], #exchange to scan at 17h
-"22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h
-"NYSE_SECTOR_TO_SCAN":["it"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\
+"17h_stock_exchanges":["Paris","XETRA","EUREX"], #exchange to scan at 17h  
+"22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h   
+"NYSE_SECTOR_TO_SCAN":["it", "fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\ 
           #"fin","materials","healthcare"
           
           
@@ -25,6 +25,7 @@ _settings={
 "REPORT_22h":True, #for Nasdaq and Nyse
 "HEARTBEAT":False, # to test telegram
 "HEARTBEAT_IB":False, # to test telegram
+"UPDATE_SLOW_STRAT":True, 
 
 "ALERT_THRESHOLD":3, #in %
 "ALARM_THRESHOLD":5, #in %
@@ -34,13 +35,13 @@ _settings={
 
 ## Order settings ##
 "USE_IB_FOR_DATA":{
-    "alerting":os.environ.get("USE_IB_FOR_DATA_ALERTING",True), #use IB for Data or YF, for alerting
-    "reporting":os.environ.get("USE_IB_FOR_DATA_REPORTING",False), #use IB for Data or YF, for the generation of the reports
+    "alerting":os.environ.get("USE_IB_FOR_DATA_ALERTING",True), #use IB for Data if true (otherwise YF), for alerting
+    "reporting":os.environ.get("USE_IB_FOR_DATA_REPORTING",False), #use IB for Data if true (otherwise YF), for the generation of the reports
     },
     
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
-"PERFORM_ORDER":False, #test or use IB to perform orders
+"PERFORM_ORDER":True, #test or use IB to perform orders
 "BYPASS_ORDERCAPITAL_IF_IB":False, #bypass the restriction linked to order capital if using IB. with other words, 
 #if there is enough money on your account, the order will be performed, 
 #without considering how many orders/strategy you want to perform
@@ -49,13 +50,13 @@ _settings={
 "DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
 "RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
 
-"STRATEGY_NORMAL_STOCKS":"stratIndexB",
-"STRATEGY_NORMAL_INDEX":"stratG",
+"STRATEGY_NORMAL_STOCKS":"stratG",
+"STRATEGY_NORMAL_INDEX":"stratIndexB",
 "STRATEGY_SL_STOCKS":"stratSL",
 "STRATEGY_SL_INDEX":"stratIndexSL",
 "STRATEGY_TSL_STOCKS":"stratTSL",
 "STRATEGY_TSL_INDEX":"stratIndexTSL",
-"STRATEGY_RETARD_KEEP":"stratTSL",
+"STRATEGY_RETARD_KEEP":"stratG",
 
 # Frequency is the number of days between successive candidates actualisation
 "DAILY_REPORT_PERIOD":3, #in year

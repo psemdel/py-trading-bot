@@ -3,8 +3,7 @@ from django.http import HttpResponse
 from reporting.telegram import start
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, ListOfActions
-from core import bt, btP
-from orders.models import ActionCategory, StockEx, Action, get_exchange_actions, exchange_to_index_symbol
+from orders.models import Action, exchange_to_index_symbol
 from trading_bot.settings import _settings
 
 from .filter import ReportFilter
@@ -127,48 +126,6 @@ def send_entry_exit_msg_test(symbol,entry,short, auto):
         part3=""
         
     print(part1+part2+symbol + " "+ part3) 
-            
-def actualize_hist_paris(request):
-    use_IB, actions=get_exchange_actions("Paris")
-    presel=btP.Presel(use_IB,actions1=actions,period1="1y",exchange="Paris")
-    presel.actualize_hist_vol_slow("Paris")
-    
-    return HttpResponse("candidates actualised")
-
-def actualize_hist_xetra(request):
-    use_IB, actions=get_exchange_actions("XETRA")
-    presel=btP.Presel(use_IB,actions1=actions,period1="1y",exchange="XETRA")
-    presel.actualize_hist_vol_slow("XETRA")
-    
-    return HttpResponse("candidates actualised")
-
-def actualize_hist_nasdaq(request):
-    use_IB, actions=get_exchange_actions("Nasdaq")
-    presel=btP.Presel(use_IB,actions1=actions,period1="1y",exchange="Nasdaq")
-    presel.actualize_hist_vol_slow("Nasdaq")
-    
-    return HttpResponse("candidates actualised")
-
-def actualize_realmadrid_paris(request):
-    use_IB, actions=get_exchange_actions("Paris")
-    presel=btP.Presel(use_IB,actions1=actions,period1="4y",exchange="Paris")
-    presel.actualize_realmadrid("Paris")
-    
-    return HttpResponse("candidates actualised")
-
-def actualize_realmadrid_xetra(request):
-    use_IB, actions=get_exchange_actions("XETRA")
-    presel=btP.Presel(use_IB,actions1=actions,period1="4y",exchange="XETRA")
-    presel.actualize_realmadrid("XETRA")
-    
-    return HttpResponse("candidates actualised")
-
-def actualize_realmadrid_nasdaq(request):
-    use_IB, actions=get_exchange_actions("Nasdaq")
-    presel=btP.Presel(use_IB,actions1=actions,period1="4y",exchange="Nasdaq")
-    presel.actualize_realmadrid("Nasdaq")
-    
-    return HttpResponse("candidates actualised")
 
 def cleaning(request):
     alerts=Alert.objects.filter(active=True)

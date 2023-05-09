@@ -4,7 +4,7 @@ import math
 
 from trading_bot.settings import _settings
 
-from core import stratP, btP
+from core import stratP, preselP
 from core import indicators as ic
 from core.common import intersection
 import warnings
@@ -28,6 +28,12 @@ class ListOfActions(models.Model):
     short=models.BooleanField(blank=False,default=False)
     auto=models.BooleanField(blank=False,default=False)
     actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
+    text=models.TextField(blank=True)
+    
+    def concat(self,text):
+        print(text)     
+        self.text+=text +"\n"
+        self.save()    
 
 class Report(models.Model):
     date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #) default=timezone.now()
@@ -138,7 +144,7 @@ class Report(models.Model):
 
         for symbol in pf_inv.retrieve(): 
             if symbol not in candidates:
-                ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs)
+                ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs) #not short?
                 self.order_nosubstrat_sub(symbol, short, ex, auto)
 
         #sell
@@ -156,6 +162,7 @@ class Report(models.Model):
                     order=Order.objects.filter(c1 & c2)
                     
                     if len(order)>0:
+                        order[0].pf=pf_keep
                         order[0].daily_sl_threshold=0.005
                         order[0].save()
                 else:
@@ -194,7 +201,7 @@ class Report(models.Model):
                     to_calculate=True
         
         if to_calculate:
-            wq=btP.WQPRD(st.use_IB,st=st,exchange=exchange)
+            wq=preselP.WQPRD(st.use_IB,st=st,exchange=exchange)
             
             for nb in range(102):
                 key="wq"+str(nb)
@@ -211,7 +218,7 @@ class Report(models.Model):
 ### Preselected actions strategy    
     def presel_sub(self,use_IB,l,st, exchange,**kwargs):
         if len(l)!=0:
-            presel=btP.Presel(use_IB,st=st,exchange=exchange)
+            presel=preselP.PreselPRD(use_IB,st=st,exchange=exchange)
             #hist slow does not need code here
             if Strategy.objects.get(name="retard") in l: 
                 self.retard(presel,exchange,st,**kwargs)
@@ -312,6 +319,7 @@ class Report(models.Model):
                     auto=auto
                     )
                 ent_ex_symbols.actions.add(action)
+                ent_ex_symbols.concat("define_ent_ex, Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
         except Exception as e:
             print(e)
             logger.error(e, stack_info=True, exc_info=True)    
@@ -392,14 +400,14 @@ class Report(models.Model):
                     ar.save()  
   
         
-    def display_last_decision(self,symbol,stnormal):
+    def display_last_decision(self,symbol,stnormal, key):
         symbol_complex_ent_normal=stnormal.symbols_simple_to_complex(symbol,"ent")
         symbol_complex_ex_normal=stnormal.symbols_simple_to_complex(symbol,"ex")
         decision=stnormal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
         if decision==1:
-            self.concat(symbol + " present decision for normal strategy : sell")
+            self.concat(symbol + " present decision for "+str(key)+" strategy : sell")
         elif decision==-1:
-            self.concat(symbol + " present decision for normal strategy : buy")
+            self.concat(symbol + " present decision for "+str(key)+" strategy : buy")
         return symbol_complex_ent_normal, symbol_complex_ex_normal
             
     #for a group of predefined actions, determine the signals    
@@ -410,14 +418,14 @@ class Report(models.Model):
             stnormal.call_strat(_settings["STRATEGY_NORMAL_STOCKS"])
         
         normal_strat, _=Strategy.objects.get_or_create(name="normal")
-        normal_strat_act, _=StratCandidates.objects.get_or_create(name="normal",strategy=normal_strat)  #.id
+        normal_strat_act, _=StratCandidates.objects.get_or_create(strategy=normal_strat)  #.id
         normal_strat_symbols=normal_strat_act.retrieve()
         
         for symbol in intersection(symbols,normal_strat_symbols):
             if math.isnan(stnormal.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal, "normal")
                 
                 #list present status
                 self.define_ent_ex(
@@ -437,14 +445,14 @@ class Report(models.Model):
             stnormal.call_strat(_settings["STRATEGY_SL_STOCKS"])
         
         sl_strat, _=Strategy.objects.get_or_create(name="sl")
-        sl_strat_act, _=StratCandidates.objects.get_or_create(name="sl",strategy=sl_strat) 
+        sl_strat_act, _=StratCandidates.objects.get_or_create(strategy=sl_strat) 
         sl_strat_symbols=sl_strat_act.retrieve()
         
         for symbol in intersection(symbols,sl_strat_symbols):
             if math.isnan(stnormal.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"sl")
                 
                 #list present status
                 self.define_ent_ex(
@@ -464,14 +472,14 @@ class Report(models.Model):
             stnormal.call_strat(_settings["STRATEGY_TSL_STOCKS"])
         
         tsl_strat, _=Strategy.objects.get_or_create(name="tsl")
-        tsl_strat_act, _=StratCandidates.objects.get_or_create(name="tsl",strategy=tsl_strat) 
+        tsl_strat_act, _=StratCandidates.objects.get_or_create(strategy=tsl_strat) 
         tsl_strat_symbols=tsl_strat_act.retrieve()
         
         for symbol in intersection(symbols,tsl_strat_symbols):
             if math.isnan(stnormal.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"tsl")
                 
                 #list present status
                 self.define_ent_ex(
@@ -495,7 +503,7 @@ class Report(models.Model):
             for symbol in symbols:
                 if symbol in pf_keep.retrieve():
                     self.concat("symbol presently in keep: "+symbol)
-                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"keep")
 
                     self.define_ent_ex(
                         False, #only exit
@@ -508,7 +516,7 @@ class Report(models.Model):
                         **kwargs)
                 if symbol in pf_short_keep.retrieve(): 
                     self.concat("symbol presently in keep short: "+symbol)
-                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal)
+                    symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,stnormal,"keep")
                     self.define_ent_ex(
                         False, #only exit
                         False,
@@ -613,7 +621,11 @@ class Report(models.Model):
                 self.stock_ex=StockEx.objects.get(name="Paris") #convention
                 strats=[]
   
-            if len(actions)!=0:
+            if len(actions)==0:
+                print("No actions found for exchange: "+exchange)
+                logger.info("No actions found for exchange: "+exchange)
+                return None
+            else:
                 if self.pk is None:
                     self.save()
                     
@@ -624,14 +636,14 @@ class Report(models.Model):
                 #calculats everything used afterwards
                 #also used for "normal strat"
                 stnormal=stratP.StratPRD(use_IB,actions1=actions,period1=str(_settings["DAILY_REPORT_PERIOD"])+"y",**kwargs)
-
+                
                 ##Perform a single strategy on predefined actions
                 self.perform_normal_strat(stnormal.symbols, stnormal, exchange, **kwargs)
                 
                 ##Populate a report with different statistics
                 sk=ic.VBTSTOCHKAMA.run(stnormal.high,stnormal.low,stnormal.close)
                 sma=ic.VBTMA.run(stnormal.close)
-                
+
                 sp=None
                 if _settings["CALCULATE_PATTERN"]:
                     sp=ic.VBTPATTERN.run(stnormal.open,stnormal.high,stnormal.low,stnormal.close,light=True)
@@ -643,12 +655,14 @@ class Report(models.Model):
                                         low=stnormal.low,
                                         close=stnormal.close,
                                         volume=stnormal.volume,
+                                        data=stnormal.data,
                                         open_ind=stnormal.open_ind,
                                         high_ind=stnormal.high_ind,
                                         low_ind=stnormal.low_ind,
                                         close_ind=stnormal.close_ind, 
                                         volume_ind=stnormal.volume_ind,
-                                       **kwargs)
+                                        data_ind=stnormal.data_ind,
+                                        **kwargs)
 
                 if _settings["CALCULATE_TREND"]:
                     st.call_strat("strat_kama_stoch_matrend_macdbb_macro") #for the trend
@@ -674,7 +688,11 @@ class Report(models.Model):
         except ValueError as e:
             logger.error(e, stack_info=True, exc_info=True)
         except Exception as e:
+            import sys
+            _, e_, exc_tb = sys.exc_info()
             print(e)
+            print("line " + str(exc_tb.tb_lineno))
+            logger.error("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
             logger.error(e, stack_info=True, exc_info=True)
             pass 
     

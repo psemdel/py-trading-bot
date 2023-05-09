@@ -123,28 +123,24 @@ class TestIB(TestCase):
         m.Excluded.objects.create(name="all",strategy=self.strategy)
 
     def test_retrieve_YF(self):
-        cours_high, cours_low, cours_close, cours_open, cours_volume,  \
-               cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind, use_IB, symbols=ib.retrieve_data(self.actions,"1y",False) 
+        use_IB, symbols=ib.retrieve_data(self,self.actions,"1y",False) 
                
-        self.assertEqual(np.shape(cours_close)[1],3)
-        self.assertTrue(np.shape(cours_close)[0]>200)
-        self.assertTrue(np.shape(cours_close_ind)[0]>200)
-        self.assertEqual(np.shape(cours_high)[1],3)
-        self.assertTrue(np.shape(cours_high)[0]>200)
+        self.assertEqual(np.shape(self.close)[1],3)
+        self.assertTrue(np.shape(self.close)[0]>200)
+        self.assertTrue(np.shape(self.close_ind)[0]>200)
+        self.assertEqual(np.shape(self.high)[1],3)
+        self.assertTrue(np.shape(self.high)[0]>200)
         
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", \
     reason="This test requires a running instance of IB running in parallel, which is impossible in Travis")
     def test_retrieve_ib(self):
-        cours_high, cours_low, cours_close, cours_open, cours_volume,  \
-               cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind, use_IB, symbols=ib.retrieve_data(self.actions,"1y",True) 
+        use_IB, symbols=ib.retrieve_data(self,self.actions,"1y",True) 
             
-        self.assertEqual(np.shape(cours_close)[1],3)
-        self.assertTrue(np.shape(cours_close)[0]>200)
-        self.assertTrue(np.shape(cours_close_ind)[0]>200)
-        self.assertEqual(np.shape(cours_high)[1],3)
-        self.assertTrue(np.shape(cours_high)[0]>200)
+        self.assertEqual(np.shape(self.close)[1],3)
+        self.assertTrue(np.shape(self.close)[0]>200)
+        self.assertTrue(np.shape(self.close_ind)[0]>200)
+        self.assertEqual(np.shape(self.high)[1],3)
+        self.assertTrue(np.shape(self.high)[0]>200)
      
     def test_get_ratio(self):
         t=ib.get_ratio(self.a)
@@ -154,11 +150,15 @@ class TestIB(TestCase):
         ib.get_last_price(self.a4)       
         
     def test_cash_balance(self):
-        self.assertTrue(ib.cash_balance()>=0)       
+        self.assertTrue(ib.cash_balance()>=0)   
+        self.assertTrue(ib.cash_balance(currency="USD")>=0)   
+
+    def test_check_enough_cash(self):
+        self.assertTrue(ib.check_enough_cash(10000,currency="USD"))        
 
     def test_entry_order_manual(self):
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         
         t=ib.entry_order_sub("AIR.PA","none","Paris",False,False)
 
@@ -172,8 +172,8 @@ class TestIB(TestCase):
         self.assertFalse(t)
         
     def test_exit_order_manual(self):        
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        ocap=m.OrderCapital.objects.create(capital=1,strategy=self.strategy,stock_ex=self.e,sector=self.s)
                 
         ib.entry_order_sub("AIR.PA","none","Paris",False,False)   
         t=ib.exit_order_sub("AIR.PA","none","Paris",False,False)   
@@ -201,7 +201,7 @@ class TestIB(TestCase):
         
     def test_check_hold_duration(self):
         st_retard=m.Strategy.objects.create(name="retard")
-        pf=m.PF.objects.create(name="retard_Paris",short=False,strategy=st_retard,stock_ex=self.e,sector=self.s)
+        pf=m.PF.objects.create(short=False,strategy=st_retard,stock_ex=self.e,sector=self.s)
         pf.append(self.a.symbol)
         d=datetime.now()
         o=m.Order.objects.create(action=self.a, pf=pf, short=False,entering_date=d) 

@@ -55,15 +55,21 @@ def get_exchange_actions(exchange,**kwargs):
     if stock_ex.presel_at_sector_level and kwargs.get("sec"):
         action_sector, _=ActionSector.objects.get_or_create(name=kwargs.get("sec"))
         c4 = Q(sector=action_sector)
-        actions=Action.objects.filter(c1 & c2 & c3 & c4)
+        actions=Action.objects.filter(c1 & c3 & c4) #c2 & no actual reason, but I use mix of Nasdaq and NYSE for sector
     else:
         actions=Action.objects.filter(c1 & c2 & c3)
         
+    if len(actions)==0: #fallback for EUREX for instance
+        cat=ActionCategory.objects.get(short="IND")
+        c1 = Q(category=cat)
+        actions=Action.objects.filter(c1 & c2 & c3)
+
     #actions=filter_intro_action( actions,None)  
     use_IB=False
     if _settings["USE_IB_FOR_DATA"]["reporting"]:
         use_IB=check_ib_permission([a.symbol for a in actions])
    
+    
     return use_IB, actions
 
 ### Conversion between input from YF and IB
@@ -130,6 +136,9 @@ class Currency(models.Model):
     name=models.CharField(max_length=100, blank=False)
     symbol=models.CharField(max_length=100, blank=False,default="A")
     
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name
     
@@ -145,6 +154,9 @@ class Strategy(models.Model):
     name=models.CharField(max_length=100, blank=False)
     perform_order=models.BooleanField(blank=False,default=False)
     
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name
     
@@ -160,6 +172,9 @@ class StockEx(models.Model):
     strategies_in_use=models.ManyToManyField(Strategy,blank=True)   # Presel strategies in use, normal/sl/tsl depends on the selected candidates
     presel_at_sector_level=models.BooleanField(blank=False,default=False)
     main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=None)
+    
+    class Meta:
+        ordering = ["name"]
     
     def __str__(self):
         return self.name 
@@ -262,15 +277,14 @@ def pf_retrieve_all(**kwargs):
 ### Portfolio for a given strategy (used as name presently)
 class PF(models.Model):
     # can be replaced with ib.positions() or ib.portfolio()
-    name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)
     sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
     short=models.BooleanField(blank=False,default=False)
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=0)
     
-    def __str__(self):
-        return self.name
+    class Meta:
+        ordering = ["strategy","stock_ex"]
     
     def get_len(self):
         return len(self.actions.all())
@@ -300,39 +314,42 @@ class PF(models.Model):
             self.save()
         except Exception as e:
             logger.error(e + " symbol: "+symbol, stack_info=True, exc_info=True)
-            pass    
+            pass
+        
+    def __str__(self):
+        t=self.strategy.name + "_" + self.stock_ex.name
+        if self.short:
+            t+="_short"
+        if self.sector.name!="undefined":
+            t+=("_" +self.sector.name)
+        return t
 
-def get_sub(strategy, exchange,short,**kwargs):
+def get_sub(strategy, exchange,short,**kwargs): #check the input
     if type(strategy)!=str or type(exchange)!=str:
         raise ValueError("get sub got non str input, strategy: "+str(strategy)+ " "+str(type(strategy)) + \
                          ", exchange: "+str(exchange) + " " + str(type(exchange)))
-    
-    sector="undefined"
-    name=strategy + "_" + exchange
-    if short:
-        name+="_short"
-  
+
     try:
         stock_ex=StockEx.objects.get(name=exchange) 
     except:
         raise ValueError("Stock exchange: "+str(exchange)+" not found, create it in the admin panel")
-    
+
+    sector="undefined"
     if stock_ex.presel_at_sector_level:
         if kwargs.get("sec"):
-            sector=kwargs.get("sec") 
-            name+="_"+sector
+            sector=kwargs.get("sec")
             
-    return name, sector
+    return sector
 
 def get_pf(strategy, exchange,short,**kwargs):
     try:
-        name, sector=get_sub(strategy, exchange,short,**kwargs)
+        sector=get_sub(strategy, exchange,short,**kwargs)
         res, _ = PF.objects.get_or_create(
                 stock_ex=StockEx.objects.get(name=exchange),
                 strategy=Strategy.objects.get(name=strategy),
                 short=short,
                 sector=ActionSector.objects.get(name=sector),
-                name=name)
+                )
 
         return res
     except Exception as e:
@@ -343,7 +360,7 @@ def get_pf(strategy, exchange,short,**kwargs):
 class ActionCategory(models.Model):
     short=models.CharField(max_length=15, blank=False, default="AAA", primary_key=True)
     name=models.CharField(max_length=100, blank=False)
-
+        
     def __str__(self):
         return self.name 
 
@@ -351,7 +368,10 @@ class ActionCategory(models.Model):
 class ActionSector(models.Model):
     name=models.CharField(max_length=100, blank=False)
     strategies_in_use=models.ManyToManyField(Strategy,blank=True)   
-
+    
+    class Meta:
+        ordering = ["name"]
+        
     def __str__(self):
         return self.name     
     
@@ -360,22 +380,26 @@ class ActionSector(models.Model):
 
 class OrderCapital(models.Model):
     capital=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    name=models.CharField(max_length=100, blank=False,default="")
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
     sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
-    
+
+    class Meta:
+        ordering = ["strategy","stock_ex"]
+        
     def __str__(self):
-        return self.name 
+        t=self.strategy.name + "_" + self.stock_ex.name
+        if self.sector.name!="undefined":
+            t+=("_" +self.sector.name)
+        return t
 
 def get_order_capital(strategy, exchange,**kwargs):
     try:
-        name, sector=get_sub(strategy, exchange,False,**kwargs)
+        sector=get_sub(strategy, exchange,False,**kwargs)
         res, created = OrderCapital.objects.get_or_create(
             stock_ex=StockEx.objects.get(name=exchange),
             strategy=Strategy.objects.get(name=strategy),
             sector=ActionSector.objects.get(name=sector),
-            name=name
             )
         
         if created or res.capital is None:
@@ -389,7 +413,6 @@ def get_order_capital(strategy, exchange,**kwargs):
 ###And on daily basis the other strategy decides which of the candidate is really bought or sold
 
 class Candidates(models.Model):
-    name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)    
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=1)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
@@ -411,13 +434,12 @@ class Candidates(models.Model):
         return arr
     
     def __str__(self):
-        return self.name     
+        return self.strategy.name + "_" + self.stock_ex.name
 
 def get_candidates(strategy, exchange):
     res, _ = Candidates.objects.get_or_create(
         stock_ex=StockEx.objects.get(name=exchange),
         strategy=Strategy.objects.get(name=strategy),
-        name=strategy + "_" + exchange
         )
     return res
     
@@ -458,7 +480,6 @@ class Excluded(models.Model):
  
 ### Define a list of actions and indexes that can be traded using the defined strategy
 class StratCandidates(models.Model):
-    name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)    
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
     
@@ -469,4 +490,15 @@ class StratCandidates(models.Model):
         return arr  
     
     def __str__(self):
-        return self.name     
+        return self.strategy.name   
+    
+class Job(models.Model):
+    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
+    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
+    
+    last_execution=models.DateTimeField(null=False, blank=False, auto_now_add=True)
+    frequency_days=models.IntegerField(null=False, blank=False, default=14)
+    period_year=models.IntegerField(null=False, blank=False, default=1)
+    
+    def __str__(self):
+        return self.strategy.name + "_" + self.stock_ex.name

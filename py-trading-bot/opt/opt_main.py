@@ -8,8 +8,10 @@ import numpy as np
 import gc
 import copy
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
+from core.common import remove_multi
 import itertools
 import pandas as pd
+
 
 #Script to optimize the combination of patterns/signals used for a given strategy
 
@@ -41,6 +43,7 @@ def log(text):
 class OptMain(VBTfunc):
     def __init__(self,period,**kwargs):
         
+        self.data_dic={}
         self.close_dic={}
         self.open_dic={}
         self.low_dic={}
@@ -56,11 +59,13 @@ class OptMain(VBTfunc):
                 self.open_dic[ind]=self.open_ind
                 self.low_dic[ind]=self.low_ind
                 self.high_dic[ind]=self.high_ind
+                self.data_dic[ind]=self.data_ind
             else:
                 self.close_dic[ind]=self.close
                 self.open_dic[ind]=self.open
                 self.low_dic[ind]=self.low
-                self.high_dic[ind]=self.high        
+                self.high_dic[ind]=self.high    
+                self.data_dic[ind]=self.data
         
         self.out={}
         
@@ -87,6 +92,7 @@ class OptMain(VBTfunc):
         
         self.fees=kwargs.get("fees",0.0005)
         self.sl=kwargs.get("sl")
+        self.tsl=kwargs.get("tsl")
         
         self.best_arrs=np.zeros((self.loops*40,self.nb_macro_modes,self.len_ent+self.len_ex))
         self.best_arrs_ret=np.zeros(self.loops*40)
@@ -211,16 +217,6 @@ class OptMain(VBTfunc):
         self.exs_short={}
         self.defi("ex")
         
-    def remove_multi(self,t2):
-        if type(t2)==pd.core.frame.DataFrame:
-            multi=t2.columns #does not work for indexes...
-            l=len(multi[0])
-
-            for ii in range(l-2,-1,-1):
-                multi=multi.droplevel(ii)
-            t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
-        return t2
-    
     def defi(self,ent_or_ex):
         try:
             for ind in self.indexes: #CAC, DAX, NASDAQ
@@ -241,7 +237,7 @@ class OptMain(VBTfunc):
                             t=self.all_t_exs[ind][ii]
                         
                         t2=ic.VBTSUM.run(t,arr=arr[ii]).out #equivalent to if arr[ii]: then consider self.all_t_ents[ind][ii]
-                        t2=self.remove_multi(t2)
+                        t2=remove_multi(t2)
                         
                         if self.shift:
                             t_shift=ic.VBTSUM.run(t2.shift(periods=1, fill_value=0),self.shift_arr[0]).out

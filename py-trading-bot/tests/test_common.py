@@ -7,7 +7,7 @@ Created on Thu Jun 23 17:03:49 2022
 """
 
 import unittest
-from core import common
+from core import common, presel
 import numpy as np
 
 class TestCommon(unittest.TestCase):
@@ -30,7 +30,29 @@ class TestCommon(unittest.TestCase):
         self.assertEqual(np.shape(v.open)[1],26)
         self.assertEqual(np.shape(v.close)[1],26)   
         self.assertEqual(np.shape(v.volume)[1],26)
+        self.assertEqual(len(np.shape(v.close_ind)),1)      
 
-
+    def test_copy_attr(self):
+        p=presel.Presel("CAC40","2007_2009")
+        
+        self.assertEqual(np.shape(p.high)[0],511)
+        self.assertEqual(np.shape(p.low)[0],511)
+        self.assertEqual(np.shape(p.open)[0],511)
+        self.assertEqual(np.shape(p.close)[0],511)  
+        
+        self.assertEqual(np.shape(p.volume)[0],511)
+        self.assertEqual(np.shape(p.high_ind)[0],511)
+        self.assertEqual(np.shape(p.low_ind)[0],511)
+        self.assertEqual(np.shape(p.open_ind)[0],511)
+        self.assertEqual(np.shape(p.close_ind)[0],511)        
+        self.assertEqual(np.shape(p.volume_ind)[0],511)  
+          
+        self.assertEqual(np.shape(p.high)[1],26)
+        self.assertEqual(np.shape(p.low)[1],26)
+        self.assertEqual(np.shape(p.open)[1],26)
+        self.assertEqual(np.shape(p.close)[1],26)   
+        self.assertEqual(np.shape(p.volume)[1],26)        
+        self.assertEqual(len(np.shape(p.close_ind)),1)    
+        
 if __name__ == '__main__':
     unittest.main()

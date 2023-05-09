@@ -9,6 +9,7 @@ import math
 import numpy as np
 from datetime import datetime
 from core.constants import INTRO
+import pandas as pd
 
 from core.data_manager import retrieve
 
@@ -16,17 +17,19 @@ class VBTfunc():
     def __init__(self,symbol_index,period):
         self.period=period
         self.symbol_index=symbol_index
-                    
-        self.high, self.low, self.close, self.open,self.volume,\
-        self.high_ind, self.low_ind, self.close_ind, self.open_ind,\
-        self.volume_ind=retrieve(symbol_index,period)
+        retrieve(self,symbol_index,period)
     
     def rel_dif(self,n,d): #for instance to calculate distance between MA and signal
         if d==0 or math.isnan(n) or math.isnan(d):
             return 0
         else:
             return round(n/d-1,4) 
-    
+
+def copy_attr(o1,o2):
+    for suffix in ["","_ind"]:
+        for l in ["high","low","close","open","volume","data"]:
+            setattr(o1,l+suffix, getattr(o2,l+suffix))
+
 def filter_intro_symbol_sub(s,y_period):
     td=datetime.today()
     min_y=td.year-y_period
@@ -95,3 +98,14 @@ def empty_append(x, v, axis, **kwargs):
 def intersection(lst1, lst2):
     lst3 = [value for value in lst1 if value in lst2]
     return lst3   
+
+def remove_multi(t2):
+    if type(t2)==pd.core.frame.DataFrame:
+        multi=t2.columns 
+        if type(multi)==pd.core.indexes.multi.MultiIndex:
+            l=len(multi[0])
+    
+            for ii in range(l-2,-1,-1):
+                multi=multi.droplevel(ii)
+            t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
+    return t2

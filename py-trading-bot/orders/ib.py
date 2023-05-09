@@ -222,11 +222,24 @@ def retrieve_ib_pf(**kwargs):
     else:
         return None, None
 
+@connect_ib   
+def check_enough_cash(order_size,**kwargs):
+    if cash_balance(**kwargs)>=order_size:
+        return True
+    else:
+        kwargs["currency"]="EUR" #fallback, if there is enough EUR, IB will convert
+        if cash_balance(**kwargs)>=order_size:
+            return True
+        else:
+            return False
+        
 @connect_ib        
 def cash_balance(**kwargs):
+    currency=kwargs.get('currency',"EUR")
+
     if kwargs['client'] and ib_global["connected"]:
-        for v in kwargs['client'].accountSummary():
-            if v.tag == 'CashBalance':
+        for v in kwargs['client'].accountValues():
+            if v.tag == 'CashBalance' and v.currency==currency:
                 return float(v.value)
     else:
         return 0
@@ -278,23 +291,13 @@ def get_ratio(action,**kwargs):
                 if len(bars)!=0:
                     df=util.df(bars)
                     cours_ref=df.iloc[0]["close"] #closing price of the day before
-                    cours_open=df.iloc[-1]["open"]
-
-                if kwargs.get("opening",False):
-                    cours_pres=cours_open
-                else:
                     cours_pres=IBData.get_last_price(contract)
    
         else: #YF
             cours=vbt.YFData.fetch([action.symbol], period="2d")
             cours_close=cours.get("Close")
             cours_ref=cours_close[action.symbol].iloc[0]
-                    
-            if kwargs.get("opening",False):
-                cours_open=cours.get("Open")
-                cours_pres=cours_open[action.symbol].iloc[-1]
-            else:
-                cours_pres=cours_close[action.symbol].iloc[-1]
+            cours_pres=cours_close[action.symbol].iloc[-1]
                 
         if cours_pres!=0 and cours_ref!=0:
             return rel_dif(cours_pres,cours_ref)*100
@@ -373,10 +376,9 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         
         if use_IB:
             order_size=_settings["ORDER_SIZE"]
-            balance=cash_balance()
+            enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
         else:
-            order_size=1
-            balance=10 #to get true
+            enough_cash=True
         
         if len(orders)==0: #necessary for the first trade of a stock for instance, or if it was closed on a stop loss
             order=Order(action=action, pf=pf, short=short) #use full if you did the entry order manually...
@@ -397,12 +399,12 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         
         if (symbol in pf.retrieve() ):
             logger.info(str(symbol) + " already in portfolio")
-        if order_size>balance and not short:
+        if not enough_cash and not short:
             logger.info(str(symbol) + " order not executed, not enough cash available")
         
         if (symbol not in pf.retrieve() and 
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
-            order_size<=balance or short):
+            enough_cash or short):
             
             #pf should be enough, but it is a double security
             if (short and sign<0) or (not short and sign>0):
@@ -426,7 +428,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
                                             short,
                                             quantity=order.quantity*2) #*2 to revert the order
                 logger_trade.info("entering_price: "+ str(new_order.entering_price))
-                new_order.quantity=retrieve_quantity(action)
+                new_order.quantity, _=retrieve_quantity(action)
                 new_order.short=short
                 
                 logger_trade.info("sl" + str(kwargs.get("sl",False)))
@@ -437,15 +439,17 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
                         new_order.sl_threshold=order.entering_price*(1+sl)
                     else:
                         new_order.sl_threshold=order.entering_price*(1-sl)
-                if kwargs.get("daily_sl",False):
-                    new_order.daily_sl_threshold=kwargs.get("daily_sl")
-                    
+                
                 if new_order.entering_price is not None and order.entering_price is not None: 
                     order.profit=new_order.entering_price-order.entering_price
                     if order.entering_price != 0:
                         order.profit_percent=(new_order.entering_price/order.entering_price-1)*100
             else:
-                new_order.entering_price=1.0              
+                new_order.entering_price=1.0 
+                logger_trade.info("Manual reverse order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
+                
+            if kwargs.get("daily_sl",False):
+                new_order.daily_sl_threshold=kwargs.get("daily_sl")
             
             order.exiting_date=timezone.now()
             order.active=False
@@ -453,8 +457,6 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             new_order.save()
             pf.append(action.symbol)
             pf_inv.remove(action.symbol)
-            pf.save()
-            pf_inv.save()
             return True
         return False
     
@@ -497,6 +499,8 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                     order.profit=order.exiting_price-order.entering_price
                     if order.entering_price != 0:
                         order.profit_percent=(order.exiting_price/order.entering_price-1)*100
+            else:
+                logger_trade.info("Manual exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 
             order.exiting_date=timezone.now()
             order.active=False
@@ -505,7 +509,6 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             ocap.capital+=1
             ocap.save()
             pf.remove(symbol)
-            pf.save()
             return True
         else:
             logger.info(str(symbol) + " not found in portfolio for exit order")
@@ -520,18 +523,14 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         #type check necessary for indexes
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
+        action=Action.objects.get(symbol=symbol)
         
         if use_IB:
             order_size=_settings["ORDER_SIZE"]
-            balance=cash_balance()
+            enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
         else:
-            order_size=1
-            balance=10 #to get true
-        
-        if balance<order_size and balance>0.9*order_size: #tolerance on order side
-            order_size=balance
-        
-        action=Action.objects.get(symbol=symbol)
+            enough_cash=True
+
         strategy_none, _ = Strategy.objects.get_or_create(name="none")
         excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
         if (symbol in pf.retrieve() ):
@@ -540,13 +539,13 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             logger.info(str(symbol) + " excluded")    
         #if (ocap.capital==0):
             #print(symbol + " order not executed, no order capital available: " + ocap.name)
-        if order_size>balance and not short:
+        if not enough_cash and not short:
             logger.info(str(symbol) + " order not executed, not enough cash available")
         
         if (symbol not in pf.retrieve() and 
             symbol not in excluded.retrieve() and  
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
-            order_size<=balance or short):
+            enough_cash or short):
 
             order=Order(action=action, pf=pf, short=short)
 
@@ -565,15 +564,15 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
                         order.sl_threshold=order.entering_price*(1+sl)
                     else:
                         order.sl_threshold=order.entering_price*(1-sl)
-                if kwargs.get("daily_sl",False):
-                    order.daily_sl_threshold=kwargs.get("daily_sl")
-                
             else:
-                order.entering_price=1.0                    
-            
+                order.entering_price=1.0   
+                logger_trade.info("Manual entry order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
+                 
+            if kwargs.get("daily_sl",False):
+                order.daily_sl_threshold=kwargs.get("daily_sl")
+                
             order.save()
             pf.append(action.symbol)
-            pf.save()
             ocap.capital-=1
             ocap.save()
             return True
@@ -723,10 +722,33 @@ def retrieve_data_YF(actions,period,**kwargs):
             
         #res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
         ok=False
+        first_round=True
+        #look for anomaly
+        if len(all_symbols)>2:
+            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            avg=np.average(
+                [len(vbt.YFData.fetch(all_symbols[0], period=period,**kwargs).get('Open')),
+                len(vbt.YFData.fetch(all_symbols[1], period=period,**kwargs).get('Open')),
+                len(vbt.YFData.fetch(all_symbols[-1], period=period,**kwargs).get('Open'))]
+                )
+            
+            if len(res.get('Open'))<avg-10:
+                print("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
+                
+                res_nodrop=vbt.YFData.fetch(all_symbols, period=period,**kwargs)
+                nb_nan={}
+                for c in res.get('Open').columns:
+                    nb_nan[c]=np.count_nonzero(np.isnan(res_nodrop.get('Open')[c]))
+
+                nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
+                print("Number of nan in each column: "+str(nb_nan))
+        else:
+            first_round=False
         
         #test if the symbols were downloaded
         while not ok and len(symbols)>=0:
-            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            if not first_round:
+                res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
             ok=True
             o=res.get('Open')
             for s in symbols:
@@ -742,9 +764,10 @@ def retrieve_data_YF(actions,period,**kwargs):
                symbols,\
                index_symbol    
     except Exception as e:
+         print(e)
          logger.error(e, stack_info=True, exc_info=True)
         
-def retrieve_data(actions,period,use_IB,**kwargs):
+def retrieve_data(o,actions,period,use_IB,**kwargs):
     if actions is None or len(actions)==0:
         raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:
@@ -757,27 +780,18 @@ def retrieve_data(actions,period,use_IB,**kwargs):
         if not use_IB:
             cours, symbols, index_symbol=retrieve_data_YF(actions,period,**kwargs)
 
-        cours_action=cours.select(symbols)
-        cours_open =cours_action.get('Open')
-        cours_high=cours_action.get('High')
-        cours_low=cours_action.get('Low')
-        cours_close=cours_action.get('Close')
-        cours_volume=cours_action.get('Volume')
-        logger.info("number of days retrieved: " + str(np.shape(cours_close)[0]))
+        o.data=cours.select(symbols)
+        o.data_ind=cours.select(index_symbol)
         
-        cours_index=cours.select(index_symbol)
-        cours_open_ind =cours_index.get('Open')
-        cours_high_ind=cours_index.get('High')
-        cours_low_ind=cours_index.get('Low')
-        cours_close_ind=cours_index.get('Close')
-        cours_volume_ind=cours_index.get('Volume')
-        
-        if len(cours_open_ind)==0 or len(cours_open)==0:
+        for l in ["Close","Open","High","Low","Volume"]:
+            setattr(o,l.lower(),o.data.get(l))
+            setattr(o,l.lower()+"_ind",o.data_ind.get(l))
+            
+        logger.info("number of days retrieved: " + str(np.shape(o.close)[0]))
+        if len(o.open_ind)==0 or len(o.open_ind)==0:
             raise ValueError("Retrieve data failed and returned empty Dataframe, check the symbols")
-        
-        return cours_high, cours_low, cours_close, cours_open, cours_volume,  \
-               cours_high_ind, cours_low_ind,  cours_close_ind, cours_open_ind,\
-               cours_volume_ind, use_IB, symbols
+
+        return use_IB, symbols
                
                
                

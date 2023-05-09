@@ -3,11 +3,10 @@
 <table>
     <tr>
         <td><a href="{% url 'reporting:start_bot' %}">Start bot</a></td>
-        <td><a href="{% url 'orders:portfolio' %}">Portfolio</a></td>
     </tr>
     <tr>
+        <td><a href="{% url 'orders:portfolio' %}">Portfolio</a></td>
         <td><a href="{% url 'reporting:alerts' %}">Alerts</a></td>
-        <td><a href="{% url 'reporting:reports' %}">Main page</a></td>
     </tr>
     <tr>
         <td><a href="{% url 'reporting:17h' %}">Write report 17h (Paris, Xetra)</a></td>
@@ -16,18 +15,6 @@
     <tr>
         <td><a href="{% url 'reporting:cleaning' %}">Cleaning alerts</a></td>
         <td><a href="{% url 'admin:index' %}">Admin panel</a></td>
-    </tr>
-    <tr>
-        <td><a href="{% url 'reporting:actualize_hist_paris' %}">Actualize hist Paris candidates (twice a month)</a></td>
-        <td><a href="{% url 'reporting:actualize_hist_xetra' %}">Actualize hist XETRA candidates (twice a month)</a></td>
-    </tr>
-    <tr>
-        <td><a href="{% url 'reporting:actualize_hist_nasdaq' %}">Actualize hist Nasdaq candidates (twice a month)</a></p>
-        <td><a href="{% url 'reporting:actualize_realmadrid_paris' %}">Actualize real madrid Paris candidates (every month)</a></td>
-    </tr>
-    <tr>
-        <td><a href="{% url 'reporting:actualize_realmadrid_xetra' %}">Actualize real madrid XETRA candidates (every month)</a></td>
-        <td><a href="{% url 'reporting:actualize_realmadrid_nasdaq' %}">Actualize real madrid Nasdaq candidates (every month)</a></td>
     </tr>
 </table>
 <br/>
