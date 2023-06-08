@@ -263,13 +263,19 @@ class MyScheduler():
                 c=None
                 for exchange in _settings["17h_stock_exchanges"]:
                     c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
-                    c=c|c1
+                    if c is None:
+                        c=c1
+                    else:
+                        c=c|c1
                 indexes = Action.objects.filter(c&c3)
             elif kwargs.get("opening")=="15h":
                 c=None
                 for exchange in _settings["22h_stock_exchanges"]:
                     c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
-                    c=c|c1
+                    if c is None:
+                        c=c1
+                    else:
+                        c=c|c1
                 indexes = Action.objects.filter(c&c3)
             else:
                 indexes = Action.objects.filter(c3)

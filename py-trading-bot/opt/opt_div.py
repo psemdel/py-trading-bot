@@ -1,4 +1,4 @@
-from core import bt
+from core import presel
 
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
@@ -34,7 +34,7 @@ class Opt(OptMain):
         self.bti={}
         
         for ind in self.indexes:
-            self.bti[ind]=bt.BT(ind,period,"test","long")
+            self.bti[ind]=presel.Presel(ind,period)
 
     def calculate_eq_ret(self,pf):
         m_rb=pf.total_market_return
@@ -47,12 +47,12 @@ class Opt(OptMain):
 
         return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed
 
-    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret):
+    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret,key):
         if not self.check_tested_arrs():
             return best_arrs_cand, best_ret_cand
 
         #create the underlying strategy
-        self.defi_ex()
+        self.defi_ex(key)
             
         ret=0
         ret_arr=[]

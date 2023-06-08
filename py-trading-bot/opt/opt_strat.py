@@ -45,7 +45,6 @@ class Opt(OptMain):
         
         m_rb=np.mean(rb)
         m_rr=np.mean(rr)
-        
 
         if abs(m_rb)<0.1: #avoid division by zero
             p=(m_rr)/ 0.1*np.sign(m_rb)   
@@ -53,18 +52,20 @@ class Opt(OptMain):
             p=(m_rr- m_rb )/ abs(m_rb)
 
         return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed
-  
-    def manual_calculate_pf(self,ind,*args): #the order is bull/bear/uncertain
+
+    def manual_calculate_pf(self,ind,key,*args): #the order is bull/bear/uncertain
         self.calc_arrs=[]
         for arr in args:
             self.calc_arrs.append(arr)
         
-        self.defi_ent()
-        self.defi_ex()
-        self.macro_mode()
-        pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
-                                      short_entries=self.ents_short[ind],
-                                      short_exits=self.exs_short[ind],
+        self.defi_ent(key)
+        self.defi_ex(key)
+        self.macro_mode(key)
+        pf=vbt.Portfolio.from_signals(self.data_dic[ind]["learn"], 
+                                      self.ents[ind]["learn"],
+                                      self.exs[ind]["learn"],
+                                      short_entries=self.ents_short[ind]["learn"],
+                                      short_exits=self.exs_short[ind]["learn"],
                                       tsl_stop=self.tsl,
                                       sl_stop=self.sl,
                                       freq="1d",fees=self.fees)
@@ -72,49 +73,56 @@ class Opt(OptMain):
         print("equivalent return " + str(self.calculate_eq_ret(pf)))
         return pf #for display for instance
 
-    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret):
-        if not self.check_tested_arrs():
-            return best_arrs_cand, best_ret_cand
-        self.defi_ent()
-        self.defi_ex()
-        self.macro_mode()
-        
-        if self.index:
-            ret_arr=[]
-        else:
-            ret=0
-
-        for ind in self.indexes: #CAC, DAX, NASDAQ
-            pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
-                                          short_entries=self.ents_short[ind],
-                                          short_exits=self.exs_short[ind],
-                                          freq="1d",fees=self.fees,
-                                          tsl_stop=self.tsl,
-                                          sl_stop=self.sl,
-                                          ) #stop_exit_price="close"
+    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret,**kwargs):
+        try:
+            
+            key= kwargs.get("dic","learn")
+            if (not self.check_tested_arrs()) and not "test" in key:
+                return best_arrs_cand, best_ret_cand
+            
+            self.defi_ent(key)
+            self.defi_ex(key)
+            self.macro_mode(key)
             
             if self.index:
-                ret_arr.append(self.calculate_eq_ret(pf))
+                ret_arr=[]
             else:
-                ret+=self.calculate_eq_ret(pf)
+                ret=0
 
-        if self.index:
-            while np.std(ret_arr)>10:
-                 ii=np.argmax(ret_arr)
-                 ret_arr=np.delete(ret_arr,ii,0)
-         
-            ret=np.mean(ret_arr)
-
-        trades =len(pf.get_trades().records_arr)
-        del pf
-         
-        if ret> best_arrs_ret and ret>best_ret_cand and trades>50:
-            return self.calc_arrs, ret
-        
-        return best_arrs_cand, best_ret_cand
-
-
-        
+            for ind in self.indexes: #CAC, DAX, NASDAQ
+                pf=vbt.Portfolio.from_signals(self.close_dic[ind][key],  #use data for tsl or sl!!!!
+                                              self.ents[ind],
+                                              self.exs[ind],
+                                              short_entries=self.ents_short[ind],
+                                              short_exits=self.exs_short[ind],
+                                              freq="1d",fees=self.fees,
+                                              tsl_stop=self.tsl,
+                                              sl_stop=self.sl,
+                                              ) #stop_exit_price="close"
+                if self.index:
+                    ret_arr.append(self.calculate_eq_ret(pf))
+                else:
+                    ret+=self.calculate_eq_ret(pf)
     
+            if self.index:
+                while np.std(ret_arr)>10:
+                     ii=np.argmax(ret_arr)
+                     ret_arr=np.delete(ret_arr,ii,0)
+             
+                ret=np.mean(ret_arr)
+    
+            trades =len(pf.get_trades().records_arr)
+            del pf
+             
+            if (ret> best_arrs_ret and ret>best_ret_cand and trades>50) or "test" in key:
+                return self.calc_arrs, ret
+            
+            return best_arrs_cand, best_ret_cand
+        except Exception as msg:
+            import sys
+            _, _, exc_tb = sys.exc_info()
+            print("line " + str(exc_tb.tb_lineno))
+            print(msg)
+            
 
      

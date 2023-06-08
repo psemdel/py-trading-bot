@@ -155,6 +155,7 @@ class Report(models.Model):
                     action=Action.objects.get(symbol=symbol)
                     pf_keep.append(action) #move the symbol from retard to keep pf
                     pf.remove(action)
+                    logger_trade.info(symbol + " moved from retard to retard_keep portfolio")
                     
                     #tsl part
                     c1 = Q(action=action)
@@ -163,7 +164,6 @@ class Report(models.Model):
                     
                     if len(order)>0:
                         order[0].pf=pf_keep
-                        order[0].daily_sl_threshold=0.005
                         order[0].save()
                 else:
                     ex, auto=exit_order(symbol,key, exchange,short,auto, **kwargs)

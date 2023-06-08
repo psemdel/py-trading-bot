@@ -836,3 +836,9 @@ RAW=["BZ=F", #brent
      "CL=F",  #crude
      "GC=F", #gold
      ]
+
+mode_to_int={
+    "bull":0,
+    "bear":1,
+    "uncertain":2
+    }

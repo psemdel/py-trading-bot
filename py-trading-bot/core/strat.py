@@ -55,65 +55,65 @@ def filter_macro(all_t_ent, macro_trend):
         
 def defi_i_fast( open_,high, low, close,calc_arrs,**kwargs):
     try:
-        core_length=7
+        non_pattern_len=7
         
         all_t_ent=[np.full(np.shape(close),0.0) for ii in range(len(calc_arrs))]
         all_t_ex=[np.full(np.shape(close),0.0) for ii in range(len(calc_arrs))]
         
         #determine if it is needed to calculate
-        u_core=[False for ii in range(7)]
+        u_core=[False for ii in range(non_pattern_len)]
         u_bull=[False for ii in range(len(BULL_PATTERNS))]
         u_bear=[False for ii in range(len(BEAR_PATTERNS))]
         
         for ii in range(len(calc_arrs)): #3
-            for jj in range(7):
-                if calc_arrs[ii][jj] or calc_arrs[ii][jj+core_length+len(BULL_PATTERNS)]: #needed for entry or exit
+            for jj in range(non_pattern_len):
+                if calc_arrs[ii][jj] or calc_arrs[ii][jj+non_pattern_len+len(BULL_PATTERNS)]: #needed for entry or exit
                      u_core[jj]=True
             for jj in range(len(BULL_PATTERNS)):
-                if calc_arrs[ii][core_length+jj]:
+                if calc_arrs[ii][non_pattern_len+jj]:
                     u_bull[jj]=True
             for jj in range(len(BEAR_PATTERNS)):
-                if calc_arrs[ii][2*core_length+len(BULL_PATTERNS)+jj]:
+                if calc_arrs[ii][2*non_pattern_len+len(BULL_PATTERNS)+jj]:
                     u_bear[jj]=True                    
 
         if u_core[0]:
             t=ic.VBTMA.run(close)
             all_t_ent=defi_i_fast_sub(all_t_ent,t.entries, calc_arrs, 0)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits, calc_arrs, 0+core_length+len(BULL_PATTERNS))
+            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits, calc_arrs, 0+non_pattern_len+len(BULL_PATTERNS))
          
         if u_core[1] or u_core[2]:
             t=ic.VBTSTOCHKAMA.run(high,low,close)
             all_t_ent=defi_i_fast_sub(all_t_ent,t.entries_stoch, calc_arrs, 1)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits_stoch, calc_arrs, 1+core_length+len(BULL_PATTERNS))
+            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits_stoch, calc_arrs, 1+non_pattern_len+len(BULL_PATTERNS))
             all_t_ent=defi_i_fast_sub(all_t_ent,t.entries_kama, calc_arrs, 2)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits_kama, calc_arrs, 2+core_length+len(BULL_PATTERNS))            
+            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits_kama, calc_arrs, 2+non_pattern_len+len(BULL_PATTERNS))            
         
         if u_core[3]:
             t=ic.VBTSUPERTREND.run(high,low,close)
             all_t_ent=defi_i_fast_sub(all_t_ent,t.entries, calc_arrs, 3)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits, calc_arrs, 3+core_length+len(BULL_PATTERNS))
+            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits, calc_arrs, 3+non_pattern_len+len(BULL_PATTERNS))
               
         if u_core[4]:
             t=vbt.BBANDS.run(close)
             all_t_ent=defi_i_fast_sub(all_t_ent,t.lower_above(close), calc_arrs, 4)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.upper_below(close), calc_arrs, 4+core_length+len(BULL_PATTERNS))
+            all_t_ex=defi_i_fast_sub(all_t_ex,t.upper_below(close), calc_arrs, 4+non_pattern_len+len(BULL_PATTERNS))
   
         if u_core[5] or u_core[6]: 
             t=vbt.RSI.run(close,wtype='simple')
             all_t_ent=defi_i_fast_sub(all_t_ent,t.rsi_crossed_below(20), calc_arrs, 5)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.rsi_crossed_above(80), calc_arrs, 5+core_length+len(BULL_PATTERNS))
+            all_t_ex=defi_i_fast_sub(all_t_ex,t.rsi_crossed_above(80), calc_arrs, 5+non_pattern_len+len(BULL_PATTERNS))
             all_t_ent=defi_i_fast_sub(all_t_ent,t.rsi_crossed_below(30), calc_arrs, 6)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.rsi_crossed_above(70), calc_arrs, 6+core_length+len(BULL_PATTERNS))            
+            all_t_ex=defi_i_fast_sub(all_t_ex,t.rsi_crossed_above(70), calc_arrs, 6+non_pattern_len+len(BULL_PATTERNS))            
         
         for ii, func_name in enumerate(BULL_PATTERNS):
             if u_bull[ii]:
                 t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ent").out
-                all_t_ent=defi_i_fast_sub(all_t_ent,t, calc_arrs, 7+ii)
+                all_t_ent=defi_i_fast_sub(all_t_ent,t, calc_arrs, non_pattern_len+ii)
             
         for ii, func_name in enumerate(BEAR_PATTERNS):
             if u_bear[ii]:
                 t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ex").out
-                all_t_ex=defi_i_fast_sub(all_t_ex,t, calc_arrs, ii+2*core_length+len(BULL_PATTERNS))        
+                all_t_ex=defi_i_fast_sub(all_t_ex,t, calc_arrs, ii+2*non_pattern_len+len(BULL_PATTERNS))        
 
         for ii in range(len(calc_arrs)):
             all_t_ent[ii]=(all_t_ent[ii]>=1)
@@ -132,8 +132,9 @@ def defi_i_fast( open_,high, low, close,calc_arrs,**kwargs):
         logger.error(e, stack_info=True, exc_info=True)        
 
 def defi_nomacro(close,all_t,ent_or_ex, calc_arr):
-    len_ent=7+len(BULL_PATTERNS)
-    len_ex=7+len(BEAR_PATTERNS)
+    non_pattern_len=7
+    len_ent=non_pattern_len+len(BULL_PATTERNS)
+    len_ex=non_pattern_len+len(BEAR_PATTERNS)
     ent=None
 
     if ent_or_ex=="ent":
@@ -485,7 +486,7 @@ class Strat(VBTfunc):
                             a_bear, 
                             a_uncertain,
                             **kwargs) 
-
+        
     def stratIndex(self,**kwargs):
         a_bull=[1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 1., 1., 0., 0., 1.,
        0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,

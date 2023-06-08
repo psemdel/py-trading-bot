@@ -33,11 +33,11 @@ class Opt(OptMain):
         self.bti={}
         
         for ind in self.indexes:
-            self.bti[ind]=presel.Presel(ind,period,"test","long")
+            self.bti[ind]=presel.Presel(ind,period)
         
         self.macd={}
         for ind in self.indexes:
-            self.macd[ind]=vbt.MACD.run(self.close_dic[ind])
+            self.macd[ind]=vbt.MACD.run(self.close_dic[ind]["learn"])
 
     def calculate_eq_ret(self,pf):
         m_rb=pf.total_market_return
@@ -57,7 +57,7 @@ class Opt(OptMain):
             
         return np.mean(ret_arr)
   
-    def manual_calculate_pf(self,ind,*args): #the order is bull/bear/uncertain
+    def manual_calculate_pf(self,ind,key,*args): #the order is bull/bear/uncertain
         self.calc_arrs=[]
         for arr in args:
             self.calc_arrs.append(arr)
@@ -65,7 +65,7 @@ class Opt(OptMain):
         self.defi_ent()
         self.defi_ex()
         self.macro_mode()
-        pf=vbt.Portfolio.from_signals(self.close_dic[ind], self.ents[ind],self.exs[ind],
+        pf=vbt.Portfolio.from_signals(self.close_dic[ind][key], self.ents[ind],self.exs[ind],
                                       short_entries=self.ents_short[ind],
                                       short_exits=self.exs_short[ind],
                                       freq="1d",fees=self.fees)
@@ -73,21 +73,22 @@ class Opt(OptMain):
         print("equivalent return " + str(self.calculate_eq_ret(pf)))
         return pf #for display for instance
     
-    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret):
+    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret,**kwargs):
         if not self.check_tested_arrs():
             return best_arrs_cand, best_ret_cand
-
+        
+        key= kwargs.get("dic","learn")
         #create the underlying strategy
-        self.defi_ent()
-        self.defi_ex()
-        self.macro_mode()
+        self.defi_ent(key)
+        self.defi_ex(key)
+        self.macro_mode(key)
         
         ret=0
         ret_arr=[]
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
             self.bti[ind].overwrite_strat_underlying(self.ents[ind],self.exs[ind])
-            self.bti[ind].preselect_macd_vol_macro(macro_trend=self.macro_trend[ind],macd=self.macd[ind])
+            self.bti[ind].preselect_macd_vol_macro(macro_trend=self.macro_trend[ind][key],macd=self.macd[ind])
             
             pf=vbt.Portfolio.from_signals(self.bti[ind].close, 
                                           self.bti[ind].entries,

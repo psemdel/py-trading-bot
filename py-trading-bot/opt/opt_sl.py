@@ -15,9 +15,9 @@ from opt.opt_main import log
 #to optimize the stop losses
 class Opt(OptStrat):
     def calculate_pf(self, **kwargs):
-        self.defi_ent()
-        self.defi_ex()
-        self.macro_mode()
+        self.defi_ent("learn")
+        self.defi_ex("learn")
+        self.macro_mode("learn")
          
         if self.index:
             ret_arr=[]
@@ -26,12 +26,12 @@ class Opt(OptStrat):
     
         for ind in self.indexes: #CAC, DAX, NASDAQ
             if kwargs.get("sl"):
-                pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
+                pf=vbt.Portfolio.from_signals(self.close_dic[ind]["learn"], self.ents[ind],self.exs[ind], #should be data
                                               short_entries=self.ents_short[ind],
                                               short_exits=self.exs_short[ind],
-                                              freq="1d",fees=self.fees,tsl_stop=kwargs.get("sl"),stop_exit_price="close")
+                                              freq="1d",fees=self.fees,tsl_stop=kwargs.get("sl")) #,stop_exit_price="close", should be data
             else:
-                pf=vbt.Portfolio.from_signals(self.data_dic[ind], self.ents[ind],self.exs[ind],
+                pf=vbt.Portfolio.from_signals(self.close_dic[ind]["learn"], self.ents[ind],self.exs[ind],
                                               short_entries=self.ents_short[ind],
                                              short_exits=self.exs_short[ind],
                                                freq="1d",fees=self.fees)

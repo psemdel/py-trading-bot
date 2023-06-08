@@ -119,7 +119,7 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),26.76) 
+        self.assertEqual(round(pf.get_total_return(),2),23.76) 
 
     def test_preselect_divergence_blocked(self):
         self.bti.preselect_divergence_blocked()

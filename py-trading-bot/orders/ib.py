@@ -401,6 +401,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
             logger.info(str(symbol) + " already in portfolio")
         if not enough_cash and not short:
             logger.info(str(symbol) + " order not executed, not enough cash available")
+            print("Reversal order "+str(symbol) + "not executed, not enough cash available!!!!")
         
         if (symbol not in pf.retrieve() and 
             (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
