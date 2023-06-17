@@ -111,6 +111,8 @@ CAC40_INTRO={
     "SW.PA":"2000-03-01",
     }
 
+CAC40_DELIST={}
+
 DAX=[
     "1COV.DE",
     "ADS.DE",
@@ -169,6 +171,8 @@ DAX_INTRO={
     "BNR.DE":"2010-05-01",
     "VNA.DE":"2013-08-01"
     }
+
+DAX_DELIST={}
   
 NASDAQ=[
     "AAPL",  
@@ -210,7 +214,7 @@ NASDAQ=[
     "EXC",
     "FAST",
     "META",
-    "FISV",
+    #"FISV",
     "FTNT",
     "GILD",
     "GOOG", 
@@ -305,6 +309,8 @@ NASDAQ_INTRO={
     "ZS":"2018-06-01",
     "ZM":"2019-05-01",
     }
+
+NASDAQ_DELIST={}
 
 NYSE=["MMM",
       "AOS",
@@ -648,7 +654,7 @@ NYSE=["MMM",
       "STT",
       "STE",
       "SYK",
-      "SIVB",
+      "SIVBQ",
       "SYF",
       "SNPS",   
       "SYY",
@@ -781,19 +787,31 @@ NYSE_INTRO={
     "ZTS":"2013-02-01",
     }
 
+NYSE_DELIST={
+    "CTXS":"2022-10-01",
+    "FBHS":"2022-10-15",
+    "FISV":"2023-05-01",
+    "FRC":"2023-05-01",
+    "NLOK":"2023-09-01",
+    "NLSN":"2023-10-01",
+    "SIVBQ":"2023-03-27",
+    "SBNY":"2023-03-24",
+    
+    }
+
 #S&P by sector, no distinction between NYSE and NASDAQ
 REALESTATE=["ARE","AMT","AVB","BXP","CPT","CBRE","CCI","DLR","DRE","EQIX","EQR","ESS","EXR","FRT","PEAK",
             "HST","IRM","KIM","MAA","PLD","PSA","O","REG","SBAC","SPG","UDR","VTR","VICI","VNO","WELL",
             "WY"]
 INDUSTRY=["MMM","AOS","ALK","ALLE","AAL","AME","BA","CHRW","CARR","CAT","CTAS","CPRT","CSX","CMI","DE",
-          "DAL","DOV","ETN","EMR","EFX","EXPD","FAST","FDX","FTV","FBHS","GNRC","GD","GE","HON","HWM",
+          "DAL","DOV","ETN","EMR","EFX","EXPD","FAST","FDX","FTV","GNRC","GD","GE","HON","HWM", "FBHS",
           "HII","IEX","ITW","IR","JBHT","J","JCI","LHX","LDOS","LMT","MAS","NLSN","NDSN","NSC","NOC",
           "ODFL","OTIS","PCAR","PH","PNR","PWR","RTX","RSG","RHI","ROK","ROL","SNA","LUV","SWK","TXT",
           "TT","TDG","UNP","UAL","UPS","URI","VRSK","WAB","WM","GWW","XYL"]
 IT=["ACN","ADBE","ADP","AKAM","AMD","APH","ADI","ANSS","AAPL","AMAT","ANET","ADSK","AVGO","BR","CDNS",
-    "CDW","CDAY","CSCO","CTXS","CTSH","GLW","DXC","ENPH","EPAM","FFIV","FIS","FISV","FLT","FTNT","IT",
+    "CDW","CDAY","CSCO","CTSH","GLW","DXC","ENPH","EPAM","FFIV","FIS","FLT","FTNT","IT",          "FISV", "CTXS",
     "GPN","HPE","HPQ","IBM","INTC","INTU","JKHY","JNPR","KEYS","KLAC","LRCX","MA","MCHP","MU","MSFT",
-    "MPWR","MSI","NTAP","NLOK","NVDA","NXPI","ON","ORCL","PAYX","PAYC","PYPL","PTC","QRVO","QCOM","ROP",
+    "MPWR","MSI","NTAP","NVDA","NXPI","ON","ORCL","PAYX","PAYC","PYPL","PTC","QRVO","QCOM","ROP", "NLOK",
     "CRM","STX","NOW","SWKS","SEDG","SNPS","TEL","TDY","TER","TXN","TRMB","TYL","VRSN","V","WDC","ZBRA"]
 COM=["ATVI","GOOGL","T","CHTR","CMCSA","DISH","DIS","EA","FOX","IPG","LYV","LUMN","MTCH","META","NFLX",
      "NWS","OMC","PARA","TMUS","TTWO","TWTR","VZ","WBD"]
@@ -811,7 +829,7 @@ UTILITIES=["AES","LNT","AEE","AEP","AWK","ATO","CNP","CMS","ED","CEG","D","DTE",
 FIN=["AFL","ALL","AXP","AIG","AMP","AON","AJG","AIZ","BAC","WRB","BRK-B","BLK","BK","BRO","COF","CBOE",
     "SCHW","CB","CINF","C","CFG","CME","CMA","DFS","RE","FDS","FITB","BEN","GL","GS","HIG","HBAN",
     "ICE","IVZ","JPM","KEY","LNC","L","MTB","MKTX","MMC","MET","MCO","MS","MSCI","NDAQ","NTRS","PNC",
-    "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SIVB","SYF","TROW","TRV","TFC","USB","WFC","WTW",
+    "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SYF","TROW","TRV","TFC","USB","WFC","WTW", "SIVBQ"
     "ZION"]
 MATERIALS=["APD","ALB","AMCR","AVY","BALL","CE","CF","CTVA","DOW","DD","EMN","ECL","FMC","FCX","IP",
            "IFF","LIN","LYB","MLM","MOS","NEM","NUE","PKG","PPG","SEE","SHW","VMC","WRK"]
@@ -823,6 +841,7 @@ HEALTHCARE=["ABT","ABBV","ABMD","A","ALGN","ABC","AMGN","BAX","BDX","BIO","TECH"
 
 
 INTRO={**CAC40_INTRO,**DAX_INTRO,**NASDAQ_INTRO,**NYSE_INTRO}
+DELIST={**CAC40_DELIST,**DAX_DELIST,**NASDAQ_DELIST,**NYSE_DELIST} #the issue with delist is that YF cannot retrieve delisted symbol even in for a period when they were listed
 
 INDEXES=["^GSPC", #SP500
          "^FCHI", #cac40 

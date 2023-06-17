@@ -45,7 +45,7 @@ def log(text,**kwargs):
 
 class OptMain(VBTfunc):
     def __init__(self,period,**kwargs):
-        self.indexes=["CAC40", "DAX", "NASDAQ","IT"]
+        self.indexes=kwargs.get("indexes",["CAC40", "DAX", "NASDAQ","IT"])
         self.index=kwargs.get("index",False)
         
         #init
@@ -576,7 +576,8 @@ class OptMain(VBTfunc):
             else:
                self.symbols[ind]=self.close_dic[ind]["total"].columns 
         log(symbols_to_keep)
-                  
+         
+    #split a learning set in equal part         
     def split_in_part(self,**kwargs):
         self.number_of_parts=kwargs.get("number_of_parts",10)
         target_l={}

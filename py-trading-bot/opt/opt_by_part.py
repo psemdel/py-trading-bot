@@ -11,6 +11,8 @@ import numpy as np
 from opt.opt_main import log
 import vectorbtpro as vbt
 
+#Try to optimize the strategy depending on the performance of the different symbols on a predefined strategy
+
 class Opt(OptStrat):
     def __init__(self,period,**kwargs):
         if not kwargs.get("no_reinit",False):

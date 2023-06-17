@@ -11,6 +11,9 @@ import numpy as np
 from opt.opt_main import log
 import vectorbtpro as vbt
 
+#Try to optimize the strategy depending on the performance of the different symbols on a predefined strategy
+#The process strategy to sort the symbols is regenerated each time the set of symbols changes
+
 class OptRecursive(OptByPart):
     def __init__(self,period,**kwargs):
         super().__init__(period,**kwargs)

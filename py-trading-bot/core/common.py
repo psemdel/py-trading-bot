@@ -8,7 +8,7 @@ Created on Sun Jan  9 13:09:58 2022
 import math
 import numpy as np
 from datetime import datetime
-from core.constants import INTRO
+from core.constants import INTRO, DELIST
 import pandas as pd
 
 from core.data_manager import retrieve
@@ -35,11 +35,14 @@ def filter_intro_symbol_sub(s,y_period):
     min_y=td.year-y_period
     limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
 
+    if s in DELIST:
+        return False
     if s in INTRO: #should come from database
         if INTRO[s]<limit_date:
             return True
     else:
         return True
+
     return False
 
 def filter_intro_symbol(input_symbols,y_period):

@@ -721,22 +721,21 @@ def retrieve_data_YF(actions,period,**kwargs):
             _, index_symbol=exchange_to_index_symbol(actions[0].stock_ex)  
             all_symbols=symbols+[index_symbol]
             
-        #res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
         ok=False
         first_round=True
         #look for anomaly
         if len(all_symbols)>2:
-            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop')
             avg=np.average(
-                [len(vbt.YFData.fetch(all_symbols[0], period=period,**kwargs).get('Open')),
-                len(vbt.YFData.fetch(all_symbols[1], period=period,**kwargs).get('Open')),
-                len(vbt.YFData.fetch(all_symbols[-1], period=period,**kwargs).get('Open'))]
+                [len(vbt.YFData.fetch(all_symbols[0], period=period).get('Open')),
+                len(vbt.YFData.fetch(all_symbols[1], period=period).get('Open')),
+                len(vbt.YFData.fetch(all_symbols[-1], period=period).get('Open'))]
                 )
-            
+                        
             if len(res.get('Open'))<avg-10:
                 print("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
-                
-                res_nodrop=vbt.YFData.fetch(all_symbols, period=period,**kwargs)
+                logger.info("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
+                res_nodrop=vbt.YFData.fetch(all_symbols, period=period)
                 nb_nan={}
                 for c in res.get('Open').columns:
                     nb_nan[c]=np.count_nonzero(np.isnan(res_nodrop.get('Open')[c]))
@@ -749,9 +748,10 @@ def retrieve_data_YF(actions,period,**kwargs):
         #test if the symbols were downloaded
         while not ok and len(symbols)>=0:
             if not first_round:
-                res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop',**kwargs)
+                res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop')
             ok=True
             o=res.get('Open')
+            
             for s in symbols:
                 try:
                     o[s]
@@ -760,7 +760,7 @@ def retrieve_data_YF(actions,period,**kwargs):
                     ok=False
                     symbols.remove(s)
                     all_symbols.remove(s)
-        
+
         return res,\
                symbols,\
                index_symbol    

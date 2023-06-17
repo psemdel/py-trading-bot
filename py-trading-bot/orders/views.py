@@ -96,9 +96,9 @@ def opening(form, action, pf, oc, o):
 def closing(action,pf, c3, c5, c6, c7, oc):
     orders=Order.objects.filter(c3 & c5 & c6 & c7)
     if len(orders)==0:
-        return HttpResponse("Order not found")
+        raise ValueError("Order not found")
     elif len(orders)>1:
-        return HttpResponse("Several orders found, do the step manually in the admin panel")
+        raise ValueError("Several orders found, do the step manually in the admin panel")
     else:
         o=orders[0]
     

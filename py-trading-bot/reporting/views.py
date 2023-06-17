@@ -52,7 +52,7 @@ def daily_report_sub(exchange,**kwargs):
     
     st=report1.daily_report_action(exchange,**kwargs)
     if st is None:
-        raise ValueError("The creation of the strategy failed, report creation interrupted")
+        raise ValueError("The creation of the strategy failed, report creation interrupted, <a href={% url 'reporting:reports' %}>Main page</a>")
         
     report1.presel(st,exchange,**kwargs)
     report1.presel_wq(st,exchange,**kwargs)
@@ -65,7 +65,7 @@ def daily_report_index_sub(indexes):
     report3.daily_report_index(indexes) # "BZ=F" issue
     send_order_test(report3)
 
-def daily_report(**kwargs):
+def daily_report(request,**kwargs):
     try:
         short_name=kwargs.get("short_name")
         key=kwargs.get("key")
@@ -81,17 +81,17 @@ def daily_report(**kwargs):
         indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
         daily_report_index_sub(indexes)
         
-        return HttpResponse("report written")
+        return render(request, 'reporting/success_report.html')
 
     except Exception as e:
         print(e)
         pass
 
 def trigger_17h(request):
-    return daily_report(short_name="17h",key="17h_stock_exchanges")
+    return daily_report(request,short_name="17h",key="17h_stock_exchanges")
     
 def trigger_22h(request):
-    return daily_report(short_name="22h",key="22h_stock_exchanges")
+    return daily_report(request,short_name="22h",key="22h_stock_exchanges")
 
 def send_order_test(report):
     for auto in [False, True]:
@@ -140,11 +140,11 @@ def test_order(request):
     strategy=""
     exchange="XETRA"
     short=False
-    
+    return render(request, 'reporting/success_report.html')
     #with MyIB() as myIB:
     #    return myIB.entry_order(symbol,strategy, exchange,short), True
     
-    return HttpResponse("test order done")
+    return HttpResponse("test")
 
 def test(request):
     from ib_insync import Stock

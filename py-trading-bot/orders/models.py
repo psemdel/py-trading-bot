@@ -68,8 +68,7 @@ def get_exchange_actions(exchange,**kwargs):
     use_IB=False
     if _settings["USE_IB_FOR_DATA"]["reporting"]:
         use_IB=check_ib_permission([a.symbol for a in actions])
-   
-    
+
     return use_IB, actions
 
 ### Conversion between input from YF and IB
@@ -121,9 +120,9 @@ def exchange_to_index_symbol(exchange):
 def action_to_etf(action,short):
     if action.category==ActionCategory.objects.get(short="IND"):
         if short:
-            action=action.etf_short
+            return action.etf_short
         else:
-            action=action.etf_long
+            return action.etf_long
     return action
 
 def symbol_to_action(symbol):
@@ -223,8 +222,6 @@ def filter_intro_sub(a,y_period):
            return False
     return True
 
-    return False
-
 def filter_intro_action(input_actions,y_period):
     actions=[]
     for a in input_actions:
@@ -251,8 +248,7 @@ class Order(models.Model):
         return self.action.name + " "+ str(self.entering_date)
 
 def pf_retrieve_all(**kwargs):
-    arr=[]
-    
+    a=[]
     for pf in PF.objects.filter(short=kwargs.get("short",False)):
         if kwargs.get("opening")=="9h":
             stockEx1=StockEx.objects.filter(name="Paris")
@@ -268,11 +264,9 @@ def pf_retrieve_all(**kwargs):
             actions=pf.actions.filter( (c2|c3)) #c1 &
         else:
             actions=pf.actions.all() #filter(c1)
-        
-        for action in actions:
-            if not action in arr:
-                arr.append(action)
-    return arr
+        a+=actions
+
+    return list(set(a)) #unique
 
 ### Portfolio for a given strategy (used as name presently)
 class PF(models.Model):
@@ -290,10 +284,7 @@ class PF(models.Model):
         return len(self.actions.all())
     
     def retrieve(self):
-        arr=[]
-        for action in self.actions.all():
-            arr.append(action.symbol)
-        return arr
+        return [action.symbol for action in self.actions.all()]
 
     def remove(self,symbol):
         try:
@@ -428,10 +419,7 @@ class Candidates(models.Model):
         self.save()
         
     def retrieve(self):
-        arr=[]
-        for action in self.actions.all():
-            arr.append(action.symbol)
-        return arr
+        return [action.symbol for action in self.actions.all()]
     
     def __str__(self):
         return self.strategy.name + "_" + self.stock_ex.name
@@ -470,10 +458,7 @@ class Excluded(models.Model):
             pass
         
     def retrieve(self):
-        arr=[]
-        for action in self.actions.all():
-            arr.append(action.symbol)
-        return arr
+        return [action.symbol for action in self.actions.all()]
     
     def __str__(self):
         return self.name 
@@ -484,10 +469,7 @@ class StratCandidates(models.Model):
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
     
     def retrieve(self):
-        arr=[]
-        for action in self.actions.all():
-            arr.append(action.symbol)
-        return arr  
+        return [action.symbol for action in self.actions.all()]
     
     def __str__(self):
         return self.strategy.name   

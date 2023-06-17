@@ -153,7 +153,7 @@ if False:
     
     o.outer_perf()      
     
-if True:
+if False:
     from opt.opt_by_part_rec import OptRecursive
     
     a_bull=[ 0.,  0.,  0.,  1.,  1.,  1.,  1.,  0.,  0.,  0.,  1.,  1.,  0.,
@@ -169,7 +169,7 @@ if True:
       0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  1.,  0.,  0.,
       0.,  0.,  1.,  0.,  0.]
 
-    o=OptRecursive("2007_2020",
+    o=OptRecursive("2007_2023",
            nb_macro_modes=3,
            predefined=True,
            a_bull=a_bull,
@@ -181,4 +181,65 @@ if True:
     
     o.perf_recursion()    
   
+if False:
+    from opt.opt_corr import Opt
+    
+    a_bull=[ 0.,  0.,  0.,  1.,  1.,  1.,  1.,  0.,  0.,  0.,  1.,  1.,  0.,
+             0.,  0.,  1.,  1.,  1.,  0.,  1.,  0.,  0.,  0.,  0.,  0.,  0.,
+             0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  1.,  1.,  0.,
+             0.,  0.,  0.,  0.,  0.]
+    a_bear=  [ 1.,  1.,  0.,  0.,  1.,  1.,  1.,  0.,  0.,  1.,  0.,  1.,  0.,
+      0.,  0.,  0.,  0.,  0.,  1.,  0.,  1., -0.,  0.,  0.,  0.,  1.,
+      0.,  0.,  1.,  0.,  0.,  0.,  0.,  0.,  1.,  1.,  0.,  1.,  0.,
+      0.,  0.,  0.,  0.,  0.]
+    a_uncertain= [ 1.,  0.,  1.,  1.,  0.,  1.,  1.,  0.,  0.,  1.,  1.,  1.,  1.,
+      1.,  0.,  0.,  0.,  0.,  1.,  1.,  0.,  1.,  0.,  0.,  0.,  0.,
+      0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  1.,  0.,  0.,
+      0.,  0.,  1.,  0.,  0.]
+
+    for indexes in ["CAC40","DAX","NASDAQ","IT"]:
+
+        o=Opt("2007_2023",
+               indexes=indexes,
+               nb_macro_modes=3,
+               predefined=True,
+               a_bull=a_bull,
+               a_bear=a_bear,
+               a_uncertain=a_uncertain, 
+               #index=True,
+               test_window_start=0
+               )  
+        
+        o.outer_perf()      
   
+if True:
+    from opt.opt_symbols import Opt
+    
+    a_bull=[ 0.,  0.,  0.,  1.,  1.,  1.,  1.,  0.,  0.,  0.,  1.,  1.,  0.,
+             0.,  0.,  1.,  1.,  1.,  0.,  1.,  0.,  0.,  0.,  0.,  0.,  0.,
+             0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  1.,  1.,  0.,
+             0.,  0.,  0.,  0.,  0.]
+    a_bear=  [ 1.,  1.,  0.,  0.,  1.,  1.,  1.,  0.,  0.,  1.,  0.,  1.,  0.,
+      0.,  0.,  0.,  0.,  0.,  1.,  0.,  1., -0.,  0.,  0.,  0.,  1.,
+      0.,  0.,  1.,  0.,  0.,  0.,  0.,  0.,  1.,  1.,  0.,  1.,  0.,
+      0.,  0.,  0.,  0.,  0.]
+    a_uncertain= [ 1.,  0.,  1.,  1.,  0.,  1.,  1.,  0.,  0.,  1.,  1.,  1.,  1.,
+      1.,  0.,  0.,  0.,  0.,  1.,  1.,  0.,  1.,  0.,  0.,  0.,  0.,
+      0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  1.,  0.,  0.,
+      0.,  0.,  1.,  0.,  0.]
+
+    indexes="CAC40"
+    symbols=['AC', 'ATO', 'RNO']
+    o=Opt("2007_2023",
+           indexes,
+           symbols,
+           nb_macro_modes=3,
+           predefined=True,
+           a_bull=a_bull,
+           a_bear=a_bear,
+           a_uncertain=a_uncertain, 
+           #index=True,
+           test_window_start=0
+           )  
+    
+    o.outer_perf()  

@@ -57,11 +57,7 @@ class Report(models.Model):
         use_IB=False
         if _settings["USE_IB_FOR_DATA"]["reporting"]:
             use_IB=check_ib_permission(symbols)
-        actions=[]
-        
-        for symbol in symbols:
-            actions.append(Action.objects.get(symbol=symbol))
-
+        actions=[Action.objects.get(symbol=symbol) for symbol in symbols]
         return self.daily_report(actions,None,use_IB,index=True)  #exchange is none
         
     def daily_report_action(self,exchange,**kwargs):
@@ -70,10 +66,7 @@ class Report(models.Model):
 
 ### Logic for buying and selling actions preselected with retard strategy
     def candidates_to_YF(self,symbols_to_YF, candidates):
-        candidates_YF=[]
-        for c in candidates:
-            candidates_YF.append(symbols_to_YF[c])
-        return candidates_YF
+        return [symbols_to_YF[c] for c in candidates]
 
     def retard(self,presel,exchange,st,**kwargs):
         #key="retard"+"_"+exchange
@@ -86,19 +79,15 @@ class Report(models.Model):
         
         if presel.last_short:
             direction="short"
+            candidates=candidates_short
         else:
             direction="long"
 
         self.concat("Retard, " + "direction " + direction + ", stockex: " + exchange +\
                     ", action duration: " +str(presel.out))
-        
-        short=False
-        if len(candidates)==0:
-            short=True
-            candidates=candidates_short
-            
+  
         auto=True
-        self.order_nosubstrat(self.candidates_to_YF(st.symbols_to_YF,candidates), exchange, "retard", short, auto,**kwargs) #retard can be automatized
+        self.order_nosubstrat(self.candidates_to_YF(st.symbols_to_YF,candidates), exchange, "retard", presel.last_short, auto,**kwargs) #retard can be automatized
 
     #YF symbol expected here
     def order_only_exit_substrat(self,candidates, exchange, key, short,**kwargs):
@@ -694,6 +683,7 @@ class Report(models.Model):
             print("line " + str(exc_tb.tb_lineno))
             logger.error("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
             logger.error(e, stack_info=True, exc_info=True)
+            #self.concat("daily_report, exchange: "+exchange + " crashed, check the logs")
             pass 
     
 class ActionReport(models.Model):

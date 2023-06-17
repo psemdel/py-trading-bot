@@ -12,6 +12,8 @@ from core.strat import Strat
 from core.presel import Presel, WQ
 from core import common, constants
 from core.common import copy_attr
+
+
 import numpy as np
 import pandas as pd
 
@@ -30,6 +32,7 @@ class StratLIVE(Strat):
                 setattr(self,l,getattr(self,l+"_ind"))
         
     ##to plot the last days for instance
+    ##Different from retrieve_data in stratP as it needs to work outside of Django
     def retrieve_live(self):
         all_symbols=self.symbols+[self.index_symbol]
         
