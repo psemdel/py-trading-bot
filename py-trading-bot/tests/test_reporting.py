@@ -355,38 +355,36 @@ class TestReporting(TestCase):
         self.assertEqual(self.report1.text,"test\n")
 
     def test_daily_report_index(self):
-        self.report1.daily_report_index(["^FCHI","^GDAXI"])
+        self.report1.daily_report(symbols=["^FCHI","^GDAXI"],is_it_index=True)
 
     def test_presel(self):
-        self.st=self.report1.daily_report_action("Paris")   
-        print("non")
-        print(self.st)
+        self.st=self.report1.daily_report(exchange="Paris")   
         self.report1.presel(self.st,"Paris")
         
     def test_presel_wq(self):
-        self.st=self.report1.daily_report_action("Paris")  
+        self.st=self.report1.daily_report(exchange="Paris")  
         self.report1.presel_wq(self.st,"Paris")
         
     def test_presel_XETRA(self):
-        self.st=self.report1.daily_report_action("XETRA")   
+        self.st=self.report1.daily_report(exchange="XETRA")   
         self.report1.presel(self.st,"XETRA")
         
     def test_presel_wq_XETRA(self):
-        self.st=self.report1.daily_report_action("XETRA")      
+        self.st=self.report1.daily_report(exchange="XETRA")      
         self.report1.presel_wq(self.st,"XETRA")
         
     def test_presel_Nasdaq(self):
-        self.st=self.report1.daily_report_action("Nasdaq")   
+        self.st=self.report1.daily_report(exchange="Nasdaq")   
         self.report1.presel(self.st,"Nasdaq")
         
     def test_presel_wq_Nasdaq(self):
-        self.st=self.report1.daily_report_action("Nasdaq")      
+        self.st=self.report1.daily_report(exchange="Nasdaq")      
         self.report1.presel_wq(self.st,"Nasdaq")   
         
     def test_presel_NYSE(self):
         for s in ["it","fin"]: 
             report=m.Report()
-            st=report.daily_report_action("NYSE",sec=s) 
+            st=report.daily_report(exchange="NYSE",sec=s) 
             report.presel(st,"NYSE",sec=s)
             report.presel_wq(st,"NYSE",sec=s)
                  

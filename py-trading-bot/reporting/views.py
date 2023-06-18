@@ -50,7 +50,7 @@ def daily_report_sub(exchange,**kwargs):
     report1=Report()
     report1.save()
     
-    st=report1.daily_report_action(exchange,**kwargs)
+    st=report1.daily_report(exchange=exchange,**kwargs)
     if st is None:
         raise ValueError("The creation of the strategy failed, report creation interrupted, <a href={% url 'reporting:reports' %}>Main page</a>")
         
@@ -62,7 +62,7 @@ def daily_report_index_sub(indexes):
     report3=Report()
     report3.save()    
 
-    report3.daily_report_index(indexes) # "BZ=F" issue
+    report3.daily_report(symbols=indexes, it_is_index=True) # "BZ=F" issue
     send_order_test(report3)
 
 def daily_report(request,**kwargs):

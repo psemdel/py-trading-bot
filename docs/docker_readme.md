@@ -5,7 +5,7 @@ You can operate the bot in Docker and Kubernetes. Instruction were tested with L
 2. Adapt the Configuration in trading_bot/settings see the installation_guide. See the chapter below concerning settings.
 3. Start minikube or equivalent. In your terminal:
 
-    start minikube
+    minikube start 
     
 4. Link docker to minikube:  
     

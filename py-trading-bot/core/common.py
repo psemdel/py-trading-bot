@@ -5,6 +5,7 @@ Created on Sun Jan  9 13:09:58 2022
 
 @author: maxime
 """
+import numbers
 import math
 import numpy as np
 from datetime import datetime
@@ -13,24 +14,47 @@ import pandas as pd
 
 from core.data_manager import retrieve
 
+'''
+Parent class for all preselection and underlying strategy
+
+Arguments
+----------
+   symbol_index: main index to be retrieved
+   period: period of time in year for which we shall retrieve the data
+'''
 class VBTfunc():
-    def __init__(self,symbol_index,period):
+    def __init__(self,symbol_index: str,period: numbers.Number):
         self.period=period
         self.symbol_index=symbol_index
         retrieve(self,symbol_index,period)
     
-    def rel_dif(self,n,d): #for instance to calculate distance between MA and signal
+    '''
+    Perform a division
+    '''
+    def rel_dif(self,n: numbers.Number,d: numbers.Number):
         if d==0 or math.isnan(n) or math.isnan(d):
             return 0
         else:
             return round(n/d-1,4) 
 
+'''
+Copy attributes from one object to another
+'''
 def copy_attr(o1,o2):
     for suffix in ["","_ind"]:
         for l in ["high","low","close","open","volume","data"]:
             setattr(o1,l+suffix, getattr(o2,l+suffix))
 
-def filter_intro_symbol_sub(s,y_period):
+
+'''
+Filter not introduced or delisted products from a list. Here outside of Django execution, to be called within Jupyter
+
+Arguments
+----------
+       s: YF ticker of the product to be tested
+       y_period: period of time in year where we need to check backward from now
+'''  
+def filter_intro_symbol_sub(s: str,y_period: numbers.Number)-> bool:
     td=datetime.today()
     min_y=td.year-y_period
     limit_date=str(min_y)+"-" + str(td.month) + "-" + str(td.day)
@@ -45,13 +69,29 @@ def filter_intro_symbol_sub(s,y_period):
 
     return False
 
-def filter_intro_symbol(input_symbols,y_period):
+'''
+Filter not introduced or delisted products from a list. Here outside of Django execution, to be called within Jupyter
+
+Arguments
+----------
+       input_symbols: list if symbols to be tested
+       y_period: period of time in year where we need to check backward from now
+'''  
+def filter_intro_symbol(input_symbols: list,y_period: numbers.Number) -> list:
     symbols=[]
     for s in input_symbols:
         if filter_intro_symbol_sub(s,y_period):
             symbols.append(s)   
     return symbols   
 
+'''
+Save a dataframe to a file
+
+Arguments
+----------
+       x_df: a dataframe to be saved
+       filename: name of the file where to save the dataframe
+'''
 def save(x_df,filename):
     x_df.to_csv('data/'+filename)
 
@@ -64,6 +104,15 @@ def save_vbt_both(cours, entries, exits, entries_short, exits_short, **kwargs):
     save(exits_short, "exits_short"+suffix)    
     save(cours,"cours"+suffix)
     
+'''
+Add a column/row to a np.array
+
+Arguments
+----------
+       x: column/row to be added
+       v: original array where a column/row needs to be added
+       axis: axis (column/row)
+'''    
 def empty_append(x, v, axis, **kwargs):
     try:
         """
@@ -98,17 +147,31 @@ def empty_append(x, v, axis, **kwargs):
         print("shape v: " + str(np.shape(v)))
         return x  
     
-def intersection(lst1, lst2):
-    lst3 = [value for value in lst1 if value in lst2]
-    return lst3   
+'''
+Perform an intersection between two lists
 
-def remove_multi(t2):
-    if type(t2)==pd.core.frame.DataFrame:
-        multi=t2.columns 
-        if type(multi)==pd.core.indexes.multi.MultiIndex:
-            l=len(multi[0])
-    
-            for ii in range(l-2,-1,-1):
-                multi=multi.droplevel(ii)
-            t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
-    return t2
+Arguments
+----------
+       list1: a list
+       list1: another list
+'''     
+def intersection(lst1: list, lst2: list) -> list:
+    lst3 = [value for value in lst1 if value in lst2]
+    return lst3 
+  
+'''
+Remove the multi index from the dataframe, to allow futher operations
+
+Arguments
+----------
+       df: a dataframe
+'''   
+def remove_multi(df: pd.core.frame.DataFrame)-> pd.core.frame.DataFrame:
+    multi=df.columns 
+    if type(multi)==pd.core.indexes.multi.MultiIndex:
+        l=len(multi[0])
+
+        for ii in range(l-2,-1,-1):
+            multi=multi.droplevel(ii)
+        df=pd.DataFrame(data=df.values,index=df.index,columns=multi)
+    return df

@@ -20,8 +20,10 @@ from orders.models import Action, Order, get_pf, get_candidates,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission, filter_intro_action
       
-##Temporary storage for the telegram to message the orders at the end of the reporting.
-##Difficulty is that the telegram bot is async, so it is not possible to just make send_msg() in the order execution function
+"""
+Temporary storage for the telegram to message the orders at the end of the reporting.
+Difficulty is that the telegram bot is async, so it is not possible to just make send_msg() in the order execution function
+"""
 class ListOfActions(models.Model):
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     entry=models.BooleanField(blank=False,default=False) #otherwise exit
@@ -33,8 +35,12 @@ class ListOfActions(models.Model):
     def concat(self,text):
         print(text)     
         self.text+=text +"\n"
-        self.save()    
-
+        self.save() 
+        
+"""
+Periodically, a report is written. It performs calculation to decide if products need to be bought or sold.
+It also fill ActionReports which saves human readable indicators
+"""
 class Report(models.Model):
     date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #) default=timezone.now()
     text=models.TextField(blank=True)
@@ -53,19 +59,20 @@ class Report(models.Model):
         self.text+=text +"\n"
         self.save()
 
-    def daily_report_index(self,symbols):
-        use_IB=False
-        if _settings["USE_IB_FOR_DATA"]["reporting"]:
-            use_IB=check_ib_permission(symbols)
-        actions=[Action.objects.get(symbol=symbol) for symbol in symbols]
-        return self.daily_report(actions,None,use_IB,index=True)  #exchange is none
-        
-    def daily_report_action(self,exchange,**kwargs):
-        use_IB, actions=get_exchange_actions(exchange,**kwargs)
-        return self.daily_report(actions,exchange,use_IB,**kwargs) 
-
 ### Logic for buying and selling actions preselected with retard strategy
-    def candidates_to_YF(self,symbols_to_YF, candidates):
+    """
+   	Convert a list of tickers to list of YF tickers
+       
+    Arguments
+   	----------
+       symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
+       candidates: list of product symbols, that can be either YF or IB tickers
+       
+   	""" 
+    def candidates_to_YF(self,
+                         symbols_to_YF: dict=None, 
+                         candidates: list=[]
+                         ) -> list:
         return [symbols_to_YF[c] for c in candidates]
 
     def retard(self,presel,exchange,st,**kwargs):
@@ -589,11 +596,37 @@ class Report(models.Model):
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass   
-            
-    def daily_report(self,actions,exchange,use_IB,**kwargs): #for one exchange and one sector
+        
+    """
+	Method that write the report itself
+
+	Optional arguments
+	----------
+    index: is it indexes that are provided
+    exchange: name of the stock exchange
+    symbols: list of YF symbols
+    sec: sector of the stocks for which we write the report
+    
+	"""       
+    def daily_report(self,
+        it_is_index: bool=False,
+        exchange: str=None,
+        sec: str=None,
+        symbols: list=[],        
+        **kwargs): #for one exchange and one sector
         try: 
-            sec=kwargs.get("sec")
-            self.it_is_index=kwargs.get("index",False)
+            ##preprocessing
+            self.it_is_index=it_is_index
+            if self.it_is_index:
+                #symbols=kwargs.get("symbols",[])
+                use_IB=False
+                if _settings["USE_IB_FOR_DATA"]["reporting"]:
+                    use_IB=check_ib_permission(symbols)
+                actions=[Action.objects.get(symbol=symbol) for symbol in symbols]
+            else: #actions, exchange is provided
+                use_IB, actions=get_exchange_actions(exchange,**kwargs)
+            
+            ##handle the sectors
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)
                 if self.stock_ex.presel_at_sector_level:
@@ -611,8 +644,8 @@ class Report(models.Model):
                 strats=[]
   
             if len(actions)==0:
-                print("No actions found for exchange: "+exchange)
-                logger.info("No actions found for exchange: "+exchange)
+                print("No actions found for exchange: "+str(exchange))
+                logger.info("No actions found for exchange: "+str(exchange))
                 return None
             else:
                 if self.pk is None:
@@ -683,9 +716,12 @@ class Report(models.Model):
             print("line " + str(exc_tb.tb_lineno))
             logger.error("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
             logger.error(e, stack_info=True, exc_info=True)
-            #self.concat("daily_report, exchange: "+exchange + " crashed, check the logs")
+            self.concat("daily_report, exchange: "+exchange + " crashed, check the logs")
             pass 
-    
+
+"""
+Contain human readable indicators for one product and one report
+"""    
 class ActionReport(models.Model):
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     action=models.ForeignKey('orders.Action',on_delete=models.CASCADE, null=True,default=None)
@@ -726,7 +762,10 @@ class ActionReport(models.Model):
         else:
             return "none" + " " + str(self.report.date)
     
-    
+"""
+Performance alert for one product
+Related to the sending of a message in Telegram
+"""   
 class Alert(models.Model):
     active=models.BooleanField(blank=False,default=True)
     opportunity=models.BooleanField(blank=False,default=False)

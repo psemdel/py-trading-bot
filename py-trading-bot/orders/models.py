@@ -1,3 +1,4 @@
+import numbers
 from django.db import models
 from django.db.models import Q
 
@@ -22,8 +23,15 @@ for tz in zoneinfo.available_timezones():
     all_tz.append((tz,tz))
 all_tz=sorted(all_tz)  
 
-### Check if IB can be used
-def check_ib_permission(symbols):
+
+'''
+Check if IB can be used
+
+Arguments
+----------
+   symbols: list of YF tickers
+'''
+def check_ib_permission(symbols: list):
     IBok=True
     for symbol in symbols:
         if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
@@ -39,8 +47,14 @@ def check_ib_permission(symbols):
     
     return IBok
     
-### Get lists of actions for the reporting
-def get_exchange_actions(exchange,**kwargs):
+'''
+Get lists of actions for the reporting
+
+Arguments
+----------
+    exchange: name of the stock exchange
+'''
+def get_exchange_actions(exchange:str,**kwargs):
     cat=ActionCategory.objects.get(short="ACT")
     
     try:
@@ -71,8 +85,14 @@ def get_exchange_actions(exchange,**kwargs):
 
     return use_IB, actions
 
-### Conversion between input from YF and IB
-def period_YF_to_ib(period): #see also split_freq_str in vbt
+'''
+Conversion between input from YF and IB for the period
+
+Arguments
+----------
+    period: time period for which data should be downloaded
+'''
+def period_YF_to_ib(period: str): #see also split_freq_str in vbt
     #transform "10 d" in "10 D"
     period_ib=None
     if period is not None:
@@ -86,7 +106,14 @@ def period_YF_to_ib(period): #see also split_freq_str in vbt
     
     return period_ib
 
-def interval_YF_to_ib(interval):
+'''
+Conversion between input from YF and IB for the interval
+
+Arguments
+----------
+    interval: time interval for which data should be downloaded
+'''
+def interval_YF_to_ib(interval: str):
     #Time period of one bar. Must be one of: ‘1 secs’, ‘5 secs’, ‘10 secs’ 15 secs’, ‘30 secs’, ‘1 min’, ‘2 mins’, ‘3 mins’, ‘5 mins’, ‘10 mins’, ‘15 mins’, ‘20 mins’, ‘30 mins’, ‘1 hour’, ‘2 hours’, ‘3 hours’, ‘4 hours’, ‘8 hours’, ‘1 day’, ‘1 week’, ‘1 month’.
     if interval is None:
         res='1 day'
@@ -103,7 +130,90 @@ def interval_YF_to_ib(interval):
             
     return res
 
+
+'''
+Index is like stock (but it had to be separated, as an index cannot be bought directly)
+'''                  
+class Action(models.Model): #Action means stock in French
+    symbol=models.CharField(max_length=15, blank=False, primary_key=True)
+    ib_ticker_explicit=models.CharField(max_length=15, blank=True,default="AAA") #for index especially
+    name=models.CharField(max_length=100, blank=False)
+    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
+    currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
+    category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=None)
+    delisted=models.BooleanField(blank=False,default=False)
+    etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
+    etf_short=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_short2',blank=True,null=True)
+    
+    intro_date=models.DateTimeField(null=True, blank=True, default=None)
+    delisting_date=models.DateTimeField(null=True, blank=True, default=None)
+    
+    class Meta:
+        ordering = ["name"]
+        
+    def ib_ticker(self):
+        if self.ib_ticker_explicit!="AAA" and self.ib_ticker_explicit is not None:
+            return self.ib_ticker_explicit
+        else:
+            t=self.symbol.split(".")
+            return t[0]      
+        
+    def __str__(self):
+        return self.name
+
+'''
+Filter not introduced or delisted products from a list
+
+Arguments
+----------
+       a: Action to be tested
+       y_period: period of time in year where we need to check backward from now
+'''     
+def filter_intro_sub(
+        a: Action,
+        y_period: numbers.Number
+        )-> bool:
+    td=datetime.datetime.today()
+    if y_period is None:
+        limit_date=td
+    else:
+        limit_date=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here but otherwise bug
+
+    if a.intro_date is not None: #should come from database
+        if a.intro_date>limit_date :
+           return False
+    if a.delisting_date is not None:
+        if a.delisting_date<limit_date :
+           return False
+    return True
+
+'''
+Filter not introduced or delisted products from a list
+
+Arguments
+----------
+       input_actions: list of products to be tested
+       y_period: period of time in year where we need to check backward from now
+'''  
+def filter_intro_action(
+        input_actions: list,
+        y_period: numbers.Number
+        )-> list:
+    actions=[]
+    for a in input_actions:
+        if filter_intro_sub(a,y_period):
+            actions.append(a)   
+    return actions
+
 ### Data retrieval ###
+'''
+Determine which main index corresponds to a stock exchange
+
+Arguments
+----------
+    exchange: name of the stock exchange
+'''
 def exchange_to_index_symbol(exchange):
     if type(exchange)==str:
         stock_ex=StockEx.objects.get(name=exchange)
@@ -116,8 +226,19 @@ def exchange_to_index_symbol(exchange):
         return ["COMP","^IXIC"]
     else:
         return [stock_ex.main_index.ib_ticker(),stock_ex.main_index.symbol]
-    
-def action_to_etf(action,short):
+
+'''
+If the provided product is an index, will return the corresponding ETF
+
+Arguments
+----------
+    action: product
+    short: if the products are presently in a short direction
+'''    
+def action_to_etf(
+        action: Action,
+        short: bool
+        ) -> Action:
     if action.category==ActionCategory.objects.get(short="IND"):
         if short:
             return action.etf_short
@@ -125,7 +246,14 @@ def action_to_etf(action,short):
             return action.etf_long
     return action
 
-def symbol_to_action(symbol):
+'''
+Return action corresponding to a YF ticker
+
+Arguments
+----------
+       symbol: YF ticker of the product for which the order was performed
+'''  
+def symbol_to_action(symbol)-> Action:
     if type(symbol)==str:
         return Action.objects.get(symbol=symbol)
     else:
@@ -148,7 +276,10 @@ class Fees(models.Model):
     
     def __str__(self):
         return self.name  
-
+    
+'''
+Strategy to be used for product to perform the orders
+''' 
 class Strategy(models.Model):
     name=models.CharField(max_length=100, blank=False)
     perform_order=models.BooleanField(blank=False,default=False)
@@ -178,56 +309,6 @@ class StockEx(models.Model):
     def __str__(self):
         return self.name 
     
-### Index is like stock (but it had to be separated, as an index cannot be bought directly
-class Action(models.Model): #Action means stock in French
-    symbol=models.CharField(max_length=15, blank=False, primary_key=True)
-    ib_ticker_explicit=models.CharField(max_length=15, blank=True,default="AAA") #for index especially
-    name=models.CharField(max_length=100, blank=False)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
-    currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
-    category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=None)
-    delisted=models.BooleanField(blank=False,default=False)
-    etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
-    etf_short=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_short2',blank=True,null=True)
-    
-    intro_date=models.DateTimeField(null=True, blank=True, default=None)
-    delisting_date=models.DateTimeField(null=True, blank=True, default=None)
-    
-    class Meta:
-        ordering = ["name"]
-        
-    def ib_ticker(self):
-        if self.ib_ticker_explicit!="AAA" and self.ib_ticker_explicit is not None:
-            return self.ib_ticker_explicit
-        else:
-            t=self.symbol.split(".")
-            return t[0]      
-        
-    def __str__(self):
-        return self.name
-    
-def filter_intro_sub(a,y_period):
-    td=datetime.datetime.today()
-    if y_period is None:
-        limit_date=td
-    else:
-        limit_date=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here but otherwise bug
-
-    if a.intro_date is not None: #should come from database
-        if a.intro_date>limit_date :
-           return False
-    if a.delisting_date is not None:
-        if a.delisting_date<limit_date :
-           return False
-    return True
-
-def filter_intro_action(input_actions,y_period):
-    actions=[]
-    for a in input_actions:
-        if filter_intro_sub(a,y_period):
-            actions.append(a)   
-    return actions
 
 class Order(models.Model):
     action=models.ForeignKey('Action',on_delete=models.CASCADE)
@@ -247,7 +328,10 @@ class Order(models.Model):
     def __str__(self):
         return self.action.name + " "+ str(self.entering_date)
 
-def pf_retrieve_all(**kwargs):
+'''
+Retrieve a list of all products presently owned
+'''
+def pf_retrieve_all(**kwargs)-> list:
     a=[]
     for pf in PF.objects.filter(short=kwargs.get("short",False)):
         if kwargs.get("opening")=="9h":
@@ -347,7 +431,9 @@ def get_pf(strategy, exchange,short,**kwargs):
         logger.error(strategy)
         logger.error(e, stack_info=True, exc_info=True)
 
-### To distinguish between ETF, actions, indexes...
+'''
+To distinguish between ETF, actions, indexes...
+'''
 class ActionCategory(models.Model):
     short=models.CharField(max_length=15, blank=False, default="AAA", primary_key=True)
     name=models.CharField(max_length=100, blank=False)
@@ -355,7 +441,9 @@ class ActionCategory(models.Model):
     def __str__(self):
         return self.name 
 
-###GICS sectors    
+'''
+GICS sectors    
+'''
 class ActionSector(models.Model):
     name=models.CharField(max_length=100, blank=False)
     strategies_in_use=models.ManyToManyField(Strategy,blank=True)   
@@ -400,9 +488,10 @@ def get_order_capital(strategy, exchange,**kwargs):
     except Exception as e:
         logger.error(e, stack_info=True, exc_info=True)           
 
-###For strategy using two time frame, in the slow one (10 days) candidates are defined
-###And on daily basis the other strategy decides which of the candidate is really bought or sold
-
+'''
+For strategy using two time frame, in the slow one (10 days) candidates are defined
+And on daily basis the other strategy decides which of the candidate is really bought or sold
+'''
 class Candidates(models.Model):
     actions=models.ManyToManyField(Action,blank=True)    
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=1)
@@ -431,8 +520,9 @@ def get_candidates(strategy, exchange):
         )
     return res
     
-### List of actions provisory excluded for a strategy as it risks to perform bad
-    
+'''
+List of actions provisory excluded for a strategy as it risks to perform bad
+'''  
 class Excluded(models.Model):
     name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)   
@@ -463,7 +553,9 @@ class Excluded(models.Model):
     def __str__(self):
         return self.name 
  
-### Define a list of actions and indexes that can be traded using the defined strategy
+'''
+Define a list of actions and indexes that can be traded using the defined strategy
+'''
 class StratCandidates(models.Model):
     actions=models.ManyToManyField(Action,blank=True)    
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)

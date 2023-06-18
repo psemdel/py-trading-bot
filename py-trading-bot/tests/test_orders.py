@@ -151,10 +151,8 @@ class TestOrders(TestCase):
     def test_pf_retrieve_all(self):
         pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
         pf.append(self.a.symbol)
-        pf.save()
         pf2=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
         pf2.append(self.a3.symbol)
-        
         self.assertEqual(m.pf_retrieve_all(),[self.a, self.a3])      
 
     def test_pf_append(self):
