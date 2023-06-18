@@ -110,8 +110,8 @@ def defi(close,all_t,ent_or_ex, calc_arrs,macro_trend):
 #not called from a IF, because it cannot interpret correctly the input arrays
 #for optimization only
 def strat_wrapper_macro_legacy(open_,high, low, close, a_bull, a_bear, a_uncertain,
-                        macro_trend_bull="long", macro_trend_bear="both",
-                        macro_trend_uncertain="both",**kwargs):
+                        dir_bull="long", dir_bear="both",
+                        dir_uncertain="both",**kwargs):
     
     try:
         if kwargs.get("prd"):
@@ -133,9 +133,9 @@ def strat_wrapper_macro_legacy(open_,high, low, close, a_bull, a_bear, a_uncerta
     
         #put both/long/short
         t=VBTMACROMODE.run(ent,ex, macro_trend,\
-                           macro_trend_bull=macro_trend_bull,
-                           macro_trend_bear=macro_trend_bear,
-                           macro_trend_uncertain=macro_trend_uncertain)
+                           dir_bull=dir_bull,
+                           dir_bear=dir_bear,
+                           dir_uncertain=dir_uncertain)
     
         return t.entries, t.exits, t.entries_short, t.exits_short, macro_trend, min_ind, max_ind  
     except Exception as e:
@@ -205,7 +205,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_uncertain="VBTSTOCHKAMA",
                              )
         self.get_output(s)
@@ -220,7 +220,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_uncertain="VBTPATTERN",
                              )
         self.get_output(s)
@@ -236,7 +236,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTSUPERTRENDMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -254,7 +254,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -272,7 +272,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTSUPERTRENDMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -291,7 +291,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTMA",
                              f_bear="VBTPATTERN",
                              f_uncertain="VBTPATTERN",
@@ -310,7 +310,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTSUPERTRENDMA",
                              f_bear="VBTPATTERN",
                              f_uncertain="VBTPATTERN",
@@ -330,7 +330,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTSUPERTRENDMA",
                              f_bear="VBTPATTERN",
                              f_uncertain="VBTPATTERN",
@@ -348,7 +348,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTMA",
                              f_bear="VBTPATTERN",
                              f_uncertain="VBTPATTERN",
@@ -366,7 +366,7 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTSUPERTRENDMA",
                              f_bear="VBTPATTERN",
                              f_uncertain="VBTPATTERN",
@@ -386,9 +386,9 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=True,
-                             macro_trend_bull=kwargs.get("macro_trend_bull","long"), 
-                             macro_trend_bear=kwargs.get("macro_trend_bear","short"),
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_bull=kwargs.get("dir_bull","long"), 
+                             dir_bear=kwargs.get("dir_bear","short"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -407,9 +407,9 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=True,
-                             macro_trend_bull=kwargs.get("macro_trend_bull","long"), 
-                             macro_trend_bear=kwargs.get("macro_trend_bear","short"),
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_bull=kwargs.get("dir_bull","long"), 
+                             dir_bear=kwargs.get("dir_bear","short"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -428,9 +428,9 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=True,
-                             macro_trend_bull=kwargs.get("macro_trend_bull","long"), 
-                             macro_trend_bear=kwargs.get("macro_trend_bear","short"),
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_bull=kwargs.get("dir_bull","long"), 
+                             dir_bear=kwargs.get("dir_bear","short"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_uncertain="VBTSTOCHKAMA",
                              macro_trend_index=kwargs.get("macro_trend_index",False)
                              )
@@ -445,9 +445,9 @@ class StratLegacy(Strat):
                              self.close_ind,
                              trend_lim=100,
                              macro_trend_bool=True,
-                             macro_trend_bull=kwargs.get("macro_trend_bull","long"), 
-                             macro_trend_bear=kwargs.get("macro_trend_bear","short"),
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_bull=kwargs.get("dir_bull","long"), 
+                             dir_bear=kwargs.get("dir_bear","short"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_uncertain="VBTPATTERN",
                              macro_trend_index=kwargs.get("macro_trend_index",False)
                              )

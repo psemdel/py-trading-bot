@@ -7,8 +7,9 @@ Created on Sat May 14 22:36:16 2022
 """
 import vectorbtpro as vbt
 import numpy as np
+import numbers
 
-from core.common import VBTfunc, save_vbt_both
+from core.common import VBTfunc, save_vbt_both, remove_multi
 import core.indicators as ic
 from core.macro import VBTMACROFILTER, VBTMACROMODE, VBTMACROTREND, VBTMACROTRENDPRD, major_int
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
@@ -23,37 +24,73 @@ Strategies on one action, no preselection
 So it determines entries and exits for one action to optimize the return
 """
 
-def defi_i_fast_sub(all_t_ent,t, calc_arrs, jj):
+"""
+Multiply the entries or exits by the array (0 or 1)
+
+Arguments
+----------
+    all_t: entries or exits for all strategies before
+    t: entries or exits for the strategy to be added
+    calc_arrs: array of the strategy combination 
+    jj: index of the strategy to be added in calc_arrs
+"""   
+def defi_i_fast_sub(
+        all_t: list,
+        t: pd.core.frame.DataFrame, 
+        calc_arrs: list, 
+        jj: int
+        ) -> list:
     try:
         for ii in range(len(calc_arrs)):
             t2=ic.VBTSUM.run(t,arr=calc_arrs[ii][jj]).out
-            
-            if type(t2)==pd.core.frame.DataFrame:
-             #==pandas.core.frame.DataFrame
-                multi=t2.columns 
-                l=len(multi[0])
-                for kk in range(l-2,-1,-1):
-                    multi=multi.droplevel(kk)
-                t2=pd.DataFrame(data=t2.values,index=t2.index,columns=multi)
-            all_t_ent[ii]+=t2
+            t2=remove_multi(t2)
+            all_t[ii]+=t2
     
-        return all_t_ent    
+        return all_t  
     except Exception as e:
         print(e)
  
-def filter_macro(all_t_ent, macro_trend):
+"""
+For each trend set the correct entries and exits
+
+Arguments
+----------
+    all_t: entries or exits for all strategies before
+    macro_trend: trend for each symbols and moment in time
+"""      
+def filter_macro(all_t: list,
+                 macro_trend: pd.core.frame.DataFrame,
+                 ) -> pd.core.frame.DataFrame:
     ent=None
     dic={0:-1, 1:1, 2:0}  #bull, bear, uncertain
     
-    for ii in range(len(all_t_ent)):
-        ents_raw=VBTMACROFILTER.run(all_t_ent[ii],macro_trend,dic[ii]).out #
+    for ii in range(len(all_t)):
+        ents_raw=VBTMACROFILTER.run(all_t[ii],macro_trend,dic[ii]).out #
         if ent is None:
             ent=ents_raw
         else:
             ent=ic.VBTOR.run(ent, ents_raw).out
     return ent
         
-def defi_i_fast( open_,high, low, close,calc_arrs,**kwargs):
+"""
+Calculate the entries and exits for each strategy of the array separately
+
+Arguments
+----------
+    close: close prices
+    all_t: entries and exits for one strategy or the array
+    ent_or_ex: do we want to return the entries or exits?
+    calc_arr: array of the strategy combination 
+    macro_trend: trend for each symbols and moment in time
+"""        
+def defi_i_fast( 
+        open_: pd.core.frame.DataFrame,
+        high: pd.core.frame.DataFrame, 
+        low: pd.core.frame.DataFrame, 
+        close: pd.core.frame.DataFrame,
+        calc_arrs: list,
+        macro_trend: pd.core.frame.DataFrame=None,
+        ) -> (list, list):
     try:
         non_pattern_len=7
         
@@ -119,7 +156,6 @@ def defi_i_fast( open_,high, low, close,calc_arrs,**kwargs):
             all_t_ent[ii]=(all_t_ent[ii]>=1)
             all_t_ex[ii]=(all_t_ex[ii]>=1)
         #agregate the signals for different macro trends
-        macro_trend=kwargs.get("macro_trend")
         if macro_trend is not None:
             all_t_ent=filter_macro(all_t_ent, macro_trend)                    
             all_t_ex=filter_macro(all_t_ex, macro_trend)     
@@ -129,18 +165,33 @@ def defi_i_fast( open_,high, low, close,calc_arrs,**kwargs):
 
         return all_t_ent, all_t_ex
     except Exception as e:
-        logger.error(e, stack_info=True, exc_info=True)        
+        logger.error(e, stack_info=True, exc_info=True)     
 
-def defi_nomacro(close,all_t,ent_or_ex, calc_arr):
+"""
+transform the array of strategy into entries and exits
+
+Arguments
+----------
+    close: close prices
+    all_t: entries and exits for one strategy or the array
+    ent_or_ex: do we want to return the entries or exits?
+    calc_arr: array of the strategy combination 
+"""
+def defi_nomacro(
+        close: pd.core.frame.DataFrame,
+        all_t: list,
+        ent_or_ex: str, 
+        a_simple: list
+        )-> (pd.core.frame.DataFrame, pd.core.frame.DataFrame):
     non_pattern_len=7
     len_ent=non_pattern_len+len(BULL_PATTERNS)
     len_ex=non_pattern_len+len(BEAR_PATTERNS)
     ent=None
 
     if ent_or_ex=="ent":
-        arr=calc_arr[0:len_ent] 
+        arr=a_simple[0:len_ent] 
     else:
-        arr=calc_arr[len_ent:len_ent+len_ex]  
+        arr=a_simple[len_ent:len_ent+len_ex]  
     
     for ii in range(len(arr)):
         if arr[ii]:
@@ -154,22 +205,43 @@ def defi_nomacro(close,all_t,ent_or_ex, calc_arr):
     default=ic.VBTAND.run(ent, np.full(all_t[0].shape, False)).out #trick to keep the right shape
     return ent, default
 
-#wrapper for the different strategy functions
-def strat_wrapper_simple(open_,high, low, close, arr,
-                        direction="long"):
+"""
+wrapper for the different strategy functions
+
+No trend split
+
+Each strategy is defined by the arrays a_simple
+
+Arguments
+----------
+    open_: open prices
+    high: high prices
+    low: low prices
+    close: close prices
+    a_simple: array of the strategy combination 
+    dir_simple: direction to use during bull trend
+"""
+def strat_wrapper_simple(
+        open_: pd.core.frame.DataFrame,
+        high: pd.core.frame.DataFrame, 
+        low: pd.core.frame.DataFrame, 
+        close: pd.core.frame.DataFrame, 
+        a_simple: list,
+        dir_simple:str="long"
+        ) -> (pd.core.frame.DataFrame, pd.core.frame.DataFrame, pd.core.frame.DataFrame, pd.core.frame.DataFrame):
    
     #calculate all signals and patterns, is a bit long
-    ent,ex=defi_i_fast( open_,high, low, close,[arr])
+    ent,ex=defi_i_fast( open_,high, low, close,[a_simple])
     default=ic.VBTAND.run(ent, np.full(ent.shape, False)).out #trick to keep the right shape
     
-    if direction in ["long","both"]:
+    if dir_simple in ["long","both"]:
         entries=ent
         exits=ex
     else:
         entries=default
         exits=default
         
-    if direction in ["both","short"]:
+    if dir_simple in ["both","short"]:
         entries_short=ex
         exits_short=ent
     else:
@@ -178,33 +250,65 @@ def strat_wrapper_simple(open_,high, low, close, arr,
 
     return entries, exits, entries_short, exits_short
 
-def strat_wrapper_macro(open_,high, low, close, a_bull, a_bear, a_uncertain,
-                        macro_trend_bull="long", macro_trend_bear="both",
-                        macro_trend_uncertain="both",**kwargs):
-    
+"""
+wrapper for the different strategy functions
+
+split the trend in 3 parts: bear, uncertain, bull
+set a strategy for each of them
+
+Each strategy is defined by the arrays a_bull, a_bear, a_uncertain
+
+Arguments
+----------
+    open_: open prices
+    high: high prices
+    low: low prices
+    close: close prices
+    a_bull: array of the strategy combination to use for bull trend
+    a_bear: array of the strategy combination to use for bear trend
+    a_uncertain: array of the strategy combination to use for uncertain trend
+    dir_bull: direction to use during bull trend
+    dir_bear: direction to use during bear trend
+    dir_uncertain: direction to use during uncertain trend
+"""
+def strat_wrapper_macro(open_: np.array,
+                        high: np.array, 
+                        low: np.array, 
+                        close: np.array, 
+                        a_bull: list, 
+                        a_bear: list, 
+                        a_uncertain: list,
+                        dir_bull: str="long", 
+                        dir_bear: str="both",
+                        dir_uncertain: str="both",
+                        prd:bool=False,
+                        ):
     try:
-        if kwargs.get("prd"):
+        
+        if prd:
             t=VBTMACROTRENDPRD.run(close)
         else:
             t=VBTMACROTREND.run(close)
-
-        macro_trend=t.macro_trend
-        min_ind=t.min_ind
-        max_ind=t.max_ind
-        
-        #calculate all signals and patterns, is a bit long
-        calc_arrs=[a_bull,a_bear, a_uncertain ]
         
         #combine for the given array the signals and patterns
-        ent,ex=defi_i_fast( open_,high, low, close,calc_arrs,macro_trend=macro_trend)
+        ent,ex=defi_i_fast( open_,
+                           high,
+                           low, 
+                           close,
+                           calc_arrs=[a_bull,a_bear, a_uncertain ],
+                           macro_trend=t.macro_trend)
         #put both/long/short
-        t=VBTMACROMODE.run(ent,ex, macro_trend,\
-                           macro_trend_bull=macro_trend_bull,
-                           macro_trend_bear=macro_trend_bear,
-                           macro_trend_uncertain=macro_trend_uncertain)
+        t2=VBTMACROMODE.run(ent,ex, t.macro_trend,\
+                           dir_bull=dir_bull,
+                           dir_bear=dir_bear,
+                           dir_uncertain=dir_uncertain)
     
-        return t.entries, t.exits, t.entries_short, t.exits_short, macro_trend, min_ind, max_ind  
+        return t2.entries, t2.exits, t2.entries_short, t2.exits_short, t.macro_trend, t.min_ind, t.max_ind  
     except Exception as e:
+        import sys
+        _, e_, exc_tb = sys.exc_info()
+        print(e)
+        print("line " + str(exc_tb.tb_lineno))
         logger.error(e, stack_info=True, exc_info=True) 
   
 
@@ -643,7 +747,7 @@ class Strat(VBTfunc):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -660,9 +764,9 @@ class Strat(VBTfunc):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=True,
-                             macro_trend_bull=kwargs.get("macro_trend_bull","long"), 
-                             macro_trend_bear=kwargs.get("macro_trend_bear","short"),
-                             macro_trend_uncertain=kwargs.get("macro_trend_uncertain","long"),
+                             dir_bull=kwargs.get("dir_bull","long"), 
+                             dir_bear=kwargs.get("dir_bear","short"),
+                             dir_uncertain=kwargs.get("dir_uncertain","long"),
                              f_bull="VBTMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -672,55 +776,85 @@ class Strat(VBTfunc):
                              macro_trend_index=kwargs.get("macro_trend_index",False))
         self.get_output(s)        
         
-#for trend only        
-#wrapper for talib function
-def function_to_res(f_name, open_, high, low, close,**kwargs):
-    f_callable=getattr(ic,f_name)
-    needed_args=inspect.getfullargspec(f_callable.run).args
+'''
+Wrapper to call function from indicators based on their name
 
-    if ('open_' in needed_args) and ('close' in needed_args) and\
-       ('high' in needed_args) and ('low' in needed_args) :
-        if "light" in needed_args:
-            res = f_callable.run(open_, high, low, close,**kwargs)
-        else:
-            res = f_callable.run(open_, high, low, close)
-            
-    elif ('close' in needed_args) and\
-       ('high' in needed_args) and ('low' in needed_args) :  
-        if "light" in needed_args:
-            res = f_callable.run(high, low, close,**kwargs)
-        else:
-            res = f_callable.run(high, low, close)
-    elif ('open_' in needed_args) and\
-          ('high' in needed_args) and ('low' in needed_args) :  
-        if "light" in needed_args:
-            res = f_callable.run(open_,  low, close,**kwargs)
-        else:
-            res = f_callable.run(open_,  low, close)
-    elif  ('close' in needed_args)  and ('low' in needed_args) :  
-        if "light" in needed_args:
-               res = f_callable.run(low, close,**kwargs)
-        else:
-               res = f_callable.run(low, close)
-    elif  ('high' in needed_args)  and ('low' in needed_args) :  
-        if "light" in needed_args:           
-           res = f_callable.run(high, low,**kwargs)
-        else:
-           res = f_callable.run(high, low) 
-    else:
-        if "light" in needed_args:  
-           res = f_callable.run(close,**kwargs)
-        else:
-           res = f_callable.run(close)
+Arguments
+----------
+    f_name: name of the function in indicators
+    open_: open prices
+    high: high prices
+    low: low prices
+    close: close prices
+    light: for pattern, choose pattern normal or light
+'''
+def function_to_res(
+        f_name: str, 
+        open_: np.array, 
+        high: np.array, 
+        low: np.array, 
+        close: np.array,
+        light: bool=None
+        ) -> (np.array, np.array):
     
+    f_callable=getattr(ic,f_name)
+    dic={}
+
+    for k in ["open_","close","high","low","light"]:
+        if k in inspect.getfullargspec(f_callable.run).args:
+            dic[k]=locals()[k]
+
+    res = f_callable.run(**dic)
     return res.entries, res.exits
 
-#wrapper for the different strategy functions
-def strat_wrapper(open_,high, low, close, close_ind,
-                f_bull="VBTSTOCHKAMA", f_bear="VBTSTOCHKAMA", f_uncertain="VBTSTOCHKAMA",
-                f_very_bull="VBTSTOCHKAMA", f_very_bear="VBTSTOCHKAMA",
-                trend_lim=1.5, trend_lim2=10, macro_trend_bool=False,macro_trend_bull="long", macro_trend_bear="short",
-                macro_trend_uncertain="both",trend_key="bbands",macro_trend_index=False,light=True):
+'''
+wrapper for the different strategy functions
+
+split the trend in 5 parts: very bear, bear, uncertain, bull and very bull
+set a strategy for each of them
+
+Arguments
+----------
+    open_: open prices
+    high: high prices
+    low: low prices
+    close: close prices
+    close_ind: close prices of the corresponding main index
+    f_bull: strategy function to use during bull trend
+    f_bear: strategy function to use during bear trend
+    f_uncertain: strategy function to use during uncertain trend
+    f_very_bull: strategy function to use during very bull trend
+    f_very_bear: strategy function to use during very bear trend
+    trend_lim: score of the trend between uncertain and bear/bull
+    trend_lim2: score of the trend between bear/bull and very bear/very bull
+    macro_trend_bool: differentiate the direction depending on the macro trend
+    dir_bull: direction to use during bull trend
+    dir_bear: direction to use during bear trend
+    dir_uncertain: direction to use during uncertain trend
+    trend_key: which trend function is to be used
+    macro_trend_index: base the macro trend calculation on the main index only, or not
+    light: for pattern, choose pattern normal or light
+'''
+def strat_wrapper(
+        open_: np.array,
+        high: np.array, 
+        low: np.array, 
+        close: np.array, 
+        close_ind: np.array,
+        f_bull:str="VBTSTOCHKAMA", 
+        f_bear:str="VBTSTOCHKAMA", 
+        f_uncertain:str="VBTSTOCHKAMA",
+        f_very_bull:str="VBTSTOCHKAMA", 
+        f_very_bear:str="VBTSTOCHKAMA",
+        trend_lim: numbers.Number=1.5, 
+        trend_lim2: numbers.Number=10, 
+        macro_trend_bool:bool=False,
+        dir_bull:str="long", 
+        dir_bear:str="short",
+        dir_uncertain:str="both",
+        trend_key:str="bbands",
+        macro_trend_index:bool=False,
+        light:bool=True):
     
     macro_trend=np.full(close.shape, 0)  
     min_ind=np.full(close.shape, 0)   
@@ -736,13 +870,8 @@ def strat_wrapper(open_,high, low, close, close_ind,
         t=ic.VBTBBANDSTREND.run(close)
     else:
         t=ic.VBTMACDBBTREND.run(close)
-        
-    trend=t.trend
-    kama=t.kama
-    bb_bw=t.bb_bw
-        
+  
     ent_very_bull, ex_very_bull=function_to_res(f_very_bull,open_, high, low, close,light=light)
-    
     ent_very_bear, ex_very_bear=function_to_res(f_very_bear, open_, high, low, close,light=light)
     ent_bull, ex_bull=function_to_res(f_bull,open_, high, low, close,light=light)
     ent_bear, ex_bear=function_to_res(f_bear, open_, high, low, close,light=light)
@@ -759,16 +888,16 @@ def strat_wrapper(open_,high, low, close, close_ind,
     
     for ii in range(len(close)):
           if trend_lim!=100:
-              if trend[ii]<=-trend_lim2:
+              if t.trend[ii]<=-trend_lim2:
                   temp_ent[ii] = ent_very_bull[ii]
                   temp_ex[ii] = ex_very_bull[ii] 
-              elif trend[ii]>=trend_lim2:
+              elif t.trend[ii]>=trend_lim2:
                   temp_ent[ii] = ent_very_bear[ii]
                   temp_ex[ii] = ex_very_bear[ii]                   
-              elif trend[ii]<-trend_lim:
+              elif t.trend[ii]<-trend_lim:
                   temp_ent[ii] = ent_bull[ii]
                   temp_ex[ii] = ex_bull[ii] 
-              elif trend[ii]>trend_lim:
+              elif t.trend[ii]>trend_lim:
                   temp_ent[ii] = ent_bear[ii]
                   temp_ex[ii] = ex_bear[ii]
               else:
@@ -780,61 +909,61 @@ def strat_wrapper(open_,high, low, close, close_ind,
 
           if macro_trend_bool:
               if macro_trend[ii]==-1:
-                  if (temp!=0 and macro_trend_bull not in ["both", "short"]):
+                  if (temp!=0 and dir_bull not in ["both", "short"]):
                       exits_short[ii] = True
-                  if (temp!=0 and macro_trend_bull not in ["both", "long"]):
+                  if (temp!=0 and dir_bull not in ["both", "long"]):
                       exits[ii] = True
 
-                  if macro_trend_bull in ["both", "short"]:
+                  if dir_bull in ["both", "short"]:
                       entries_short[ii] = temp_ex[ii]
                       exits_short[ii] = temp_ent[ii] 
                       
-                  if macro_trend_bull in ["both", "long"]:
+                  if dir_bull in ["both", "long"]:
                       entries[ii] = temp_ent[ii]
                       exits[ii] = temp_ex[ii]
 
                   temp=0
                   
               elif macro_trend[ii]==1:
-                  if (temp!=1 and macro_trend_bear not in ["both", "short"]):
+                  if (temp!=1 and dir_bear not in ["both", "short"]):
                       exits_short[ii] = True
-                  if (temp!=1 and macro_trend_bear not in ["both", "long"]):
+                  if (temp!=1 and dir_bear not in ["both", "long"]):
                       exits[ii] = True
 
-                  if macro_trend_bear in ["both", "short"]:
+                  if dir_bear in ["both", "short"]:
                       entries_short[ii] = temp_ex[ii]
                       exits_short[ii] = temp_ent[ii] 
                       
-                  if macro_trend_bear in ["both", "long"]:
+                  if dir_bear in ["both", "long"]:
                       entries[ii] = temp_ent[ii]
                       exits[ii] = temp_ex[ii]
 
                   temp=1
               else:
-                  if (temp!=2 and macro_trend_uncertain not in ["both", "short"]):
+                  if (temp!=2 and dir_uncertain not in ["both", "short"]):
                       exits_short[ii] = True
-                  if (temp!=2 and macro_trend_uncertain not in ["both", "long"]):
+                  if (temp!=2 and dir_uncertain not in ["both", "long"]):
                       exits[ii] = True
                   
-                  if macro_trend_uncertain in ["both", "short"]:
+                  if dir_uncertain in ["both", "short"]:
                       entries_short[ii] = temp_ex[ii]
                       exits_short[ii] = temp_ent[ii] 
                       
-                  if macro_trend_uncertain in ["both", "long"]:
+                  if dir_uncertain in ["both", "long"]:
                       entries[ii] = temp_ent[ii]
                       exits[ii] = temp_ex[ii]                  
 
                   temp=2
           else: #no macro trend
-              if macro_trend_uncertain in ["both", "short"]:
+              if dir_uncertain in ["both", "short"]:
                   entries_short[ii] = temp_ex[ii]
                   exits_short[ii] = temp_ent[ii] 
                 
-              if macro_trend_uncertain in ["both", "long"]:
+              if dir_uncertain in ["both", "long"]:
                   entries[ii] = temp_ent[ii]
                   exits[ii] = temp_ex[ii]    
      
-    return entries, exits, entries_short, exits_short, trend, macro_trend, kama, bb_bw, min_ind, max_ind  
+    return entries, exits, entries_short, exits_short, t.trend, macro_trend, t.kama, t.bb_bw, min_ind, max_ind  
   
 STRATWRAPPER = vbt.IF(
      class_name='StratWrapper',
@@ -842,8 +971,8 @@ STRATWRAPPER = vbt.IF(
      input_names=['high', 'low', 'close','open_','close_ind'],
      param_names=['f_bull', 'f_bear', 'f_uncertain','f_very_bull', 'f_very_bear','trend_lim', 
                   'trend_lim2', 
-                  'macro_trend_bool','macro_trend_bull',
-                  'macro_trend_bear','macro_trend_uncertain','trend_key','macro_trend_index'],
+                  'macro_trend_bool','dir_bull',
+                  'dir_bear','dir_uncertain','trend_key','macro_trend_index'],
      output_names=['entries', 'exits', 'entries_short', 'exits_short','trend','macro_trend',
                    'kama','bb_bw','min_ind', 'max_ind'] 
 ).with_apply_func(
@@ -852,9 +981,9 @@ STRATWRAPPER = vbt.IF(
      trend_lim=1.5,
      trend_lim2=10,
      macro_trend_bool=False,
-     macro_trend_bull="long", 
-     macro_trend_bear="short",
-     macro_trend_uncertain="both",
+     dir_bull="long", 
+     dir_bear="short",
+     dir_uncertain="both",
      f_bull="VBTSTOCHKAMA", 
      f_bear="VBTSTOCHKAMA", 
      f_uncertain="VBTSTOCHKAMA",
@@ -863,4 +992,4 @@ STRATWRAPPER = vbt.IF(
      trend_key="bbands",
      macro_trend_index=False,
      light=True
-)            
+)              

@@ -171,7 +171,7 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),0.03)  
 
     def test_strat_kama_stoch_matrend_bbands_macro(self): 
-        self.st_legacy.strat_kama_stoch_matrend_bbands_macro(macro_trend_bull="long",macro_trend_uncertain="long",macro_trend_bear="both")
+        self.st_legacy.strat_kama_stoch_matrend_bbands_macro(dir_bull="long",dir_uncertain="long",dir_bear="both")
         
         pf=vbt.Portfolio.from_signals(self.st_legacy.close, self.st_legacy.entries,self.st_legacy.exits,
                                       short_entries=self.st_legacy.entries_short,
@@ -182,7 +182,7 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),0.60)  
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),1.36)  
 
-        self.st_legacy.strat_kama_stoch_matrend_bbands_macro(macro_trend_bull="long",macro_trend_uncertain="both",macro_trend_bear="both")
+        self.st_legacy.strat_kama_stoch_matrend_bbands_macro(dir_bull="long",dir_uncertain="both",dir_bear="both")
         
         pf=vbt.Portfolio.from_signals(self.st_legacy.close, self.st_legacy.entries,self.st_legacy.exits,
                                       short_entries=self.st_legacy.entries_short,
@@ -194,7 +194,7 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),1.73) 
 
     def test_strat_kama_stoch_matrend_macdbb_macro(self): 
-        self.st.strat_kama_stoch_matrend_macdbb_macro(macro_trend_bull="long",macro_trend_uncertain="long",macro_trend_bear="both")
+        self.st.strat_kama_stoch_matrend_macdbb_macro(dir_bull="long",dir_uncertain="long",dir_bear="both")
         
         pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,
                                       short_entries=self.st.entries_short,
@@ -205,7 +205,7 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.89)  
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),4.07)  
 
-        self.st.strat_kama_stoch_matrend_macdbb_macro(macro_trend_bull="long",macro_trend_uncertain="both",macro_trend_bear="both")
+        self.st.strat_kama_stoch_matrend_macdbb_macro(dir_bull="long",dir_uncertain="both",dir_bear="both")
         
         pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,
                                       short_entries=self.st.entries_short,
@@ -218,7 +218,7 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.66) 
 
     def test_strat_kama_stoch_macro(self): 
-        self.st_legacy.strat_kama_stoch_macro(macro_trend_bull="long",macro_trend_uncertain="long",macro_trend_bear="both")
+        self.st_legacy.strat_kama_stoch_macro(dir_bull="long",dir_uncertain="long",dir_bear="both")
         
         pf=vbt.Portfolio.from_signals(self.st_legacy.close, self.st_legacy.entries,self.st_legacy.exits,
                                       short_entries=self.st_legacy.entries_short,
@@ -230,7 +230,7 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),9.73)  
 
     def test_strat_pattern_light_macro(self): 
-        self.st_legacy.strat_pattern_light_macro(macro_trend_bull="long",macro_trend_uncertain="long",macro_trend_bear="both")
+        self.st_legacy.strat_pattern_light_macro(dir_bull="long",dir_uncertain="long",dir_bear="both")
         
         pf=vbt.Portfolio.from_signals(self.st_legacy.close, self.st_legacy.entries,self.st_legacy.exits,
                                       short_entries=self.st_legacy.entries_short,
