@@ -4,7 +4,6 @@ from django.db.models import Q
 
 from trading_bot.settings import _settings
 import datetime
-#from orders.ib import 
 import logging
 logger = logging.getLogger(__name__)
 

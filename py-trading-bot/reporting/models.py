@@ -602,7 +602,7 @@ class Report(models.Model):
 
 	Optional arguments
 	----------
-    index: is it indexes that are provided
+    it_is_index: is it indexes that are provided
     exchange: name of the stock exchange
     symbols: list of YF symbols
     sec: sector of the stocks for which we write the report

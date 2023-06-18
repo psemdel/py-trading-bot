@@ -653,10 +653,25 @@ def check_if_index(action):
     else:
         return False    
  
-# All symbols must be from same stock exchange
-#IB need a ticker, an exchange and information about the type of product to find the correct contract
+"""
+Retrieve the data using IB
+
+Note: All symbols must be from same stock exchange
+IB need a ticker, an exchange and information about the type of product to find the correct contract
+
+Arguments
+----------
+    actions: list of products to be downloaded
+    period: time period for which data should be downloaded
+    it_is_index: is it indexes that are provided
+"""     
+
 @connect_ib 
-def retrieve_data_ib(actions,period,**kwargs):
+def retrieve_data_ib(
+        actions: list,
+        period: str,
+        it_is_index: bool=False
+        ):
     try:
         period=period_YF_to_ib(period)
         exchanges={}
@@ -667,11 +682,11 @@ def retrieve_data_ib(actions,period,**kwargs):
             ib_symbol=a.ib_ticker()
             ib_symbols.append(ib_symbol)
             exchanges[ib_symbol]=a.stock_ex.ib_ticker
-            indexes[ib_symbol]=kwargs.get("index",False)
+            indexes[ib_symbol]=it_is_index
         
         #add the index to the list of stocks downloaded. Useful to make calculation on the index to determine trends
         #by downloading at the same time, we are sure the signals are aligned
-        if kwargs.get("index",False):
+        if it_is_index:
             index_symbol=ib_symbols[0]
             all_symbols=ib_symbols
         else:
@@ -708,13 +723,28 @@ def retrieve_data_ib(actions,period,**kwargs):
             index_symbol_ib
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
-#YF can work with only the symbol to obtain the right contract
-def retrieve_data_YF(actions,period,**kwargs):
+         
+"""
+Retrieve the data using YF
+
+YF can work with only the symbol to obtain the right contract
+
+Arguments
+----------
+    actions: list of products to be downloaded
+    period: time period for which data should be downloaded
+    it_is_index: is it indexes that are provided
+"""
+def retrieve_data_YF(
+        actions: list,
+        period: str,
+        it_is_index: bool=False
+        ):
     #add the index to the list of stocks downloaded. Useful to make calculation on the index to determine trends
     #by downloading at the same time, we are sure the signals are aligned
     try:
         symbols=[a.symbol for a in actions]
-        if kwargs.get("index",False):
+        if it_is_index:
             index_symbol=symbols[0]
             all_symbols=symbols
         else:
@@ -767,19 +797,37 @@ def retrieve_data_YF(actions,period,**kwargs):
     except Exception as e:
          print(e)
          logger.error(e, stack_info=True, exc_info=True)
-        
-def retrieve_data(o,actions,period,use_IB,**kwargs):
+
+"""
+Retrieve the data using IB or YF
+
+
+Arguments
+----------
+    o: object were to put the results
+    actions: list of products to be downloaded
+    period: time period for which data should be downloaded
+    use_IB: use IB for downloading the data
+    it_is_index: is it indexes that are provided
+    
+"""        
+def retrieve_data(o,
+                  actions: list,
+                  period: str,
+                  use_IB: str=False,
+                  it_is_index: bool=False,
+                  ) -> (bool, list):
     if actions is None or len(actions)==0:
         raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:
         if use_IB:
             try:
-                cours, symbols, index_symbol=retrieve_data_ib(actions,period,**kwargs)
+                cours, symbols, index_symbol=retrieve_data_ib(actions,period,it_is_index=it_is_index)
             except:
                 logger.info("IB retrieval of symbol failed, fallback on YF")
                 use_IB=False #fallback
         if not use_IB:
-            cours, symbols, index_symbol=retrieve_data_YF(actions,period,**kwargs)
+            cours, symbols, index_symbol=retrieve_data_YF(actions,period,it_is_index=it_is_index)
 
         o.data=cours.select(symbols)
         o.data_ind=cours.select(index_symbol)
