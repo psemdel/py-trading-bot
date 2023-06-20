@@ -84,11 +84,11 @@ def stop(bot, sched):
     bot.stop()
     sched.stop()    
 
-'''
-The scheduler contains at the same time the job scheduling and the telegram bot
-'''
 class MyScheduler():
     def __init__(self, telegram_bot,**kwargs):
+        '''
+        The scheduler contains at the same time the job scheduling and the telegram bot
+        '''
         self.manager = vbt.ScheduleManager()
         self.telegram_bot=telegram_bot
         
@@ -141,55 +141,56 @@ class MyScheduler():
                            +"\n cleaning " + str(self.cleaning) 
                            )   
 
-    '''
-    Schedule a job for the working days, as there is no trade the weekend
-    '''
+    
     def do_weekday(self, 
                    strh: str, 
                    f, #function
                    **kwargs):
+        '''
+        Schedule a job for the working days, as there is no trade the weekend
+        '''
         self.manager.every('monday', strh).do(f, **kwargs)
         self.manager.every('tuesday', strh).do(f, **kwargs)
         self.manager.every('wednesday', strh).do(f, **kwargs)
         self.manager.every('thursday', strh).do(f, **kwargs)
         self.manager.every('friday', strh).do(f, **kwargs)
-        
-    '''
-    Deactivate the alert at the end of the day
-    '''
+
     def cleaning_f(self):
+        '''
+        Deactivate the alert at the end of the day
+        '''
         alerts=Alert.objects.filter(active=True)
         for alert in alerts:
             alert.active=False
             alert.save()
     
-    '''
-    Check if the stock exchange is open
-    '''
     def check_stock_ex_open(self,action: Action)-> bool:
+        '''
+        Check if the stock exchange is open
+        '''
         tz=ZoneInfo(action.stock_ex.timezone)
         now=datetime.now(tz).time() #wil compare the time in the local time to opening_time, also in the local time
         
         return (now >action.stock_ex.opening_time and\
                     now <action.stock_ex.closing_time)
     
-    '''
-    Check if the price variation for a product is within predefined borders
-    Create an alert if it is not the case
-    
-    Arguments
-   	----------
-       ratio: present price variation in percent
-       action: product concerned
-       short: if the product is presently in a short direction
-       opening: test at stock exchange opening (need to compare with the day before then)
-    '''
     def check_change(self,
                      ratio: numbers.Number, 
                      action: Action,
                      short: bool,
                      opening: bool=False,
                      **kwargs):
+        '''
+        Check if the price variation for a product is within predefined borders
+        Create an alert if it is not the case
+        
+        Arguments
+       	----------
+           ratio: present price variation in percent
+           action: product concerned
+           short: if the product is presently in a short direction
+           opening: test at stock exchange opening (need to compare with the day before then)
+        '''
         try:
             symbols_opportunity=constants.INDEXES+constants.RAW
 
@@ -263,20 +264,19 @@ class MyScheduler():
             logger.error(e, stack_info=True, exc_info=True)
             pass
 
-    '''
-    Preliminary steps for verification of the price variation
-    Replace the etf through their respective index    
-    
-    Arguments
-   	----------
-       actions: list of action to be checked for price variation
-       short: if the products are presently in a short direction
-    '''
-
     def check_cours(self,
                     actions: list, 
                     short: bool,
                     **kwargs):
+        '''
+        Preliminary steps for verification of the price variation
+        Replace the etf through their respective index    
+        
+        Arguments
+       	----------
+           actions: list of action to be checked for price variation
+           short: if the products are presently in a short direction
+        '''
         try:
             for action in actions: #otherwise issue with NaN
                 #check ETF --> better to check the underlying
@@ -295,17 +295,17 @@ class MyScheduler():
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass   
-        
-    '''
-    Check price variation for indexes , so independently from their belonging or not 
-    
-    Arguments
-   	----------
-       opening: test at stock exchange opening (need to compare with the day before then)
-    '''
+
     def check_index(self,
                     opening: str=None,
                     **kwargs):
+        '''
+        Check price variation for indexes , so independently from their belonging or not 
+        
+        Arguments
+       	----------
+           opening: test at stock exchange opening (need to compare with the day before then)
+        '''
         try:
             print("check index")
             cat=ActionCategory.objects.get(short="IND")
@@ -338,10 +338,10 @@ class MyScheduler():
             logger.error(e, stack_info=True, exc_info=True)
             pass
         
-    '''
-    Check price variation for portofolio, so products that we own
-    '''    
     def check_pf(self,**kwargs):
+        '''
+        Check price variation for portofolio, so products that we own
+        ''' 
         try:
             actions=pf_retrieve_all(**kwargs)
             actions_short=pf_retrieve_all(short=True,**kwargs)
@@ -362,19 +362,18 @@ class MyScheduler():
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass
-        
-    '''
-    Check price variation for product that have a stop loss
-    Trigger the selling if the limit is reached
-    
-    Arguments
-   	----------
-       actions: list of action to be checked for price variation
-    '''  
+
     def check_sl(self,
                  actions: list,
                  **kwargs):
+        '''
+        Check price variation for product that have a stop loss
+        Trigger the selling if the limit is reached
         
+        Arguments
+       	----------
+           actions: list of action to be checked for price variation
+        '''  
         for action in actions:
             if self.check_stock_ex_open(action):
                 c1 = Q(action=action)
@@ -415,16 +414,17 @@ class MyScheduler():
                                            **kwargs)
                                 if ex:
                                     self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="daily stop loss")                        
-    '''
-    Send Telegram message if orders have been performed
-    
-    Arguments
-   	----------
-       report: report for which the calculation happened
-    '''              
+           
     def send_order(self,
                    report: Report
                    ):
+        '''
+        Send Telegram message if orders have been performed
+        
+        Arguments
+       	----------
+           report: report for which the calculation happened
+        '''   
         for auto in [False, True]:
             for entry in [False, True]:
                 for short in [False, True]:
@@ -440,6 +440,9 @@ class MyScheduler():
              self.telegram_bot.send_message_to_all(report.text)       
     
     def daily_report_sub(self,exchange:str,**kwargs):
+        '''
+        See daily report
+        '''        
         report1=Report()
         report1.save()
         
@@ -452,23 +455,26 @@ class MyScheduler():
         self.send_order(report1)
         
     def daily_report_index_sub(self,indexes: list):
+        '''
+        See daily report
+        '''
         report3=Report()
         report3.save()    
 
-        report3.daily_report(symbols=indexes,is_it_index=True) # "BZ=F" issue
+        report3.daily_report(symbols=indexes,it_is_index=True) # "BZ=F" issue
         self.send_order(report3)
         
-    '''
-    Write report for an exchange and/or sector
-    
-    Arguments
-   	----------
-       report: report for which the calculation happened
-    '''  
     def daily_report(self, 
                      short_name: str=None,
                      key: str=None,
                      **kwargs):
+        '''
+        Write report for an exchange and/or sector
+        
+        Arguments
+       	----------
+           report: report for which the calculation happened
+        '''  
         try:
             print("writting daily report "+short_name)
             for exchange in _settings[key]:
@@ -489,22 +495,23 @@ class MyScheduler():
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass
-    '''
-    Define the message for the Telegram depending on the arguments
-    
-    Arguments
-   	----------
-       symbol: YF ticker of the product for which the order was performed
-       entry: was it an entry or an exit
-       short: direction of the order
-       auto: was the order automatic or not
-    '''  
+
     def send_entry_exit_msg(self,
                             symbol:str,
                             entry: bool,
                             short: bool, 
                             auto: bool,
                             **kwargs):
+        '''
+        Define the message for the Telegram depending on the arguments
+        
+        Arguments
+       	----------
+           symbol: YF ticker of the product for which the order was performed
+           entry: was it an entry or an exit
+           short: direction of the order
+           auto: was the order automatic or not
+        '''  
         if auto:
             part1=""
             part2=""
@@ -524,25 +531,25 @@ class MyScheduler():
         part4=kwargs.get("suffix","")
             
         self.telegram_bot.send_message_to_all(part1+part2+symbol + " "+ part3+" " +part4)
- 
-    '''
-    Function to test if the bot is running
-    '''
+
     def heartbeat_f(self):
+        '''
+        Function to test if the bot is running
+        '''
         self.telegram_bot.send_message_to_all("Heart beat")
 
-    '''
-    Function to test if the connection with IB is running
-    '''
     def heartbeat_ib_f(self):
+        '''
+        Function to test if the connection with IB is running
+        '''
         a=Action.objects.get(symbol="AAPL")
         t=get_last_price(a)
         self.telegram_bot.send_message_to_all("Apple current price: " + str(t))
-        
-    '''
-    Update slow strategy candidates at regular periods
-    '''
+
     def update_slow_strat(self):
+        '''
+        Update slow strategy candidates at regular periods
+        '''
         jobs=Job.objects.all()
         today=timezone.now()
         
@@ -551,14 +558,15 @@ class MyScheduler():
                 actualize_job(j.strategy.name, j.period_year, j.stock_ex.name)
                 j.last_execution=today
                 j.save()
-'''
-Perform a job with long intervals between two executions
-'''        
+       
 def actualize_job(
         strategy: str, 
         period_year: numbers.Number, 
         exchange:str
         ):
+    '''
+    Perform a job with long intervals between two executions
+    ''' 
     use_IB, actions=get_exchange_actions(exchange)
     presel=preselP.PreselPRD(use_IB,actions1=actions,period1=str(period_year)+"y",exchange=exchange)
     

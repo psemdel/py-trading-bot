@@ -41,7 +41,7 @@ if False:
           a_bear=a_bear,
           a_uncertain=a_uncertain,   
           #sl=0.005
-          #index=True
+          #it_is_index=True
           macro_trend_bull="long", 
           macro_trend_uncertain="both",
           macro_trend_bear="both",
@@ -124,7 +124,7 @@ if False:
            a_bull=a_bull,
            a_bear=a_bear,
            a_uncertain=a_uncertain, 
-           #index=True
+           #it_is_index=True
            )      
     
 #o.perf()  
@@ -148,7 +148,7 @@ if False:
            a_bull=a_bull,
            a_bear=a_bear,
            a_uncertain=a_uncertain, 
-           #index=True
+           #it_is_index=True
            )  
     
     o.outer_perf()      
@@ -175,7 +175,7 @@ if False:
            a_bull=a_bull,
            a_bear=a_bear,
            a_uncertain=a_uncertain, 
-           #index=True,
+           #it_is_index=True,
            test_window_start=0
            )  
     
@@ -206,7 +206,7 @@ if False:
                a_bull=a_bull,
                a_bear=a_bear,
                a_uncertain=a_uncertain, 
-               #index=True,
+               #it_is_index=True,
                test_window_start=0
                )  
         
@@ -238,7 +238,7 @@ if True:
            a_bull=a_bull,
            a_bear=a_bear,
            a_uncertain=a_uncertain, 
-           #index=True,
+           #it_is_index=True,
            test_window_start=0
            )  
     

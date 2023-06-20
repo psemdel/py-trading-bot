@@ -12,24 +12,6 @@ import talib
 from numba import njit
 from trading_bot.settings import _settings
 
-'''
-Determine when the trend is bull/bear or uncertain in order to improve the underlying strategy or
-to determine the ideal direction (long/short/both)
-'''
-
-'''
-Determine the top and bottom from the KAMA function
-
-Arguments
-----------
-    kama: smoothed price (KAMA method)
-    init: initial index
-    last_top_ind: index of the last top
-    last_bot_ind: index of the last bottom
-    threshold: threshold to determine when there is a top or a bottom
-    threshold_uncertain: threshold to determine when we are in an uncertain period
-    deadband: deadband before changing the trend decision
-'''
 @njit
 def major_int_sub(
         kama: np.array, 
@@ -40,7 +22,24 @@ def major_int_sub(
         threshold_uncertain: numbers.Number, 
         deadband: numbers.Number
         )-> (np.array, int, int):
-    
+    '''
+    Determine when the trend is bull/bear or uncertain in order to improve the underlying strategy or
+    to determine the ideal direction (long/short/both)
+    '''
+
+    '''
+    Determine the top and bottom from the KAMA function
+
+    Arguments
+    ----------
+        kama: smoothed price (KAMA method)
+        init: initial index
+        last_top_ind: index of the last top
+        last_bot_ind: index of the last bottom
+        threshold: threshold to determine when there is a top or a bottom
+        threshold_uncertain: threshold to determine when we are in an uncertain period
+        deadband: deadband before changing the trend decision
+    '''
     macro_trend_nouncertain= np.full(kama.shape, 0)
     macro_trend= np.full(kama.shape, 0)
     max_ind= np.full(kama.shape, 0)
@@ -110,22 +109,22 @@ def major_int_sub(
             
     return macro_trend, min_ind, max_ind
 
-'''
-Determine the top and bottom from the KAMA function
-
-Arguments
-----------
-    close: close price
-    threshold: threshold to determine when there is a top or a bottom
-    threshold_uncertain: threshold to determine when we are in an uncertain period
-    deadband: deadband before changing the trend decision
-'''
 def major_int(
         close: np.array,
         threshold: numbers.Number=0.04, 
         threshold_uncertain: numbers.Number=0, 
         deadband: numbers.Number=0.1
         )-> (np.array, int, int):
+    '''
+    Determine the top and bottom from the KAMA function
+
+    Arguments
+    ----------
+        close: close price
+        threshold: threshold to determine when there is a top or a bottom
+        threshold_uncertain: threshold to determine when we are in an uncertain period
+        deadband: deadband before changing the trend decision
+    '''
     kama=talib.KAMA(close,timeperiod=30)
 
     #by kama the begin is nan
@@ -151,16 +150,15 @@ VBTMACROTREND= vbt.IF(
      threshold_uncertain=0,
      deadband=0.1
      )  
-
-
-'''
-Like major_int but can be forced to a certain value
-'''    
+  
 def major_int_prd(close: np.array,
                   threshold: numbers.Number=0.04, 
                   threshold_uncertain: numbers.Number=0, 
                   deadband: numbers.Number=0.1
                   )-> (np.array, int, int):
+    '''
+    Like major_int but can be forced to a certain value
+    '''  
     macro_trend, min_ind, max_ind=major_int(close,threshold,threshold_uncertain,deadband)
     if _settings["FORCE_MACRO_TO"]=="bear":
         macro_trend[-1]=1 
@@ -184,18 +182,26 @@ VBTMACROTRENDPRD= vbt.IF(
      deadband=0.1
      )     
 
-'''
-Translate the entries and exits in entries, exits, entries_short, exits_short depending on the direction chosen 
-
-'''   
 @njit        
 def macro_mode(
-        temp_ent,
-        temp_ex, 
-        macro_trend, 
-        dir_bull, 
-        dir_bear, 
-        dir_uncertain):
+        temp_ent: np.array,
+        temp_ex: np.array, 
+        macro_trend: np.array, 
+        dir_bull: str, 
+        dir_bear: str, 
+        dir_uncertain: str) -> (np.array, np.array, np.array, np.array):
+    '''
+    Translate the entries and exits in entries, exits, entries_short, exits_short depending on the direction chosen 
+
+    Arguments
+    ----------
+        temp_ent: entries but without consideration of the trend
+        temp_ex: exits but without consideration of the trend
+        macro_trend: trend for each symbols and moment in time
+        dir_bull: direction to use during bull trend
+        dir_bear: direction to use during bear trend
+        dir_uncertain: direction to use during uncertain trend
+    '''       
     entries= np.full(temp_ent.shape, False)   
     exits= np.full(temp_ent.shape, False)   
     entries_short= np.full(temp_ent.shape, False)   
@@ -266,9 +272,20 @@ VBTMACROMODE= vbt.IF(
       dir_uncertain="both"
  )    
     
-    
-#restrain to the correct period the entries and exits
-def vbt_macro_filter(ent, macro_trend, mode): 
+def vbt_macro_filter(
+        ent: np.array, 
+        macro_trend: np.array, 
+        mode: int
+        ) -> np.array: 
+    '''
+    restrain to the correct period the entries or exits 
+
+    Arguments
+    ----------
+        ent: entries or exits without consideration of the trend
+        macro_trend: trend for each symbols and moment in time
+        mode: mode to select: bull/bear/uncertain
+    '''   
     out=np.full(ent.shape,False)
     try:
         ind=(macro_trend[:]==mode)
@@ -291,8 +308,15 @@ VBTMACROFILTER= vbt.IF(
      takes_1d=True,  
      )    
 
-#only to visualize macro_mode
-def macro_vis( macro_trend, mode_to_vis ):
+def macro_vis( macro_trend: np.array, mode_to_vis:int ):
+    '''
+    Function to visualize macro_mode in vbt (will put an entry/exit when the mode is entered or exited)
+
+    Arguments
+    ----------
+        macro_trend: trend for each symbols and moment in time
+        mode: mode to select: bull/bear/uncertain
+    '''  
     entries=(macro_trend[:]==mode_to_vis)
     exits=~entries
       

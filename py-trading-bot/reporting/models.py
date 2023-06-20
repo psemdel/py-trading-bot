@@ -20,11 +20,11 @@ from orders.models import Action, Order, get_pf, get_candidates,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission, filter_intro_action
       
-"""
-Temporary storage for the telegram to message the orders at the end of the reporting.
-Difficulty is that the telegram bot is async, so it is not possible to just make send_msg() in the order execution function
-"""
 class ListOfActions(models.Model):
+    """
+    Temporary storage for the telegram to message the orders at the end of the reporting.
+    Difficulty is that the telegram bot is async, so it is not possible to just make send_msg() in the order execution function
+    """
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     entry=models.BooleanField(blank=False,default=False) #otherwise exit
     short=models.BooleanField(blank=False,default=False)
@@ -36,12 +36,12 @@ class ListOfActions(models.Model):
         print(text)     
         self.text+=text +"\n"
         self.save() 
-        
-"""
-Periodically, a report is written. It performs calculation to decide if products need to be bought or sold.
-It also fill ActionReports which saves human readable indicators
-"""
+
 class Report(models.Model):
+    """
+    Periodically, a report is written. It performs calculation to decide if products need to be bought or sold.
+    It also fill ActionReports which saves human readable indicators
+    """
     date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #) default=timezone.now()
     text=models.TextField(blank=True)
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
@@ -60,19 +60,19 @@ class Report(models.Model):
         self.save()
 
 ### Logic for buying and selling actions preselected with retard strategy
-    """
-   	Convert a list of tickers to list of YF tickers
-       
-    Arguments
-   	----------
-       symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
-       candidates: list of product symbols, that can be either YF or IB tickers
-       
-   	""" 
     def candidates_to_YF(self,
                          symbols_to_YF: dict=None, 
                          candidates: list=[]
                          ) -> list:
+        """
+       	Convert a list of tickers to list of YF tickers
+           
+        Arguments
+       	----------
+           symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
+           candidates: list of product symbols, that can be either YF or IB tickers
+           
+       	""" 
         return [symbols_to_YF[c] for c in candidates]
 
     def retard(self,presel,exchange,st,**kwargs):
@@ -597,23 +597,23 @@ class Report(models.Model):
             logger.error(e, stack_info=True, exc_info=True)
             pass   
         
-    """
-	Method that write the report itself
-
-	Optional arguments
-	----------
-    it_is_index: is it indexes that are provided
-    exchange: name of the stock exchange
-    symbols: list of YF symbols
-    sec: sector of the stocks for which we write the report
-    
-	"""       
     def daily_report(self,
         it_is_index: bool=False,
         exchange: str=None,
         sec: str=None,
         symbols: list=[],        
         **kwargs): #for one exchange and one sector
+        """
+    	Method that write the report itself
+    
+    	Optional arguments
+    	----------
+        it_is_index: is it indexes that are provided
+        exchange: name of the stock exchange
+        symbols: list of YF symbols
+        sec: sector of the stocks for which we write the report
+        
+    	"""     
         try: 
             ##preprocessing
             self.it_is_index=it_is_index
@@ -718,11 +718,11 @@ class Report(models.Model):
             logger.error(e, stack_info=True, exc_info=True)
             self.concat("daily_report, exchange: "+exchange + " crashed, check the logs")
             pass 
-
-"""
-Contain human readable indicators for one product and one report
-"""    
+ 
 class ActionReport(models.Model):
+    """
+    Contain human readable indicators for one product and one report
+    """   
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     action=models.ForeignKey('orders.Action',on_delete=models.CASCADE, null=True,default=None)
     
@@ -761,12 +761,12 @@ class ActionReport(models.Model):
             return self.action.name + " " + str(self.report.date)
         else:
             return "none" + " " + str(self.report.date)
-    
-"""
-Performance alert for one product
-Related to the sending of a message in Telegram
-"""   
+
 class Alert(models.Model):
+    """
+    Performance alert for one product
+    Related to the sending of a message in Telegram
+    """  
     active=models.BooleanField(blank=False,default=True)
     opportunity=models.BooleanField(blank=False,default=False)
     opening=models.BooleanField(blank=False,default=False)

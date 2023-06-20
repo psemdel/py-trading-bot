@@ -23,44 +23,43 @@ Strategies on one action, no preselection
 
 So it determines entries and exits for one action to optimize the return
 """
-
-"""
-Multiply the entries or exits by the array (0 or 1)
-
-Arguments
-----------
-    all_t: entries or exits for all strategies before
-    t: entries or exits for the strategy to be added
-    calc_arrs: array of the strategy combination 
-    jj: index of the strategy to be added in calc_arrs
-"""   
 def defi_i_fast_sub(
         all_t: list,
         t: pd.core.frame.DataFrame, 
         calc_arrs: list, 
         jj: int
         ) -> list:
+    """
+    Multiply the entries or exits by the array (0 or 1)
+
+    Arguments
+    ----------
+        all_t: entries or exits for all strategies before
+        t: entries or exits for the strategy to be added
+        calc_arrs: array of the strategy combination 
+        jj: index of the strategy to be added in calc_arrs
+    """ 
     try:
         for ii in range(len(calc_arrs)):
-            t2=ic.VBTSUM.run(t,arr=calc_arrs[ii][jj]).out
+            t2=ic.VBTSUM.run(t,k=calc_arrs[ii][jj]).out
             t2=remove_multi(t2)
             all_t[ii]+=t2
     
         return all_t  
     except Exception as e:
         print(e)
- 
-"""
-For each trend set the correct entries and exits
-
-Arguments
-----------
-    all_t: entries or exits for all strategies before
-    macro_trend: trend for each symbols and moment in time
-"""      
+   
 def filter_macro(all_t: list,
                  macro_trend: pd.core.frame.DataFrame,
                  ) -> pd.core.frame.DataFrame:
+    """
+    For each trend set the correct entries and exits
+
+    Arguments
+    ----------
+        all_t: entries or exits for all strategies before
+        macro_trend: trend for each symbols and moment in time
+    """   
     ent=None
     dic={0:-1, 1:1, 2:0}  #bull, bear, uncertain
     
@@ -71,18 +70,7 @@ def filter_macro(all_t: list,
         else:
             ent=ic.VBTOR.run(ent, ents_raw).out
     return ent
-        
-"""
-Calculate the entries and exits for each strategy of the array separately
-
-Arguments
-----------
-    close: close prices
-    all_t: entries and exits for one strategy or the array
-    ent_or_ex: do we want to return the entries or exits?
-    calc_arr: array of the strategy combination 
-    macro_trend: trend for each symbols and moment in time
-"""        
+      
 def defi_i_fast( 
         open_: pd.core.frame.DataFrame,
         high: pd.core.frame.DataFrame, 
@@ -91,6 +79,17 @@ def defi_i_fast(
         calc_arrs: list,
         macro_trend: pd.core.frame.DataFrame=None,
         ) -> (list, list):
+    """
+    Calculate the entries and exits for each strategy of the array separately
+
+    Arguments
+    ----------
+        close: close prices
+        all_t: entries and exits for one strategy or the array
+        ent_or_ex: do we want to return the entries or exits?
+        calc_arr: array of the strategy combination 
+        macro_trend: trend for each symbols and moment in time
+    """ 
     try:
         non_pattern_len=7
         
@@ -142,14 +141,14 @@ def defi_i_fast(
             all_t_ent=defi_i_fast_sub(all_t_ent,t.rsi_crossed_below(30), calc_arrs, 6)
             all_t_ex=defi_i_fast_sub(all_t_ex,t.rsi_crossed_above(70), calc_arrs, 6+non_pattern_len+len(BULL_PATTERNS))            
         
-        for ii, func_name in enumerate(BULL_PATTERNS):
+        for ii, f_name in enumerate(BULL_PATTERNS):
             if u_bull[ii]:
-                t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ent").out
+                t=ic.VBTPATTERNONE.run(open_,high,low,close,f_name, "ent").out
                 all_t_ent=defi_i_fast_sub(all_t_ent,t, calc_arrs, non_pattern_len+ii)
             
-        for ii, func_name in enumerate(BEAR_PATTERNS):
+        for ii, f_name in enumerate(BEAR_PATTERNS):
             if u_bear[ii]:
-                t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ex").out
+                t=ic.VBTPATTERNONE.run(open_,high,low,close,f_name, "ex").out
                 all_t_ex=defi_i_fast_sub(all_t_ex,t, calc_arrs, ii+2*non_pattern_len+len(BULL_PATTERNS))        
 
         for ii in range(len(calc_arrs)):
@@ -165,24 +164,28 @@ def defi_i_fast(
 
         return all_t_ent, all_t_ex
     except Exception as e:
+        import sys
+        _, e_, exc_tb = sys.exc_info()
+        print(e)
+        print("line " + str(exc_tb.tb_lineno))
         logger.error(e, stack_info=True, exc_info=True)     
 
-"""
-transform the array of strategy into entries and exits
-
-Arguments
-----------
-    close: close prices
-    all_t: entries and exits for one strategy or the array
-    ent_or_ex: do we want to return the entries or exits?
-    calc_arr: array of the strategy combination 
-"""
 def defi_nomacro(
         close: pd.core.frame.DataFrame,
         all_t: list,
         ent_or_ex: str, 
         a_simple: list
         )-> (pd.core.frame.DataFrame, pd.core.frame.DataFrame):
+    """
+    transform the array of strategy into entries and exits
+
+    Arguments
+    ----------
+        close: close prices
+        all_t: entries and exits for one strategy or the array
+        ent_or_ex: do we want to return the entries or exits?
+        calc_arr: array of the strategy combination 
+    """
     non_pattern_len=7
     len_ent=non_pattern_len+len(BULL_PATTERNS)
     len_ex=non_pattern_len+len(BEAR_PATTERNS)
@@ -205,22 +208,6 @@ def defi_nomacro(
     default=ic.VBTAND.run(ent, np.full(all_t[0].shape, False)).out #trick to keep the right shape
     return ent, default
 
-"""
-wrapper for the different strategy functions
-
-No trend split
-
-Each strategy is defined by the arrays a_simple
-
-Arguments
-----------
-    open_: open prices
-    high: high prices
-    low: low prices
-    close: close prices
-    a_simple: array of the strategy combination 
-    dir_simple: direction to use during bull trend
-"""
 def strat_wrapper_simple(
         open_: pd.core.frame.DataFrame,
         high: pd.core.frame.DataFrame, 
@@ -229,8 +216,22 @@ def strat_wrapper_simple(
         a_simple: list,
         dir_simple:str="long"
         ) -> (pd.core.frame.DataFrame, pd.core.frame.DataFrame, pd.core.frame.DataFrame, pd.core.frame.DataFrame):
-   
-    #calculate all signals and patterns, is a bit long
+    """
+    wrapper for the different strategy functions
+
+    No trend split
+
+    Each strategy is defined by the arrays a_simple
+
+    Arguments
+    ----------
+        open_: open prices
+        high: high prices
+        low: low prices
+        close: close prices
+        a_simple: array of the strategy combination 
+        dir_simple: direction to use during bull trend
+    """
     ent,ex=defi_i_fast( open_,high, low, close,[a_simple])
     default=ic.VBTAND.run(ent, np.full(ent.shape, False)).out #trick to keep the right shape
     
@@ -250,27 +251,6 @@ def strat_wrapper_simple(
 
     return entries, exits, entries_short, exits_short
 
-"""
-wrapper for the different strategy functions
-
-split the trend in 3 parts: bear, uncertain, bull
-set a strategy for each of them
-
-Each strategy is defined by the arrays a_bull, a_bear, a_uncertain
-
-Arguments
-----------
-    open_: open prices
-    high: high prices
-    low: low prices
-    close: close prices
-    a_bull: array of the strategy combination to use for bull trend
-    a_bear: array of the strategy combination to use for bear trend
-    a_uncertain: array of the strategy combination to use for uncertain trend
-    dir_bull: direction to use during bull trend
-    dir_bear: direction to use during bear trend
-    dir_uncertain: direction to use during uncertain trend
-"""
 def strat_wrapper_macro(open_: np.array,
                         high: np.array, 
                         low: np.array, 
@@ -283,6 +263,27 @@ def strat_wrapper_macro(open_: np.array,
                         dir_uncertain: str="both",
                         prd:bool=False,
                         ):
+    """
+    wrapper for the different strategy functions
+
+    split the trend in 3 parts: bear, uncertain, bull
+    set a strategy for each of them
+
+    Each strategy is defined by the arrays a_bull, a_bear, a_uncertain
+
+    Arguments
+    ----------
+        open_: open prices
+        high: high prices
+        low: low prices
+        close: close prices
+        a_bull: array of the strategy combination to use for bull trend
+        a_bear: array of the strategy combination to use for bear trend
+        a_uncertain: array of the strategy combination to use for uncertain trend
+        dir_bull: direction to use during bull trend
+        dir_bear: direction to use during bear trend
+        dir_uncertain: direction to use during uncertain trend
+    """
     try:
         
         if prd:
@@ -310,7 +311,6 @@ def strat_wrapper_macro(open_: np.array,
         print(e)
         print("line " + str(exc_tb.tb_lineno))
         logger.error(e, stack_info=True, exc_info=True) 
-  
 
 ### For backtesting ###
 class Strat(VBTfunc):
@@ -775,19 +775,7 @@ class Strat(VBTfunc):
                              trend_key="macdbb",
                              macro_trend_index=kwargs.get("macro_trend_index",False))
         self.get_output(s)        
-        
-'''
-Wrapper to call function from indicators based on their name
 
-Arguments
-----------
-    f_name: name of the function in indicators
-    open_: open prices
-    high: high prices
-    low: low prices
-    close: close prices
-    light: for pattern, choose pattern normal or light
-'''
 def function_to_res(
         f_name: str, 
         open_: np.array, 
@@ -796,7 +784,18 @@ def function_to_res(
         close: np.array,
         light: bool=None
         ) -> (np.array, np.array):
-    
+    '''
+    Wrapper to call function from indicators based on their name
+
+    Arguments
+    ----------
+        f_name: name of the function in indicators
+        open_: open prices
+        high: high prices
+        low: low prices
+        close: close prices
+        light: for pattern, choose pattern normal or light
+    '''
     f_callable=getattr(ic,f_name)
     dic={}
 
@@ -807,34 +806,6 @@ def function_to_res(
     res = f_callable.run(**dic)
     return res.entries, res.exits
 
-'''
-wrapper for the different strategy functions
-
-split the trend in 5 parts: very bear, bear, uncertain, bull and very bull
-set a strategy for each of them
-
-Arguments
-----------
-    open_: open prices
-    high: high prices
-    low: low prices
-    close: close prices
-    close_ind: close prices of the corresponding main index
-    f_bull: strategy function to use during bull trend
-    f_bear: strategy function to use during bear trend
-    f_uncertain: strategy function to use during uncertain trend
-    f_very_bull: strategy function to use during very bull trend
-    f_very_bear: strategy function to use during very bear trend
-    trend_lim: score of the trend between uncertain and bear/bull
-    trend_lim2: score of the trend between bear/bull and very bear/very bull
-    macro_trend_bool: differentiate the direction depending on the macro trend
-    dir_bull: direction to use during bull trend
-    dir_bear: direction to use during bear trend
-    dir_uncertain: direction to use during uncertain trend
-    trend_key: which trend function is to be used
-    macro_trend_index: base the macro trend calculation on the main index only, or not
-    light: for pattern, choose pattern normal or light
-'''
 def strat_wrapper(
         open_: np.array,
         high: np.array, 
@@ -855,6 +826,34 @@ def strat_wrapper(
         trend_key:str="bbands",
         macro_trend_index:bool=False,
         light:bool=True):
+    '''
+    wrapper for the different strategy functions
+
+    split the trend in 5 parts: very bear, bear, uncertain, bull and very bull
+    set a strategy for each of them
+
+    Arguments
+    ----------
+        open_: open prices
+        high: high prices
+        low: low prices
+        close: close prices
+        close_ind: close prices of the corresponding main index
+        f_bull: strategy function to use during bull trend
+        f_bear: strategy function to use during bear trend
+        f_uncertain: strategy function to use during uncertain trend
+        f_very_bull: strategy function to use during very bull trend
+        f_very_bear: strategy function to use during very bear trend
+        trend_lim: score of the trend between uncertain and bear/bull
+        trend_lim2: score of the trend between bear/bull and very bear/very bull
+        macro_trend_bool: differentiate the direction depending on the macro trend
+        dir_bull: direction to use during bull trend
+        dir_bear: direction to use during bear trend
+        dir_uncertain: direction to use during uncertain trend
+        trend_key: which trend function is to be used
+        macro_trend_index: base the macro trend calculation on the main index only, or not
+        light: for pattern, choose pattern normal or light
+    '''
     
     macro_trend=np.full(close.shape, 0)  
     min_ind=np.full(close.shape, 0)   

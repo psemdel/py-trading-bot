@@ -6,15 +6,16 @@ import numpy as np
 
 from opt.opt_main import OptMain
 
-#Script to optimize the underlying combination of patterns/signals used for a given preselection strategy
-#Divergence use only exit signal from the underlying strategies, no need to variate the entry strategy
+'''
+Script to optimize the underlying combination of patterns/signals used for a given preselection strategy
+Divergence use only exit signal from the underlying strategies, no need to variate the entry strategy
 
-#The optimization takes place on the actions from CAC40, DAX and Nasdaq
-#Parameters very good on some actions but very bad for others should not be selected
+The optimization takes place on the actions from CAC40, DAX and Nasdaq
+Parameters very good on some actions but very bad for others should not be selected
 
-#The optimization algorithm calculates one point, look for the points around it and select the best one
-#As it can obviously lead to local maximum, the starting point is selected in a random manner
-
+The optimization algorithm calculates one point, look for the points around it and select the best one
+As it can obviously lead to local maximum, the starting point is selected in a random manner
+'''
 vbt.settings['caching']=Config(
     disable=True,
     disable_whitelist=True,
@@ -28,31 +29,43 @@ vbt.settings['caching']=Config(
     use_cached_accessors=True
 )
 
+
 class Opt(OptMain):
     def __init__(self,period,**kwargs):
+        '''
+        Optimisation main class
+
+        Arguments
+        ----------
+           period: period of time in year for which we shall retrieve the data
+        '''
         super().__init__(period,**kwargs)
         self.bti={}
         
         for ind in self.indexes:
             self.bti[ind]=presel.Presel(ind,period)
 
-    def calculate_eq_ret(self,pf):
-        m_rb=pf.total_market_return
-        m_rr=pf.get_total_return()
+    def calculate_pf( 
+              self,
+              best_arrs_cand,
+              best_ret_cand,
+              best_arrs_ret,       
+              dic):
+        '''
+        To calculate a portfolio from strategy arrays
+        For Div note that the strategy is overwritten everytime
         
-        if abs(m_rb)<0.1: #avoid division by zero
-            p=(m_rr)/ 0.1*np.sign(m_rb)   
-        else:
-            p=(m_rr- m_rb )/ abs(m_rb)
-
-        return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed
-
-    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret,key):
+        Arguments
+        ----------
+           best_arrs_cand: table containing the best candidate by the strategy array presently tested
+           best_ret_cand: table containing the return of the best candidate by the strategy array presently tested
+           best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
+        '''
         if not self.check_tested_arrs():
             return best_arrs_cand, best_ret_cand
 
         #create the underlying strategy
-        self.defi_ex(key)
+        self.defi_ex(dic)
             
         ret=0
         ret_arr=[]
@@ -80,6 +93,24 @@ class Opt(OptMain):
         
         return best_arrs_cand, best_ret_cand
         
+'''
+def calculate_eq_ret(self,pf):
+'''
+        #Calculate an equivalent score for a portfolio  
+        
+       # Arguments
+      #  ----------
+      #     pf: vbt portfolio
+''' 
+m_rb=pf.total_market_return
+m_rr=pf.get_total_return()
 
+if abs(m_rb)<0.1: #avoid division by zero
+    p=(m_rr)/ 0.1*np.sign(m_rb)   
+else:
+    p=(m_rr- m_rb )/ abs(m_rb)
+
+return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed     
+''' 
 
      

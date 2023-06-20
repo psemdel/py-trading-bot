@@ -11,18 +11,19 @@ import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
 from opt.opt_main import log
-#Script to optimize the parameters of macro_trend
-#So to detect when the trend is bull/bear or uncertain
+'''
+Script to optimize the parameters of macro_trend
+So to detect when the trend is bull/bear or uncertain
 
-#The optimization takes place on the actions from CAC40, DAX and Nasdaq
-#Criteria is that during bull the return should be positive
-#During bear the return should be negative
-#There is no criteria on uncertain which is a degree of freedom
-#Parameters very good on some actions but very bad for others should not be selected
+The optimization takes place on the actions from CAC40, DAX and Nasdaq
+Criteria is that during bull the return should be positive
+During bear the return should be negative
+There is no criteria on uncertain which is a degree of freedom
+Parameters very good on some actions but very bad for others should not be selected
 
-#The optimization algorithm calculates one point, look for the points around it and select the best one
-#As it can obviously lead to local maximum, the starting point is selected in a random manner
-
+The optimization algorithm calculates one point, look for the points around it and select the best one
+As it can obviously lead to local maximum, the starting point is selected in a random manner
+'''
 vbt.settings['caching']=Config(
     disable=True,
     disable_whitelist=True,
@@ -35,34 +36,40 @@ vbt.settings['caching']=Config(
     ],
     use_cached_accessors=True
 )
-    
+
 class Opt(VBTfunc):
-    def __init__(self,period,**kwargs):
+    def __init__(
+            self,
+            period: str,
+            it_is_index:bool=False,
+            loops:int=3,
+            ):
+        '''
+        Arguments
+        ----------
+           period: period of time in year for which we shall retrieve the data
+           it_is_index: if True, it will select only the index to make the optimization
+           loops: maximum number of loops to be performed (to limit the total computing time before having a result)
+          
+        '''
         
-        self.close_dic={}
-        self.open_dic={}
-        self.low_dic={}
-        self.high_dic={}
+        for key in ["close","open","low","high","data"]:
+            setattr(self,key+"_dic",{})
         self.indexes=["CAC40", "DAX", "NASDAQ"]
         
         for ind in self.indexes:
             super().__init__(ind,period)
             
-            if kwargs.get("index",False):
-                self.close_dic[ind]=self.close_ind
-                self.open_dic[ind]=self.open_ind
-                self.low_dic[ind]=self.low_ind
-                self.high_dic[ind]=self.high_ind
-            else:
-                self.close_dic[ind]=self.close
-                self.open_dic[ind]=self.open
-                self.low_dic[ind]=self.low
-                self.high_dic[ind]=self.high        
+            for key in ["close","open","low","high","data"]:
+                if it_is_index:
+                    getattr(self,key+"_dic")[ind]=getattr(self,key+"_ind")
+                else:
+                    getattr(self,key+"_dic")[ind]=getattr(self,key)
         
         self.macro_trend={}
         self.tested_arrs={} #the algorithm should calculate one point only once
         
-        self.loops=kwargs.get("loops",3)
+        self.loops=loops
         self.arr=[] #arr of the last step, variation are performed afterwards
         self.calc_arr=[] #for calculation in pf
         self.init_threshold=-1000 
@@ -71,8 +78,15 @@ class Opt(VBTfunc):
         self.best_end_arrs=[]
         self.best_all=[]
         self.best_all_ret=self.init_threshold
-
-    def calculate_eq_ret(self,pf,mode):
+        
+    def calculate_eq_ret(self,pf,mode: int):
+        '''
+        Calculate an equivalent score for a portfolio  
+        
+        Arguments
+        ----------
+           pf: vbt portfolio
+        '''  
         rb=pf.total_market_return.values
         rr=pf.get_total_return().values
         delta=rr-rb
@@ -97,8 +111,14 @@ class Opt(VBTfunc):
         elif mode==1:
             return -2*p*(p>0) -p*(p<0) 
 
-    #variates the array, if it is better, the new array is returned otherwise the original one
-    def variate(self, best_arrs_ret):
+    def variate(self, best_arrs_ret: list):
+        '''
+        Variates the threshold
+        
+        Arguments
+        ----------
+           best_arrs_ret: array of the best returns
+        ''' 
         best_arrs_cand=[]
         best_ret_cand=self.init_threshold
         
@@ -111,8 +131,10 @@ class Opt(VBTfunc):
 
         return best_arrs_cand, best_ret_cand                
 
-    
     def random(self):
+        '''
+        Generate random thresholds
+        ''' 
         arr=[]
         threshold=np.random.rand(1)*5*0.01
         uncertain=1000
@@ -125,8 +147,14 @@ class Opt(VBTfunc):
         arr.append(np.random.rand(1)*15*0.01) #deadband
         return arr
     
-    #calculate the trend for the different indexes
-    def macro_mode(self,mode_to_vis):
+    def macro_mode(self,mode_to_vis:int):
+        '''
+        Set an entry, when a macro mode is entered, and an exit, when it is exited
+        
+        Arguments
+        ----------
+           mode_to_vis: selected macro_mode
+        '''
         self.ents={}
         self.exs={}
 
@@ -139,8 +167,21 @@ class Opt(VBTfunc):
             t=VBTMACROVIS.run(t.macro_trend,mode_to_vis=mode_to_vis)
             self.ents[ind]=t.entries
             self.exs[ind]=t.exits
-            
-    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret):
+
+    def calculate_pf(
+            self,
+            best_arrs_cand,
+            best_ret_cand,
+            best_arrs_ret):
+        '''
+        To calculate a portfolio from strategy arrays
+        
+        Arguments
+        ----------
+           best_arrs_cand: table containing the best candidate by the strategy array presently tested
+           best_ret_cand: table containing the return of the best candidate by the strategy array presently tested
+           best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
+        '''  
         ret=0
        
         for mode in [-1,1]:
@@ -153,10 +194,12 @@ class Opt(VBTfunc):
         if ret> best_arrs_ret and ret>best_ret_cand:
             return self.calc_arr, ret
         
-        return best_arrs_cand, best_ret_cand            
-       
-            
+        return best_arrs_cand, best_ret_cand   
+ 
     def perf(self):
+        '''
+        Main fonction to optimize a strategy
+        '''  
         for jj in range(self.loops):
             print("loop " + str(jj))
             log("loop " + str(jj))

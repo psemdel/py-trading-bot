@@ -9,8 +9,6 @@ Created on Tue Jan 31 17:40:09 2023
 import unittest
 from opt import opt_strat 
 
-import vectorbtpro as vbt
-
 class TestOptStrat(unittest.TestCase):
     @classmethod
     def setUpClass(self):  
@@ -69,9 +67,9 @@ class TestOptStrat(unittest.TestCase):
               a_bull=a_bull,
               a_bear=a_bear,
               a_uncertain=a_uncertain,   
-              macro_trend_bull="long", 
-              macro_trend_uncertain="long",
-              macro_trend_bear="long",
+              dir_bull="long", 
+              dir_uncertain="long",
+              dir_bear="long",
               )
        self.o.perf()
     

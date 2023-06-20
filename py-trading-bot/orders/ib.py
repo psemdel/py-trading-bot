@@ -652,19 +652,6 @@ def check_if_index(action):
         return True
     else:
         return False    
- 
-"""
-Retrieve the data using IB
-
-Note: All symbols must be from same stock exchange
-IB need a ticker, an exchange and information about the type of product to find the correct contract
-
-Arguments
-----------
-    actions: list of products to be downloaded
-    period: time period for which data should be downloaded
-    it_is_index: is it indexes that are provided
-"""     
 
 @connect_ib 
 def retrieve_data_ib(
@@ -672,6 +659,18 @@ def retrieve_data_ib(
         period: str,
         it_is_index: bool=False
         ):
+    """
+    Retrieve the data using IB
+
+    Note: All symbols must be from same stock exchange
+    IB need a ticker, an exchange and information about the type of product to find the correct contract
+
+    Arguments
+    ----------
+        actions: list of products to be downloaded
+        period: time period for which data should be downloaded
+        it_is_index: is it indexes that are provided
+    """   
     try:
         period=period_YF_to_ib(period)
         exchanges={}
@@ -724,22 +723,23 @@ def retrieve_data_ib(
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
          
-"""
-Retrieve the data using YF
 
-YF can work with only the symbol to obtain the right contract
-
-Arguments
-----------
-    actions: list of products to be downloaded
-    period: time period for which data should be downloaded
-    it_is_index: is it indexes that are provided
-"""
 def retrieve_data_YF(
         actions: list,
         period: str,
         it_is_index: bool=False
         ):
+    """
+    Retrieve the data using YF
+
+    YF can work with only the symbol to obtain the right contract
+
+    Arguments
+    ----------
+        actions: list of products to be downloaded
+        period: time period for which data should be downloaded
+        it_is_index: is it indexes that are provided
+    """
     #add the index to the list of stocks downloaded. Useful to make calculation on the index to determine trends
     #by downloading at the same time, we are sure the signals are aligned
     try:
@@ -798,25 +798,25 @@ def retrieve_data_YF(
          print(e)
          logger.error(e, stack_info=True, exc_info=True)
 
-"""
-Retrieve the data using IB or YF
-
-
-Arguments
-----------
-    o: object were to put the results
-    actions: list of products to be downloaded
-    period: time period for which data should be downloaded
-    use_IB: use IB for downloading the data
-    it_is_index: is it indexes that are provided
-    
-"""        
 def retrieve_data(o,
                   actions: list,
                   period: str,
                   use_IB: str=False,
                   it_is_index: bool=False,
                   ) -> (bool, list):
+    """
+    Retrieve the data using IB or YF
+
+
+    Arguments
+    ----------
+        o: object were to put the results
+        actions: list of products to be downloaded
+        period: time period for which data should be downloaded
+        use_IB: use IB for downloading the data
+        it_is_index: is it indexes that are provided
+        
+    """  
     if actions is None or len(actions)==0:
         raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:

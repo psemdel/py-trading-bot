@@ -8,21 +8,34 @@ import vectorbtpro as vbt
 import pandas as pd
 import scipy.cluster.hierarchy as sch
 
-#Gather the symbols together depending on their correlation and optimize the strategy for the formed cluster
-#The clusters are within one single index, as correlation calculation needs aligned data index.
-
 class Opt(OptStrat):
-    def __init__(self,period,indexes,**kwargs):
+    def __init__(
+            self,
+            period,
+            indexes,
+            **kwargs):
+        '''
+        Gather the symbols together depending on their correlation and optimize the strategy for the formed cluster
+        The clusters are within one single index, as correlation calculation needs aligned data index.
+
+        Arguments
+        ----------
+           period: period of time in year for which we shall retrieve the data
+           indexes: main indexes used to download local data
+        '''
         super().__init__(period,split_learn_train="time",indexes=[indexes],**kwargs)
         #calculate the correlation for each ind
         self.number_of_parts=0
         corr_arrs={}
         for ind in self.indexes: #CAC, DAX, NASDAQ
             _, corr_arrs[ind]=cluster_corr(self.close_dic[ind]["learn"].corr())
-            self.split_in_part(corr_arrs,ind,**kwargs)
+            self.split_in_part(corr_arrs,ind)
             self.number_of_parts+=len(corr_arrs[ind])
-        
+
     def outer_perf(self):
+        '''
+        Method to perform the optimization, within it, perf is called several times
+        '''
         for ii in range(self.number_of_parts):
             log("Outer loop: "+str(ii),pr=True)
 
@@ -33,7 +46,15 @@ class Opt(OptStrat):
             self.init_best_arr() #reinit
             self.perf(dic="learn_part_"+str(ii),dic_test="test_part_"+str(ii))
 
-    def split_in_part(self,corr_arrs, ind,**kwargs):
+    def split_in_part(self,corr_arrs: list, ind: str):
+        '''
+        Split the set in several parts
+        
+        Arguments
+        ----------
+           corr_arrs: array where the symbols are gathered together depending on their correlation
+           ind: index
+        '''
         for ii, arr in enumerate(corr_arrs[ind]):
             for d in ["close","open","low","high"]:
                 for dic in ["learn","test"]:
@@ -45,7 +66,7 @@ def cluster_corr(corr_array, inplace=False):
     """
     Rearranges the correlation matrix, corr_array, so that groups of highly 
     correlated variables are next to eachother 
-    
+
     Parameters
     ----------
     corr_array : pandas.DataFrame or numpy.ndarray

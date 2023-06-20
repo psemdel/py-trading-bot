@@ -5,42 +5,18 @@ Created on Mon Feb  6 20:11:57 2023
 
 @author: maxime
 """
-import vectorbtpro as vbt
-#from opt.opt_main import OptMain
 import numpy as np
-import pandas as pd
-from core.macro import VBTMACROTREND, VBTMACROMODE
-from core import indicators as ic
 import copy
 from opt.opt_strat import Opt as OptStrat
 
-def vbt_macro_filter(ent, macro_trend, mode): 
-    out=np.full(ent.shape,0.0)
-    try:
-        ind=(macro_trend[:]==mode)
-        out[ind]=ent[ind] #rest is false
-    except:
-        print("error in vbtagreg")
-        print(ent)
-        print(np.shape(ent))
-        return ent        
-    return out
-
-VBTMACROFILTER= vbt.IF(
-     class_name='VbtMacroFilter',
-     short_name='macro_filter',
-     input_names=['ent', 'macro_trend'],
-     param_names=['mode'],
-     output_names=['out'],
-).with_apply_func(
-     vbt_macro_filter, 
-     takes_1d=True,  
-     ) 
-    
+'''
+Generate a strategy with a strategy array which has decimal coefficients
+'''
 class Opt(OptStrat):
-  
     def random(self):
-        #choose randomly 0 and 1. All zeros is not accepted.
+        '''
+        Generate a random strategy array, here with decimal values
+        ''' 
         arr=np.multiply(0.5,np.random.choice(2,self.len_ent+self.len_ex, p=[0.7, 0.3]))
         
         while np.sum(arr[0:self.len_ent] )==0 or np.sum(arr[self.len_ent:self.len_ent+self.len_ex])==0:#entries or exits must not be full 0
@@ -48,7 +24,14 @@ class Opt(OptStrat):
 
         return arr            
     
-    def variate(self, best_arrs_ret):
+    def variate(self, best_arrs_ret: list)-> (list, list):
+        '''
+        Variates the array, if it is better, the new array is returned otherwise the original one
+        
+        Arguments
+        ----------
+           best_arrs_ret: array of the best returns
+        ''' 
         step=0.5
         best_arrs_cand=[]
         best_ret_cand=self.init_threshold

@@ -14,9 +14,23 @@ if __name__ != '__main__':
     from trading_bot.settings import BASE_DIR
     from core import constants
 
-###Prepare and save data for local usage
-def save_data(symbols, index, action_symbols, start_date, end_date):
-    
+def save_data(
+        symbols: list, 
+        index: str, 
+        stock_symbols: list, 
+        start_date: str, 
+        end_date: str):
+    '''
+    Prepare and save data for local usage
+
+    Arguments
+    ----------
+       symbols: list of all YF tickers to be downloaded (see comment below for the reason)
+       index: YF ticker of the index
+       action_symbols: list of YF tickers to be downloaded for the stocks
+       start_date: start date for the download
+       end_date: end date for the download
+    '''
     #Everything is downloaded together to use missing_index function
     data=vbt.YFData.fetch(symbols,start=start_date,end=end_date,\
                              timeframe='1d')
@@ -40,11 +54,22 @@ def save_data(symbols, index, action_symbols, start_date, end_date):
     data_ind=data.select(index)
     data_ind.to_hdf(file_path="index.h5")
     
-    data_others=data.select(action_symbols)
+    data_others=data.select(stock_symbols)
     data_others.to_hdf(file_path="actions.h5")
 
-### Read local data
-def retrieve(o, index, period):
+def retrieve(o, 
+             index: str, 
+             period: str):
+    '''
+    Read local data
+
+    Arguments
+    ----------
+       o: object where to put the data
+       index: YF ticker of the index
+       period: period in which we want to have the data
+
+    '''
     if index=="CAC40":
         ind_sym="FCHI"
     elif index=="DAX":

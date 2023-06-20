@@ -6,13 +6,15 @@ import numpy as np
 
 from opt.opt_main import OptMain
 
-#Script to optimize the underlying combination of patterns/signals used for a given preselection strategy
+'''
+Script to optimize the underlying combination of patterns/signals used for a given preselection strategy
 
-#The optimization takes place on the actions from CAC40, DAX and Nasdaq
-#Parameters very good on some actions but very bad for others should not be selected
+The optimization takes place on the actions from CAC40, DAX and Nasdaq
+Parameters very good on some actions but very bad for others should not be selected
 
-#The optimization algorithm calculates one point, look for the points around it and select the best one
-#As it can obviously lead to local maximum, the starting point is selected in a random manner
+The optimization algorithm calculates one point, look for the points around it and select the best one
+As it can obviously lead to local maximum, the starting point is selected in a random manner
+'''
 
 vbt.settings['caching']=Config(
     disable=True,
@@ -28,7 +30,10 @@ vbt.settings['caching']=Config(
 )
 
 class Opt(OptMain):
-    def __init__(self,period,**kwargs):
+    def __init__(
+            self,
+            period: str,
+            **kwargs):
         super().__init__(period,**kwargs)
         self.bti={}
         
@@ -40,6 +45,13 @@ class Opt(OptMain):
             self.macd[ind]=vbt.MACD.run(self.close_dic[ind]["learn"])
 
     def calculate_eq_ret(self,pf):
+        '''
+        Calculate an equivalent score for a portfolio  
+        
+        Arguments
+        ----------
+           pf: vbt portfolio
+        ''' 
         m_rb=pf.total_market_return
         m_rr=pf.get_total_return()
         
@@ -50,45 +62,38 @@ class Opt(OptMain):
 
         return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed
     
-    def summarize_eq_ret(self,ret_arr):
-        while np.std(ret_arr)>10:
-            ii=np.argmax(ret_arr)
-            ret_arr=np.delete(ret_arr,ii,0)
-            
-        return np.mean(ret_arr)
-  
-    def manual_calculate_pf(self,ind,key,*args): #the order is bull/bear/uncertain
-        self.calc_arrs=[]
-        for arr in args:
-            self.calc_arrs.append(arr)
-        
-        self.defi_ent()
-        self.defi_ex()
-        self.macro_mode()
-        pf=vbt.Portfolio.from_signals(self.close_dic[ind][key], self.ents[ind],self.exs[ind],
-                                      short_entries=self.ents_short[ind],
-                                      short_exits=self.exs_short[ind],
-                                      freq="1d",fees=self.fees)
-
-        print("equivalent return " + str(self.calculate_eq_ret(pf)))
-        return pf #for display for instance
     
-    def calculate_pf(self, best_arrs_cand, best_ret_cand, best_arrs_ret,**kwargs):
+    def calculate_pf(
+            self,
+            best_arrs_cand,
+            best_ret_cand,
+            best_arrs_ret,
+            dic: str="learn"
+            )-> (list, list):
+        '''
+        To calculate a portfolio from strategy arrays
+        
+        Arguments
+        ----------
+           best_arrs_cand: table containing the best candidate by the strategy array presently tested
+           best_ret_cand: table containing the return of the best candidate by the strategy array presently tested
+           best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
+        '''
         if not self.check_tested_arrs():
             return best_arrs_cand, best_ret_cand
         
-        key= kwargs.get("dic","learn")
         #create the underlying strategy
-        self.defi_ent(key)
-        self.defi_ex(key)
-        self.macro_mode(key)
+        self.defi_ent(dic)
+        self.defi_ex(dic)
+        self.macro_mode(dic)
         
         ret=0
         ret_arr=[]
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
             self.bti[ind].overwrite_strat_underlying(self.ents[ind],self.exs[ind])
-            self.bti[ind].preselect_macd_vol_macro(macro_trend=self.macro_trend[ind][key],macd=self.macd[ind])
+            ### To be changed manually depending on the presel to optimize!! ###
+            self.bti[ind].preselect_macd_vol_macro(macro_trend=self.macro_trend[ind][dic],macd=self.macd[ind])
             
             pf=vbt.Portfolio.from_signals(self.bti[ind].close, 
                                           self.bti[ind].entries,

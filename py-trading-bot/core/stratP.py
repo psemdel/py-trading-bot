@@ -62,7 +62,7 @@ class StratPRD(Strat):
                 if period is None:
                     raise ValueError("StratPRD, no period provided")
                 
-                use_IB, self.symbols_undef=retrieve_data(self,actions,period,use_IB,index=kwargs.get("index"))
+                use_IB, self.symbols_undef=retrieve_data(self,actions,period,use_IB,it_is_index=kwargs.get("index"))
                 
                 self.symbols=self.symbols_undef #the symbols as output are then the YF symbols
                 for s in self.symbols:
