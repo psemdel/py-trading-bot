@@ -1,8 +1,8 @@
 import numbers
 from core import indicators as ic
-from core.common import VBTfunc
 from core.macro import VBTMACROTREND, VBTMACROMODE, VBTMACROFILTER
 
+from core.data_manager import retrieve
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
@@ -56,7 +56,7 @@ def log(
     if pr:
         print(text)
 
-class OptMain(VBTfunc):
+class OptMain():
     def __init__(
             self,
             period: str,
@@ -117,7 +117,7 @@ class OptMain(VBTfunc):
         self.total_len={}
 
         for ind in self.indexes:
-            super().__init__(ind,period)
+            retrieve(self,ind,period)
             if self.it_is_index:
                 self.suffix="_ind"
             else:

@@ -13,9 +13,10 @@ import vectorbtpro as vbt
 
 class TestIndicator(unittest.TestCase):
     @classmethod
-    def setUpClass(self):   
-        self.st=strat.Strat("CAC40","2007_2009")    
-    
+    def setUpClass(self):  
+        self.ust=strat.StratDiv("2007_2009", symbol_index="CAC40")
+        self.ust.run()
+
     def test_rel_dif(self):
         self.assertEqual(ic.rel_dif(float('nan'),1),0)
         self.assertEqual(ic.rel_dif(1,float('nan')),0)
@@ -26,7 +27,7 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(ic.rel_dif(2.2,2),0.1)
     
     def test_MACD(self):
-        t=vbt.MACD.run(self.st.close, macd_wtype='simple',signal_wtype='simple')
+        t=vbt.MACD.run(self.ust.close, macd_wtype='simple',signal_wtype='simple')
         
         self.assertEqual(round(t.macd[t.macd.columns[0]].values[-1],2),1.08)
         self.assertEqual(round(t.macd[t.macd.columns[1]].values[-1],2),0.17)
@@ -39,7 +40,7 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(round(t.hist[t.macd.columns[2]].values[-1],2),-0.11)
         
     def test_VBTSUPERTREND(self):
-        t=ic.VBTSUPERTREND.run(self.st.high,self.st.low,self.st.close)
+        t=ic.VBTSUPERTREND.run(self.ust.high,self.ust.low,self.ust.close)
         self.assertTrue(math.isnan(t.supert['AC'].values[0]))
         self.assertTrue(t.supert['AC'].values[-1]>0)
         self.assertEqual(t.superd['AC'].values[0],1)
@@ -50,7 +51,7 @@ class TestIndicator(unittest.TestCase):
         self.assertTrue(math.isnan(t.supers['AC'].values[-1]))    
 
     def test_VBTSUPERTRENDMA(self):
-        t=ic.VBTSUPERTRENDMA.run(self.st.high,self.st.low,self.st.close)
+        t=ic.VBTSUPERTRENDMA.run(self.ust.high,self.ust.low,self.ust.close)
         self.assertFalse(t.entries['AIR'].values[0])
         self.assertTrue(t.entries['AIR'].values[-1])
         self.assertFalse(t.exits['AIR'].values[0])
@@ -58,30 +59,30 @@ class TestIndicator(unittest.TestCase):
         self.assertTrue(t.exits['AIR'].values[-2])   
         self.assertTrue(t.exits['AIR'].values[-3])   
         
-        pf=vbt.Portfolio.from_signals(self.st.close, t.entries,t.exits)
+        pf=vbt.Portfolio.from_signals(self.ust.close, t.entries,t.exits)
         self.assertEqual(round(pf.get_total_return()['AC'],3),-0.221)
         self.assertEqual(round(pf.get_total_return()['BNP'],3),-0.271)
         
     def test_VBTNATR(self):
-        t=ic.VBTNATR.run(self.st.high,self.st.low,self.st.close).natr
+        t=ic.VBTNATR.run(self.ust.high,self.ust.low,self.ust.close).natr
         self.assertTrue(math.isnan(t['AC'].values[0]))
         self.assertEqual(round(t['AC'].values[-1],2),4.25)
         self.assertEqual(round(t['VIV'].values[-1],2),3.84)
 
     def test_VBTMA(self):
-        t=ic.VBTMA.run(self.st.high,self.st.low,self.st.close)
+        t=ic.VBTMA.run(self.ust.high,self.ust.low,self.ust.close)
         self.assertTrue(t.entries['BN'].values[18])
         self.assertTrue(t.entries['BNP'].values[20])
         self.assertFalse(t.exits['SAN'].values[-2])      
         self.assertTrue(t.exits['SAN'].values[-1])  
         self.assertTrue(t.exits['SU'].values[-3])
 
-        pf=vbt.Portfolio.from_signals(self.st.close, t.entries,t.exits)
+        pf=vbt.Portfolio.from_signals(self.ust.close, t.entries,t.exits)
         self.assertEqual(round(pf.get_total_return()['AC'],3),-0.258)
         self.assertEqual(round(pf.get_total_return()['BNP'],3),-0.494)
 
     def test_VBTSTOCHKAMA(self):
-        t=ic.VBTSTOCHKAMA.run(self.st.high,self.st.low,self.st.close)
+        t=ic.VBTSTOCHKAMA.run(self.ust.high,self.ust.low,self.ust.close)
         
         self.assertTrue(t.entries['AIR'].values[-1])
         self.assertTrue(t.entries_kama['AIR'].values[-1])
@@ -115,20 +116,20 @@ class TestIndicator(unittest.TestCase):
         self.assertTrue(t.stoch['CAP'].values[-4]>80)
         self.assertTrue(t.stoch['CAP'].values[-3]<80)   
         
-        pf=vbt.Portfolio.from_signals(self.st.close, t.entries_kama,t.exits_kama)
+        pf=vbt.Portfolio.from_signals(self.ust.close, t.entries_kama,t.exits_kama)
         self.assertEqual(round(pf.get_total_return()['AC'],3),-0.230)
         self.assertEqual(round(pf.get_total_return()['BNP'],3),-0.301)
         
-        pf=vbt.Portfolio.from_signals(self.st.close, t.entries_stoch,t.exits_stoch)
+        pf=vbt.Portfolio.from_signals(self.ust.close, t.entries_stoch,t.exits_stoch)
         self.assertEqual(round(pf.get_total_return()['AC'],3),0.075)
         self.assertEqual(round(pf.get_total_return()['BNP'],3),-0.466)      
 
-        pf=vbt.Portfolio.from_signals(self.st.close, t.entries,t.exits)
+        pf=vbt.Portfolio.from_signals(self.ust.close, t.entries,t.exits)
         self.assertEqual(round(pf.get_total_return()['AC'],3),-0.093)
         self.assertEqual(round(pf.get_total_return()['BNP'],3),-0.174)
 
     def test_VBTKAMA(self):
-        t=ic.VBTKAMA.run(self.st.close)
+        t=ic.VBTKAMA.run(self.ust.close)
         
         self.assertFalse(t.bot_ext['AIR'].values[-2])
         self.assertTrue(t.bot_ext['AIR'].values[-1])
@@ -154,21 +155,21 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(round(t.kama['MC'].values[-3],2),36.13)
         
     def test_VBTVERYBEAR(self):
-        t=ic.VBTVERYBEAR.run(self.st.close)
+        t=ic.VBTVERYBEAR.run(self.ust.close)
         self.assertFalse(t.entries['AC'].values[0])
         self.assertFalse(t.entries['AC'].values[-1])
         self.assertTrue(t.exits['AC'].values[0])
         self.assertTrue(t.exits['AC'].values[-1])
 
     def test_VBTVERYBULL(self):
-        t=ic.VBTVERYBULL.run(self.st.close)
+        t=ic.VBTVERYBULL.run(self.ust.close)
         self.assertTrue(t.entries['AC'].values[0])
         self.assertTrue(t.entries['AC'].values[-1])
         self.assertFalse(t.exits['AC'].values[0])
         self.assertFalse(t.exits['AC'].values[-1])
 
     def test_VBTKAMATREND(self):
-        t=ic.VBTKAMATREND.run(self.st.close)
+        t=ic.VBTKAMATREND.run(self.ust.close)
 
         #direction should be same as for KAMA
         self.assertEqual(t.trend['AIR'].values[-2],1)
@@ -186,7 +187,7 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(t.duration['SAN'].values[-1],0) 
   
     def test_VBTPATTERN(self):   
-        t=ic.VBTPATTERN.run(self.st.open,self.st.high,self.st.low,self.st.close,light=False)
+        t=ic.VBTPATTERN.run(self.ust.open,self.ust.high,self.ust.low,self.ust.close,light=False)
 
         self.assertTrue(t.entries[(False,'AC')].values[-2])
         self.assertTrue(t.entries[(False,'BNP')].values[-2])
@@ -197,7 +198,7 @@ class TestIndicator(unittest.TestCase):
         self.assertTrue(t.exits[(False,'SAN')].values[-1])  
         self.assertTrue(t.exits[(False,'RI')].values[-3])  
         
-        t=ic.VBTPATTERN.run(self.st.open,self.st.high,self.st.low,self.st.close,light=True)
+        t=ic.VBTPATTERN.run(self.ust.open,self.ust.high,self.ust.low,self.ust.close,light=True)
         
         self.assertTrue(t.entries[(True,'BNP')].values[-2])
         self.assertTrue(t.entries[(True,'BN')].values[-4])
@@ -210,7 +211,7 @@ class TestIndicator(unittest.TestCase):
         self.assertTrue(t.exits[(True,'RI')].values[-3])
       
     def test_VBTBBANDSTREND(self):          
-        t=ic.VBTBBANDSTREND.run(self.st.close)
+        t=ic.VBTBBANDSTREND.run(self.ust.close)
         
         #kama should be same as with kama
         self.assertEqual(round(t.kama['AC'].values[-1],2),16.84)
@@ -233,7 +234,7 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(round(t.bb_bw['SLB'].values[-1],2),0.27)
 
     def test_VBTMACDBBTREND(self):
-        t=ic.VBTMACDBBTREND.run(self.st.close)
+        t=ic.VBTMACDBBTREND.run(self.ust.close)
         
         self.assertEqual(round(t.kama['AC'].values[-1],2),16.84)
         self.assertEqual(round(t.kama['AC'].values[-2],2),16.68)
@@ -263,19 +264,19 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(t.trend['MC'].values[-5],10)
         
     def test_VBTGROW(self):
-        t=ic.VBTGROW.run(self.st.close,distance=50, ma=True)
+        t=ic.VBTGROW.run(self.ust.close,distance=50, ma=True)
         
         self.assertEqual(round(t.out[(50,True,'AC')].values[-1],2),-15.82)
         self.assertEqual(round(t.out[(50,True,'AI')].values[-1],2),-17.43)
         self.assertEqual(round(t.out[(50,True,'SAN')].values[-1],2),-3.30)
 
-        t=ic.VBTGROW.run(self.st.close,distance=50, ma=False)
+        t=ic.VBTGROW.run(self.ust.close,distance=50, ma=False)
         self.assertEqual(round(t.out[(50,False,'AC')].values[-1],2),15.08)
         self.assertEqual(round(t.out[(50,False,'AI')].values[-1],2),-1.34)
         self.assertEqual(round(t.out[(50,False,'SAN')].values[-1],2),-2.37)
  
     def test_VBTDIVERGENCE(self):
-        t=ic.VBTDIVERGENCE.run(self.st.close,self.st.close_ind)
+        t=ic.VBTDIVERGENCE.run(self.ust.close,self.ust.close_ind)
         self.assertEqual(round(t.out['AC'].values[-1],3),0.007)
         self.assertEqual(round(t.out['AI'].values[-1],3),0.001)
         self.assertEqual(round(t.out['SLB'].values[-1],3),-0.007)

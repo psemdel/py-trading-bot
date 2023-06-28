@@ -8,7 +8,7 @@ Created on Sun Jun 26 21:39:46 2022
 
 
 import unittest
-from core import stratP
+from core import strat
 import vectorbtpro as vbt
 import numpy as np
 from django.test import TestCase
@@ -86,7 +86,7 @@ class TestStratP(TestCase):
         e.save()
         
         self.actions=[self.a, self.a2, self.a3]
-        self.st=stratP.StratPRD(False,actions1=self.actions,period1="1y")
+        self.st=strat.UnderlyingStrat("1y",prd=True, use_IB=False, actions=self.actions)
         
     def test_stratPRD(self):
         st=self.st
@@ -110,7 +110,8 @@ class TestStratP(TestCase):
         self.assertFalse(res[(50,True,'AIR.PA')].values[-1]==0)        
         
     def test_call_strat(self):
-        self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro")
+        self.st=getattr(strat, "StratKamaStochMatrendMacdbbMacro")("1y",prd=True, use_IB=False, actions=self.actions)
+        self.st.run()
         
         pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,
                                       short_entries=self.st.entries_short,

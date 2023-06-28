@@ -88,9 +88,17 @@ def retrieve(o,
         setattr(o,l.lower()+"_ind",o.data_ind.get(l))
 
 if __name__ == '__main__':
+    '''
+    Write a file actions.h5 with the content of "all_symbols" and a file index.h5 with the content of "index"
+    
+    You can download anything using
+    
+    all_symbols=["YF_ticker1","YF_ticker2"]
+    index="YF_ticker3"
+    '''
     import constants
     
-    selector="DAX"
+    selector="CAC40"
     start_date='2007-01-01'
     end_date='2023-01-01'
     

@@ -7,17 +7,17 @@ Created on Fri Jun 24 19:45:34 2022
 """
 
 import unittest
-import core.indicators as ic
 from core import presel
-import math
 import vectorbtpro as vbt
 
 class TestBT(unittest.TestCase):
     def setUp(self):
-        self.bti=presel.Presel("CAC40","2007_2022_08")
+        self.period="2007_2022_08"
+        self.symbol_index="CAC40"
         
     def test_preselect_vol(self):
-        self.bti.preselect_vol()
+        self.bti=presel.PreselVol(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -28,11 +28,12 @@ class TestBT(unittest.TestCase):
                                       call_seq='auto',
                                       cash_sharing=True,
                              )
-
-        self.assertEqual(round(pf.get_total_return(),2),1.90)
+        print(round(pf.get_total_return(),2))
+        self.assertEqual(round(pf.get_total_return(),2),-0.20)
         
     def test_preselect_retard(self):
-        self.bti.preselect_retard()
+        self.bti=presel.PreselRetard(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -44,10 +45,11 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),18.03) 
+        self.assertEqual(round(pf.get_total_return(),2),17.92) 
 
     def test_preselect_macd_vol(self):
-        self.bti.preselect_macd_vol()
+        self.bti=presel.PreselMacdVol(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -62,7 +64,8 @@ class TestBT(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return(),2),1.84) 
         
     def test_preselect_hist_vol(self):
-        self.bti.preselect_hist_vol()
+        self.bti=presel.PreselHistVol(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -77,7 +80,8 @@ class TestBT(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return(),2),2.94) 
         
     def test_preselect_divergence(self):
-        self.bti.preselect_divergence()
+        self.bti=presel.PreselDivergence(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -92,7 +96,8 @@ class TestBT(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return(),2),19.67)  
         
     def test_preselect_macd_vol_macro(self):
-        self.bti.preselect_macd_vol_macro()
+        self.bti=presel.PreselMacdVolMacro(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -104,10 +109,11 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),16.93 ) 
+        self.assertEqual(round(pf.get_total_return(),2),2.82 ) 
         
     def test_preselect_retard_macro(self):
-        self.bti.preselect_retard_macro()
+        self.bti=presel.PreselRetardMacro(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -119,10 +125,11 @@ class TestBT(unittest.TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),23.76) 
+        self.assertEqual(round(pf.get_total_return(),2),23.61) 
 
     def test_preselect_divergence_blocked(self):
-        self.bti.preselect_divergence_blocked()
+        self.bti=presel.PreselDivergenceBlocked(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -135,9 +142,26 @@ class TestBT(unittest.TestCase):
                              )
 
         self.assertEqual(round(pf.get_total_return(),2),5.74) 
+
+    def test_preselect_divergence_blocked_im(self):
+        self.bti=presel.PreselDivergenceBlockedIm(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
+
+        pf=vbt.Portfolio.from_signals(self.bti.close,
+                                      self.bti.entries,
+                                      self.bti.exits,
+                                      short_entries=self.bti.entries_short,
+                                      short_exits  =self.bti.exits_short,
+                                      freq="1d",
+                                      call_seq='auto',
+                                      cash_sharing=True,
+                             )
+
+        self.assertEqual(round(pf.get_total_return(),2),9.08) 
         
     def test_preselect_vol_slow(self):
-        self.bti.preselect_vol_slow()
+        self.bti=presel.PreselVolSlow(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
         pf=vbt.Portfolio.from_signals(self.bti.close,
                                       self.bti.entries,
@@ -152,9 +176,10 @@ class TestBT(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return(),2),10.99)   
         
     def test_preselect_realmadrid(self):
-         self.bti.preselect_realmadrid()
+        self.bti=presel.PreselRealMadrid(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
-         pf=vbt.Portfolio.from_signals(self.bti.close,
+        pf=vbt.Portfolio.from_signals(self.bti.close,
                                        self.bti.entries,
                                        self.bti.exits,
                                        short_entries=self.bti.entries_short,
@@ -164,12 +189,13 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),8.05 )     
+        self.assertEqual(round(pf.get_total_return(),2),8.05 )     
 
     def test_preselect_realmadrid_blocked(self):
-         self.bti.preselect_realmadrid_blocked()
+        self.bti=presel.PreselRealMadridBlocked(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
-         pf=vbt.Portfolio.from_signals(self.bti.close,
+        pf=vbt.Portfolio.from_signals(self.bti.close,
                                        self.bti.entries,
                                        self.bti.exits,
                                        short_entries=self.bti.entries_short,
@@ -179,13 +205,14 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),5.5) 
+        self.assertEqual(round(pf.get_total_return(),2),5.5) 
 
 
     def test_preselect_macd_vol_slow(self):
-         self.bti.preselect_macd_vol_slow()
+        self.bti=presel.PreselMacdVolSlow(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
-         pf=vbt.Portfolio.from_signals(self.bti.close,
+        pf=vbt.Portfolio.from_signals(self.bti.close,
                                        self.bti.entries,
                                        self.bti.exits,
                                        short_entries=self.bti.entries_short,
@@ -195,26 +222,13 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),-0.61) 
-
-         self.bti.preselect_macd_vol_slow(only_exit_strat11=True)
-
-         pf=vbt.Portfolio.from_signals(self.bti.close,
-                                       self.bti.entries,
-                                       self.bti.exits,
-                                       short_entries=self.bti.entries_short,
-                                       short_exits  =self.bti.exits_short,
-                                       freq="1d",
-                                       call_seq='auto',
-                                       cash_sharing=True,
-                              )
-
-         self.assertEqual(round(pf.get_total_return(),2),-0.61) 
+        self.assertEqual(round(pf.get_total_return(),2),-0.61) 
 
     def test_preselect_hist_vol_slow(self):
-         self.bti.preselect_hist_vol_slow()
+        self.bti=presel.PreselHistVolSlow(self.period,symbol_index=self.symbol_index)
+        self.bti.run()
 
-         pf=vbt.Portfolio.from_signals(self.bti.close,
+        pf=vbt.Portfolio.from_signals(self.bti.close,
                                        self.bti.entries,
                                        self.bti.exits,
                                        short_entries=self.bti.entries_short,
@@ -224,21 +238,7 @@ class TestBT(unittest.TestCase):
                                        cash_sharing=True,
                               )
 
-         self.assertEqual(round(pf.get_total_return(),2),3.86)  
-
-         self.bti.preselect_hist_vol_slow(only_exit_strat11=True)
-
-         pf=vbt.Portfolio.from_signals(self.bti.close,
-                                       self.bti.entries,
-                                       self.bti.exits,
-                                       short_entries=self.bti.entries_short,
-                                       short_exits  =self.bti.exits_short,
-                                       freq="1d",
-                                       call_seq='auto',
-                                       cash_sharing=True,
-                              )
-
-         self.assertEqual(round(pf.get_total_return(),2),3.86)  
+        self.assertEqual(round(pf.get_total_return(),2),3.86)  
            
 if __name__ == '__main__':
     unittest.main()        

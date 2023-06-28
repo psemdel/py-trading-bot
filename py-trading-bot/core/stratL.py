@@ -7,8 +7,9 @@ Created on Sat Jun  4 13:05:41 2022
 """
 import vectorbtpro as vbt
 import core.indicators as ic
+import numbers
 
-from core.strat import Strat
+from core.strat import UnderlyingStrat
 from core.presel import Presel, WQ
 from core import common, constants
 from core.common import copy_attr
@@ -17,155 +18,93 @@ from core.common import copy_attr
 import numpy as np
 import pandas as pd
 
-### To back stage recent data
-#Need to be called outside of Django!!!
-# As strat but adapted to download every time the data
-class StratLIVE(Strat):
-    def __init__(self,symbols,period,index_symbol,**kwargs):
+class StratLIVE(UnderlyingStrat):
+    def __init__(
+            self,
+            symbols: list,
+            period: str,
+            symbol_index: str,
+            it_is_index: bool=False
+            ):
+        """
+        Function to back stage recent data
+        Called outside of Django!!!
+        As strat but adapted to download every time the data
+        
+        Arguments
+        ----------
+            symbols: list of YF tickers
+            period: period of time in year for which we shall retrieve the data
+            symbol_index: main index to be retrieved
+        """
         self.period=period
         self.symbols=symbols
-        self.index_symbol=index_symbol
+        self.symbol_index=symbol_index
         self.retrieve_live()
         
-        if kwargs.get("index",False):
+        if it_is_index:
             for l in ["close","open","high","low","volume","data"]:
                 setattr(self,l,getattr(self,l+"_ind"))
         
-    ##to plot the last days for instance
-    ##Different from retrieve_data in stratP as it needs to work outside of Django
     def retrieve_live(self):
-        all_symbols=self.symbols+[self.index_symbol]
+        '''
+        To plot the last days for instance
+        Different from retrieve_data in strat as it needs to work outside of Django
+        '''
+        all_symbols=self.symbols+[self.symbol_index]
         
         cours=vbt.YFData.fetch(all_symbols, period=self.period,missing_index='drop')
         self.data=cours.select(self.symbols)
-        self.data_ind=cours.select(self.index_symbol)
+        self.data_ind=cours.select(self.symbol_index)
         for l in ["Close","Open","High","Low","Volume"]:
             setattr(self,l.lower(),self.data.get(l))
             setattr(self,l.lower()+"_ind",self.data_ind.get(l))
         
         print("number of days retrieved: " + str(np.shape(self.close)[0]))
 
-def scan_strat(strat_dic, key,**kwargs):
-    res=kwargs.get('res',{})
-    res[key]={}
-    st=kwargs.get("st")
-    fees=kwargs.get("fees",0)
-    #limit the range for the calculation of the return to x market days, 
-    #set your period to be significantly longer than the restriction to avoid calculation errors
-    restriction=kwargs.get("restriction",None) 
+def scan(
+        strategy: str,
+        res: dict={},
+        ust=None, #underlying strat
+        strat_l: list=None,
+        presel_l: list=None,
+        fees: numbers.Number=0,
+        restriction:int=None,
+        **kwargs)-> dict:
+    '''
+    Calculate the performance of an underlying strategy in recent time
     
-    for p in strat_dic:
-        getattr(st,p)()
-        if restriction is not None and type(restriction)==int:
-            pf=vbt.Portfolio.from_signals(st.close[-restriction:], 
-                                          st.entries[-restriction:],
-                                          st.exits[-restriction:],
-                                          short_entries=st.entries_short[-restriction:],
-                                          short_exits  =st.exits_short[-restriction:],
-                                          freq="1d",
-                                          call_seq='auto',
-                                          fees=fees
-                                 )            
+    Note: set your period to be significantly longer than the restriction to avoid calculation errors
+    
+    Arguments
+    ----------
+        strategy: name of strategy
+        res: result dictionary, progressively filed
+        ust: underlying strategy
+        strat_l: list containing the strategy to be tested
+        presel_l: list containing the preselection strategy to be tested
+        fees: fees to be applyed during trades
+        restriction : limit the range for the calculation of the return to x market days, 
+    '''
+    res[strategy]={}
+    
+    if presel_l is not None:
+        l=presel_l
+    else:
+        l=strat_l
+        bti=ust
+
+    for p in l:
+        if presel_l is not None:
+            bti=PreselLIVE(ust=ust) #has to be recalculated everytime, otherwise it caches
+            if type(p)==int:
+                bti=WQLIVE(p,ust=ust)
+                bti.def_cand()
+                bti.calculate(nostrat11=True)
+            else:
+                getattr(bti,"preselect_"+p)()
         else:
-            pf=vbt.Portfolio.from_signals(st.close, 
-                                          st.entries,
-                                          st.exits,
-                                          short_entries=st.entries_short,
-                                          short_exits  =st.exits_short,
-                                          freq="1d",
-                                          call_seq='auto',
-                                          cash_sharing=True,
-                                          fees=fees
-                                 )
-    res[key][p]=pf.get_total_return()
-    return res        
-
-#Same as bt but for recent data
-#Only import with strat supported
-class PreselLIVE(Presel):
-    def __init__(self,**kwargs):
-        st=kwargs.get("st")
-        self.st=st
-        copy_attr(self,st)
-        
-        self.symbols=self.close.columns.values
-    
-        self.start_capital=10000
-        self.order_size=self.start_capital
-        self.capital=self.start_capital
-     
-        self.longshort=kwargs.get("longshort","long")
-     
-        self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-     
-        self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.entries_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-     
-        self.pf=[]
-        self.pf_short=[]
-        
-        st.strat_kama_stoch_matrend_bbands()
-        
-        self.ent11=st.entries
-        self.ex11=st.exits
- 
-        self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
-    
-        self.excluded=[]
-        self.hold_dur=0
-         
-        self.candidates=[[] for ii in range(len(self.close))]
-        self.candidates_short=[[] for ii in range(len(self.close))]
-         
-        self.symbols_simple=self.close.columns.values
-        self.symbols_complex=self.ent11.columns.values
-         
-        self.last_order_dir="long" 
-
-#Allow you to evaluate how performed preselection strategies on past period finishing today, so in a close past
-def scan_presel_all(period,**kwargs):
-    d={"CAC40":{"symbols":constants.CAC40,"index":"^FCHI"},
-       "DAX":  {"symbols":constants.DAX,"index":"^GDAXI"},
-       "NASDAQ":  {"symbols":constants.NASDAQ,"index":"^IXIC"},
-       "REALESTATE": {"symbols":constants.REALESTATE, "index":"^DJI"},
-       "INDUSTRY": {"symbols":constants.INDUSTRY, "index":"^DJI"},
-       "IT": {"symbols":constants.IT, "index":"^DJI"},
-       "COM": {"symbols":constants.COM, "index":"^DJI"},
-       "STAPLES": {"symbols":constants.STAPLES, "index":"^DJI"},
-       "CONSUMER": {"symbols":constants.CONSUMER, "index":"^DJI"},
-       "ENERGY": {"symbols":constants.ENERGY, "index":"^DJI"},
-       "UTILITIES": {"symbols":constants.UTILITIES, "index":"^DJI"},
-       "FIN": {"symbols":constants.FIN, "index":"^DJI"},
-       "MATERIALS": {"symbols":constants.MATERIALS, "index":"^DJI"},
-    }
-    presel_dic=["vol","realmadrid","retard","retard_macro","divergence","divergence_blocked",7,31,53,54]
-    res={}
-    
-    for k, v in d.items():
-        symbols=common.filter_intro_symbol(v["symbols"],period)
-        st=StratLIVE(symbols,str(period)+"y",v["index"])
-        res=scan_presel(presel_dic, k,res=res,st=st,**kwargs)
-        
-    return res
-
-def scan_presel(presel_dic, key,**kwargs):
-    res=kwargs.get('res',{})
-    res[key]={}
-    st=kwargs.get("st")
-    fees=kwargs.get("fees",0)
-    #limit the range for the calculation of the return to x market days, 
-    #set your period to be significantly longer than the restriction to avoid calculation errors
-    restriction=kwargs.get("restriction",None) 
-    
-    for p in presel_dic:
-        bti=PreselLIVE(st=st) #has to be recalculated everytime, otherwise it caches
-        if type(p)==int:
-            bti=WQLIVE(p,st=st)
-            bti.def_cand()
-            bti.calculate(nostrat11=True)
-        else:
-            getattr(bti,"preselect_"+p)()
+            getattr(bti,p)()
             
         if restriction is not None and type(restriction)==int:
             pf=vbt.Portfolio.from_signals(bti.close[-restriction:], 
@@ -189,24 +128,112 @@ def scan_presel(presel_dic, key,**kwargs):
                                           cash_sharing=True,
                                           fees=fees
                                  )
-        res[key][p]=pf.get_total_return()
-    return res
         
-#Same as WQ but for recent data        
+    res[strategy][p]=pf.get_total_return()
+    return res        
+
+def scan_presel_all(
+        period,
+        **kwargs):
+    """
+    Allow you to evaluate how performed preselection strategies on past period finishing today, so in a close past
+    
+    Arguments
+    ----------
+        period: period of time in year for which we shall retrieve the data
+    """    
+    
+    d={"CAC40":{"symbols":constants.CAC40,"index":"^FCHI"},
+       "DAX":  {"symbols":constants.DAX,"index":"^GDAXI"},
+       "NASDAQ":  {"symbols":constants.NASDAQ,"index":"^IXIC"},
+       "REALESTATE": {"symbols":constants.REALESTATE, "index":"^DJI"},
+       "INDUSTRY": {"symbols":constants.INDUSTRY, "index":"^DJI"},
+       "IT": {"symbols":constants.IT, "index":"^DJI"},
+       "COM": {"symbols":constants.COM, "index":"^DJI"},
+       "STAPLES": {"symbols":constants.STAPLES, "index":"^DJI"},
+       "CONSUMER": {"symbols":constants.CONSUMER, "index":"^DJI"},
+       "ENERGY": {"symbols":constants.ENERGY, "index":"^DJI"},
+       "UTILITIES": {"symbols":constants.UTILITIES, "index":"^DJI"},
+       "FIN": {"symbols":constants.FIN, "index":"^DJI"},
+       "MATERIALS": {"symbols":constants.MATERIALS, "index":"^DJI"},
+    }
+    presel_l=["vol","realmadrid","retard","retard_macro","divergence","divergence_blocked",7,31,53,54]
+    res={}
+    
+    for k, v in d.items():
+        symbols=common.filter_intro_symbol(v["symbols"],period)
+        ust=StratLIVE(symbols,str(period)+"y",v["index"])
+        res=scan( k,presel_dic=presel_l, res=res,ust=ust,**kwargs)
+        
+    return res
+
+#Same as bt but for recent data
+#Only import with strat supported
+class PreselLIVE(Presel):
+    def __init__(
+            self,
+            ust
+            ):
+        '''
+        Calculate the performance of a preselection strategy in recent time
+
+        Arguments
+        ----------
+            ust: underlying strategy
+        '''
+        self.ust=ust
+        copy_attr(self,ust)
+        
+        self.symbols=self.close.columns.values
+    
+        self.start_capital=10000
+        self.order_size=self.start_capital
+        self.capital=self.start_capital
+        
+        for k in ["entries","exits","exits_short","entries_short"]:
+            setattr(self,k, pd.DataFrame.vbt.empty_like(self.close, fill_value=False))
+     
+        self.pf=[]
+        self.pf_short=[]
+        
+        ust.strat_kama_stoch_matrend_bbands()
+        
+        self.ent11=ust.entries
+        self.ex11=ust.exits
+ 
+        self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
+    
+        self.excluded=[]
+        self.hold_dur=0
+         
+        self.candidates=[[] for ii in range(len(self.close))]
+        self.candidates_short=[[] for ii in range(len(self.close))]
+         
+        self.symbols_simple=self.close.columns.values
+        self.symbols_complex=self.ent11.columns.values
+         
+        self.last_order_dir="long" 
+        
 class WQLIVE(WQ):
-    def __init__(self, nb,**kwargs):
-        st=kwargs.get("st")
-        copy_attr(self,st)
+    def __init__(
+            self, 
+            nb:int,
+            ust=None, 
+            ):
+        '''
+        Calculate the performance of a wq strategy in recent time
+
+        Arguments
+        ----------
+            ust: underlying strategy
+        '''
+        copy_attr(self,ust)
 
         self.candidates=[[] for ii in range(len(self.close))]
         self.pf=[]
         
-        self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        
-        #actually only long are used in those strategy
-        self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.entries_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        for k in ["entries","exits","exits_short","entries_short"]: #actually only long are used in those strategy
+            setattr(self,k, pd.DataFrame.vbt.empty_like(self.close, fill_value=False))
 
         self.start_capital=10000
         self.order_size=self.start_capital
@@ -215,5 +242,13 @@ class WQLIVE(WQ):
         self.symbols_simple=self.close.columns.values
         
         self.nb=nb
-        self.out = vbt.wqa101(self.nb).run(open=self.open, high=self.high,\
-                                      low=self.low, close=self.close,volume=self.volume).out       
+        self.out = vbt.wqa101(self.nb).run(
+            open=self.open, 
+            high=self.high,
+            low=self.low, 
+            close=self.close,
+            volume=self.volume
+            ).out   
+
+        
+    

@@ -92,7 +92,7 @@ CAC40=[
     "SGO.PA",
     "SLB.PA",
     "STLA.PA", 
-    "STM.PA",
+    "STMPA.PA",
     "SU.PA",
     "SW.PA",
     "TEP.PA", 
@@ -861,3 +861,16 @@ mode_to_int={
     "bear":1,
     "uncertain":2
     }
+
+short_to_str={True: "short", False: "long"}
+short_to_sign={True:-1, False:1}
+
+strategy_to_presel={
+    "hist_vol":"PreselHistVolSlow",
+    "realmadrid":"PreselRealMadrid",
+    "retard":"PreselRetard",
+    }
+
+
+    
+    

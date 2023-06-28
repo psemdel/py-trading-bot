@@ -32,7 +32,7 @@ from orders.models import Action, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
                           get_exchange_actions   
                  
-from core import constants, preselP
+from core import constants, presel
 
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
@@ -568,10 +568,12 @@ def actualize_job(
     Perform a job with long intervals between two executions
     ''' 
     use_IB, actions=get_exchange_actions(exchange)
-    presel=preselP.PreselPRD(use_IB,actions1=actions,period1=str(period_year)+"y",exchange=exchange)
-    
-    if strategy=="hist_vol":
-        presel.actualize_hist_vol_slow(exchange)
-    elif strategy=="realmadrid":
-        presel.actualize_realmadrid(exchange)
+    pr=presel.name_to_presel(
+        constants.strategy_to_presel[strategy], 
+        str(period_year)+"y",
+        prd=True, 
+        actions=actions,
+        use_IB=use_IB,
+        exchange=exchange) 
+    pr.actualize()
 

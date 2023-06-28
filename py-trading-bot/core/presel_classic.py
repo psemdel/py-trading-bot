@@ -9,6 +9,7 @@ Created on Sun Mar 26 12:35:55 2023
 import vectorbtpro as vbt
 import numpy as np
 
+from core import strat
 from core.common import remove_multi
 from core.presel import Presel
 from numba import njit
@@ -66,8 +67,8 @@ SIGNALTOSIZE = vbt.IF(
  )       
 
 class PreselClassic(Presel):
-    def __init__(self,symbol_index,period,**kwargs):
-        super().__init__(symbol_index,period,**kwargs)
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs)
         self.pf_opt=None 
         self.cands={}
     
@@ -117,10 +118,10 @@ class PreselClassic(Presel):
 
         #transform the entries and exits in 1 and 0
         t=SIGNALTOSIZE.run(
-            self.st.entries,
-            self.st.exits,
-            self.st.entries_short,
-            self.st.exits_short,
+            self.ust.entries,
+            self.ust.exits,
+            self.ust.entries_short,
+            self.ust.exits_short,
             idx_arr=[idx_arr]
             )
 
@@ -130,7 +131,7 @@ class PreselClassic(Presel):
         self.size=self.new_alloc #remove_multi(self.new_alloc)* remove_multi(size_underlying)
 
     def apply_underlying_strat(self, strat_name):
-        getattr(self.st,strat_name)()
+        self.ust=strat.name_to_ust(strat_name,self.period, symbol_index=self.symbol_index)
         self.fill_allocations_underlying()
         
         #as function from_optimizer

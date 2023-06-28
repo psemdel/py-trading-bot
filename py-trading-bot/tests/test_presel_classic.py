@@ -14,7 +14,7 @@ import numpy as np
 
 class TestPreselClassic(TestCase):
     def setUp(self):
-        self.bti=presel_classic.PreselClassic("CAC40","2007_2022_08")
+        self.bti=presel_classic.PreselClassic("2007_2022_08",symbol_index="CAC40")
         
         
     def test_hold(self):
@@ -26,14 +26,14 @@ class TestPreselClassic(TestCase):
         pf_ref=pf_opt.simulate(self.bti.close,freq="1d")
         
         self.bti.max_sharpeY()
-        pf_test=self.bti.apply_underlying_strat("stratHold")
+        pf_test=self.bti.apply_underlying_strat("StratHold")
         self.assertEqual(round(pf_ref.get_total_return(),2),round(pf_test.get_total_return(),2))
         
     def test_one_action(self):
-        st=strat.Strat("CAC40","2007_2022_08")
-        st.stratG()
-        pf_ref=vbt.Portfolio.from_signals(st.close[509:], st.entries[509:],st.exits[509:],
-                              short_entries=st.entries_short[509:],short_exits  =st.exits_short[509:],
+        ust=strat.StratG("2007_2022_08",symbol_index="CAC40")
+        ust.run()
+        pf_ref=vbt.Portfolio.from_signals(ust.close[509:], ust.entries[509:],ust.exits[509:],
+                              short_entries=ust.entries_short[509:],short_exits  =ust.exits_short[509:],
                               freq="1d")
         
         self.bti.pf_opt = vbt.PortfolioOptimizer.from_pypfopt(
@@ -49,7 +49,7 @@ class TestPreselClassic(TestCase):
             self.bti.pf_opt._allocations[ii]=arr
             
         
-        pf_test=self.bti.apply_underlying_strat("stratG")
+        pf_test=self.bti.apply_underlying_strat("StratG")
         
         #tolerance as at the year change there is a sell/buy which can have an impact
         self.assertTrue(abs(round(pf_ref.get_total_return()[0],2)-round(pf_test.get_total_return(),2))<0.1)
@@ -60,18 +60,18 @@ class TestPreselClassic(TestCase):
         for ii in range(len(self.bti.pf_opt._allocations)):
             self.bti.pf_opt._allocations[ii]=arr
         
-        pf_test=self.bti.apply_underlying_strat("stratG")
+        pf_test=self.bti.apply_underlying_strat("StratG")
         
         #tolerance as at the year change there is a sell/buy which can have an impact
         self.assertTrue(abs(round(pf_ref.get_total_return()[1],2)-round(pf_test.get_total_return(),2))<0.1)   
         
     def test_two_action(self):
-        st=strat.Strat("CAC40","2007_2022_08")
-        st.stratG()
+        ust=strat.StratG("2007_2022_08",symbol_index="CAC40")
+        ust.run()
         
         window_start=509
-        pf_ref=vbt.Portfolio.from_signals(st.close[window_start:], st.entries[window_start:],st.exits[window_start:],
-                              short_entries=st.entries_short[window_start:],short_exits  =st.exits_short[window_start:],
+        pf_ref=vbt.Portfolio.from_signals(ust.close[window_start:], ust.entries[window_start:],ust.exits[window_start:],
+                              short_entries=ust.entries_short[window_start:],short_exits  =ust.exits_short[window_start:],
                               freq="1d")
         
         self.bti.pf_opt = vbt.PortfolioOptimizer.from_pypfopt(
@@ -87,7 +87,7 @@ class TestPreselClassic(TestCase):
         for ii in range(len(self.bti.pf_opt._allocations)):
             self.bti.pf_opt._allocations[ii]=arr
             
-        pf_test=self.bti.apply_underlying_strat("stratG")
+        pf_test=self.bti.apply_underlying_strat("StratG")
         self.assertTrue(abs(round((pf_ref.get_total_return()[0]+pf_ref.get_total_return()[1])/2,2)-round(pf_test.get_total_return(),2))<0.2)
             
         arr=[0 for ii in range(np.shape(self.bti.pf_opt._allocations)[1])]
@@ -96,7 +96,7 @@ class TestPreselClassic(TestCase):
         for ii in range(len(self.bti.pf_opt._allocations)):
             self.bti.pf_opt._allocations[ii]=arr
             
-        pf_test2=self.bti.apply_underlying_strat("stratG")    
+        pf_test2=self.bti.apply_underlying_strat("StratG")    
         
         arr=[0 for ii in range(np.shape(self.bti.pf_opt._allocations)[1])]
         arr[1]=0.5
@@ -104,7 +104,7 @@ class TestPreselClassic(TestCase):
         for ii in range(len(self.bti.pf_opt._allocations)):
             self.bti.pf_opt._allocations[ii]=arr
             
-        pf_test3=self.bti.apply_underlying_strat("stratG")  
+        pf_test3=self.bti.apply_underlying_strat("StratG")  
         
         #is not equal as targetpercent takes money from one action for the other
         self.assertTrue(abs(pf_test2.get_total_return()+pf_test3.get_total_return()-pf_test.get_total_return())<0.2)

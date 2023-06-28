@@ -8,7 +8,7 @@ Created on Sun Jun 26 21:38:23 2022
 
 from django.test import TestCase
 import unittest
-from core import preselP, stratP
+from core import presel, strat
 from orders.models import (Fees, StockEx, Action, ActionSector,
                           ActionCategory, Strategy, Currency, Candidates, Excluded,
                           get_exchange_actions)
@@ -90,72 +90,60 @@ class TestbtP(TestCase):
   #hist slow does not need code here
     def test_actualize_hist_vol_slow(self):
         use_IB, actions=get_exchange_actions("Paris")
-        print(actions)
         
-        self.presel=preselP.PreselPRD(use_IB,actions1=actions,period1="1y",exchange="Paris")
-        
+        self.pr=presel.PreselHistVolSlow("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
+
         strategy=Strategy.objects.create(name="hist_slow")
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
-        self.presel.actualize_hist_vol_slow("Paris")
+        self.pr.actualize()
         #cand=get_candidates("hist_slow","Paris")
         
     def test_actualize_hist_vol_slow2(self):
         use_IB, actions=get_exchange_actions("Paris")
-        self.st=stratP.StratPRD(use_IB,actions1=self.actions,period1="1y")
-        self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro",
-                      macro_trend_bull="long",
-                      macro_trend_uncertain="both",
-                      macro_trend_bear="both"
-                      ) 
         
-        self.presel=preselP.PreselPRD(use_IB,st=self.st,exchange="Paris")
+        self.ust=strat.StratDiv("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
+        self.ust.run()
+        
+        self.pr=presel.PreselHistVolSlow("1y",prd=True, input_ust=self.ust)
         
         strategy=Strategy.objects.create(name="hist_slow")
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
-        self.presel.actualize_hist_vol_slow("Paris")
+        self.pr.actualize()
         #cand=get_candidates("hist_slow","Paris")
         
     def test_actualize_realmadrid(self):
         use_IB, actions=get_exchange_actions("Paris")
-        self.presel=preselP.PreselPRD(use_IB,actions1=actions,period1="1y",exchange="Paris")
+        
+        self.pr=presel.PreselRealMadrid("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
         
         strategy=Strategy.objects.create(name="realmadrid")
         Excluded.objects.create(name="realmadrid", strategy=strategy)
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
-        self.presel.actualize_realmadrid("Paris")
+        self.pr.actualize()
         cand=get_candidates("realmadrid","Paris")
         self.assertEqual(len(cand.retrieve()),2)
         
     def test_actualize_realmadrid2(self):
         use_IB, actions=get_exchange_actions("Paris")
         
-        self.st=stratP.StratPRD(use_IB,actions1=self.actions,period1="1y")
-        self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro",
-                      macro_trend_bull="long",
-                      macro_trend_uncertain="both",
-                      macro_trend_bear="both"
-                      ) 
+        self.ust=strat.StratDiv("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
+        self.ust.run()
         
-        self.presel=preselP.PreselPRD(use_IB,st=self.st,exchange="Paris")
+        self.pr=presel.PreselRealMadrid("1y",prd=True, input_ust=self.ust)
         
         strategy=Strategy.objects.create(name="realmadrid")
         Excluded.objects.create(name="realmadrid", strategy=strategy)
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
-        self.presel.actualize_realmadrid("Paris")
+        self.pr.actualize()
         cand=get_candidates("realmadrid","Paris")
-        self.assertEqual(len(cand.retrieve()),2)        
+        self.assertEqual(len(cand.retrieve()),2)   
         
     def test_wq(self):
-        self.st=stratP.StratPRD(False,actions1=self.actions,period1="1y")
-        self.st.call_strat("strat_kama_stoch_matrend_macdbb_macro",
-                      macro_trend_bull="long",
-                      macro_trend_uncertain="both",
-                      macro_trend_bear="both"
-                      ) 
-                
-        wq=preselP.WQPRD(False,st=self.st,exchange="Paris")
+        self.ust=strat.StratDiv("1y",prd=True, use_IB=False,actions=self.actions,exchange="Paris")
+        self.ust.run()
+
+        wq=presel.WQ("1y",input_ust=self.ust)
         wq.call_wqa(7)
-        
-        
+ 
 if __name__ == '__main__':
     unittest.main() 

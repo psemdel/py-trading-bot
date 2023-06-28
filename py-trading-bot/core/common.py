@@ -7,7 +7,6 @@ Created on Sun Jan  9 13:09:58 2022
 """
 import numbers
 import math
-import numpy as np
 from datetime import datetime
 from core.constants import INTRO, DELIST
 import pandas as pd
@@ -37,14 +36,6 @@ class VBTfunc():
             return 0
         else:
             return round(n/d-1,4) 
-
-def copy_attr(o1,o2):
-    '''
-    Copy attributes from one object to another
-    '''
-    for suffix in ["","_ind"]:
-        for l in ["high","low","close","open","volume","data"]:
-            setattr(o1,l+suffix, getattr(o2,l+suffix))
 
 def filter_intro_symbol_sub(s: str,y_period: numbers.Number)-> bool:
     '''
@@ -84,7 +75,7 @@ def filter_intro_symbol(input_symbols: list,y_period: numbers.Number) -> list:
             symbols.append(s)   
     return symbols   
 
-def save(x_df,filename):
+def save(x_df: pd.core.frame.DataFrame,filename: str):
     '''
     Save a dataframe to a file
 
@@ -93,60 +84,24 @@ def save(x_df,filename):
            x_df: a dataframe to be saved
            filename: name of the file where to save the dataframe
     '''
-    x_df.to_csv('data/'+filename)
+    x_df.to_csv(''+filename)
 
-def save_vbt_both(cours, entries, exits, entries_short, exits_short, **kwargs):
-    suffix=kwargs.get("suffix","")
-    
+def save_vbt_both(
+        cours: pd.core.frame.DataFrame, 
+        entries: pd.core.frame.DataFrame, 
+        exits: pd.core.frame.DataFrame,
+        entries_short: pd.core.frame.DataFrame,
+        exits_short: pd.core.frame.DataFrame,
+        suffix:str=""
+        ):
+    '''
+    Save some dataframes, useful for debugging
+    '''
     save(entries,"entries"+suffix)
     save(exits, "exits"+suffix)
     save(entries_short,"entries_short"+suffix)
     save(exits_short, "exits_short"+suffix)    
     save(cours,"cours"+suffix)
-    
-    
-def empty_append(x, v, axis, **kwargs):
-    '''
-    Add a column/row to a np.array
-
-    Arguments
-    ----------
-           x: column/row to be added
-           v: original array where a column/row needs to be added
-           axis: axis (column/row)
-    '''
-    try:
-        """
-        if axis==0:
-            print("v")
-            print(np.shape(v))
-            print("x")
-            print(np.shape(x))
-        """
-        if v==[]:
-            return x
-        else:
-            av=np.array(v)
-    
-            if len(av.shape)==1:
-                #print("av shape 1")
-                if axis==1:
-                   av=av.reshape(-1, 1)
-                else:
-                   av=av.reshape(-1, 1)
-                   #av=np.transpose(av)
-                #print(np.shape(av))
-                
-            if type(x) is np.ndarray:
-                temp=np.append(x,av,axis=axis)
-                return temp
-            else:
-                return av
-    except Exception as msg:
-        print("error by append " +str(msg))
-        print("shape x: " + str(np.shape(x)))
-        print("shape v: " + str(np.shape(v)))
-        return x  
     
 def intersection(lst1: list, lst2: list) -> list:
     '''

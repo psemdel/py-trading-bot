@@ -50,13 +50,9 @@ _settings={
 "DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
 "RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
 
-"STRATEGY_NORMAL_STOCKS":"stratG",
-"STRATEGY_NORMAL_INDEX":"stratIndexB",
-"STRATEGY_SL_STOCKS":"stratSL",
-"STRATEGY_SL_INDEX":"stratIndexSL",
-"STRATEGY_TSL_STOCKS":"stratTSL",
-"STRATEGY_TSL_INDEX":"stratIndexTSL",
-"STRATEGY_RETARD_KEEP":"stratG",
+"STRATEGY_NORMAL_STOCKS":"StratG",
+"STRATEGY_NORMAL_INDEX":"StratIndexB",
+"STRATEGY_RETARD_KEEP":"StratG",
 
 # Frequency is the number of days between successive candidates actualisation
 "DAILY_REPORT_PERIOD":3, #in year

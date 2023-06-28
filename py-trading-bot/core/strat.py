@@ -8,11 +8,13 @@ Created on Sat May 14 22:36:16 2022
 import vectorbtpro as vbt
 import numpy as np
 import numbers
+import sys
 
-from core.common import VBTfunc, save_vbt_both, remove_multi
+from core.common import save_vbt_both, remove_multi
 import core.indicators as ic
 from core.macro import VBTMACROFILTER, VBTMACROMODE, VBTMACROTREND, VBTMACROTRENDPRD, major_int
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
+from core.data_manager import retrieve
 import inspect
 import pandas as pd
 
@@ -39,15 +41,12 @@ def defi_i_fast_sub(
         calc_arrs: array of the strategy combination 
         jj: index of the strategy to be added in calc_arrs
     """ 
-    try:
-        for ii in range(len(calc_arrs)):
-            t2=ic.VBTSUM.run(t,k=calc_arrs[ii][jj]).out
-            t2=remove_multi(t2)
-            all_t[ii]+=t2
-    
-        return all_t  
-    except Exception as e:
-        print(e)
+    for ii in range(len(calc_arrs)):
+        t2=ic.VBTSUM.run(t,k=calc_arrs[ii][jj]).out
+        t2=remove_multi(t2)
+        all_t[ii]+=t2
+
+    return all_t  
    
 def filter_macro(all_t: list,
                  macro_trend: pd.core.frame.DataFrame,
@@ -285,7 +284,6 @@ def strat_wrapper_macro(open_: np.array,
         dir_uncertain: direction to use during uncertain trend
     """
     try:
-        
         if prd:
             t=VBTMACROTRENDPRD.run(close)
         else:
@@ -312,25 +310,129 @@ def strat_wrapper_macro(open_: np.array,
         print("line " + str(exc_tb.tb_lineno))
         logger.error(e, stack_info=True, exc_info=True) 
 
-### For backtesting ###
-class Strat(VBTfunc):
-    def __init__(self,symbol_index,period,**kwargs):
-        super().__init__(symbol_index,period)
-        
-        if kwargs.get("index",False):
-            #self.only_index=True
-            self.close=self.close_ind
-            self.open=self.open_ind
-            self.low=self.low_ind
-            self.high=self.high_ind
-        else:
-            #self.only_index=False
-            self.symbols_simple=self.close.columns.values
+def name_to_ust(
+        ust_name: str, 
+        period: str,
+        **kwargs):
+
+    UST=getattr(sys.modules[__name__],ust_name)
+    ust=UST(period,**kwargs)
+    ust.run()
+    
+    return ust
+
+class UnderlyingStrat(): 
+    def __init__(self,
+                 period: numbers.Number,
+                 symbol_index: str=None,
+                 prd: bool=False,
+                 it_is_index: bool=False,
+                 suffix: str="",
+                 actions: list=None,
+                 symbols: list=None,
+                 use_IB: bool=None,
+                 input_ust=None, #itself a strat
+                 strat_arr_simple: list=None,
+                 strat_arr_bull: list=None,
+                 strat_arr_bear: list=None,
+                 strat_arr_uncertain: list=None,
+                 exchange:str=None,
+                 ):
+        """
+        Strategies on one action, no preselection. For production and non production, to make the strats as child of the main one.
+
+        So it determines entries and exits for one action to optimize the return
+
+        Arguments
+        ----------
+            symbol_index: main index to be retrieved
+            period: period of time in year for which we shall retrieve the data
+            prd: for production or backtesting
+            it_is_index: is it indexes that are provided
+            suffix: suffix for files
+            actions: list of actions
+            symbols: list of YF tickers
+            use_IB: should IB be used to download the data?
+            input_ust: input underlying strategy with already all data downloaded, avoid downloading the same several times
+            strat_arr_simple: array of the strategy combination to use, no trend
+            strat_arr_bull: array of the strategy combination to use, trend bull
+            strat_arr_bear: array of the strategy combination to use, trend bear
+            strat_arr_uncertain: array of the strategy combination to use, trend uncertain
+        """
+        try:
+            self.suffix=suffix
+            if self.suffix!="":
+                self.suffix="_" + self.suffix
+            for k in ["prd","period","symbol_index","use_IB", "actions","symbols","exchange"]:
+                if locals()[k] is None and input_ust is not None:
+                    setattr(self,k, getattr(input_ust,k))
+                else:
+                    setattr(self,k,locals()[k])
+               
+            self.strat_arr={}
+            if strat_arr_simple is not None:
+                self.strat_arr["simple"]=strat_arr_simple
+            if strat_arr_bull is not None:
+                self.strat_arr["bull"]=strat_arr_bull
+                self.strat_arr["bear"]=strat_arr_bear
+                if strat_arr_bear is None:
+                    raise ValueError("strat_arr_bull defined but not strat_arr_bear")
+                self.strat_arr["uncertain"]=strat_arr_uncertain
+                if strat_arr_uncertain is None:
+                    raise ValueError("strat_arr_bull defined but not strat_arr_uncertain")
             
-        if kwargs.get("suffix"):
-            self.suffix="_" + kwargs.get("suffix")
-        else:
-            self.suffix=""
+            self.symbols_to_YF={}
+            
+            if input_ust is not None:
+                for l in ["close","open","high","low","volume","data"]:
+                    setattr(self,l,getattr(input_ust,l))
+                    if getattr(input_ust,l) is None:
+                        raise ValueError(l+" no value found in StratPRD")
+                    setattr(self,l+"_ind",getattr(input_ust,l+"_ind"))
+                    if getattr(input_ust,l+"_ind") is None:
+                        raise ValueError(l+"_ind no value found in StratPRD")
+            else:
+                if not self.prd:
+                    if self.symbol_index is None:
+                        raise ValueError("symbol_index is none for ust")
+                        
+                    retrieve(self,self.symbol_index,self.period)
+            
+                    if it_is_index:
+                        for k in ["close","open","low","high"]:
+                            setattr(self,k,getattr(self,k+"_ind"))
+                    else:
+                        self.symbols_simple=self.close.columns.values
+                else:
+                    from orders.models import Action
+                    from orders.ib import retrieve_data
+                    if self.use_IB is None:
+                        raise ValueError("use_IB should not be none for Strat in production")
+                    if self.actions is None:
+                        if self.symbols is None:
+                            raise ValueError("StratPRD, no symbols provided")
+                        self.actions=[Action.objects.get(symbol=symbol) for symbol in self.symbols]
+                    self.use_IB, self.symbols=retrieve_data(self,self.actions,period,self.use_IB,it_is_index=it_is_index)  #the symbols as output are then the YF symbols
+                    for s in self.symbols:
+                        self.symbols_to_YF[s]=s
+                    
+            if input_ust is not None and self.prd: 
+                self.symbols=[]
+                for a in self.actions:
+                    if self.use_IB:
+                        s=a.ib_ticker()
+                    else:
+                        s=a.symbol
+                    self.symbols.append(s)
+                    self.symbols_to_YF[s]=a.symbol
+     
+            self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
+            self.actions=actions
+        except Exception as e:
+            import sys
+            _, e_, exc_tb = sys.exc_info()
+            print(e)
+            print("line " + str(exc_tb.tb_lineno))            
         
     def get_output(self,s):
         self.entries=s.entries
@@ -344,7 +446,21 @@ class Strat(VBTfunc):
         self.max_ind=s.max_ind
         self.min_ind=s.min_ind
   
-    def symbols_simple_to_complex(self,symbol_simple,ent_or_ex):
+    def symbols_simple_to_complex(
+            self,
+            symbol_simple: str,
+            ent_or_ex: str):
+        '''
+        dataframes like close, open... use simple YF ticker as column. For instance "AMZN"
+        
+        However underlying strategy have because of vbt a multiindex, for instance ("pattern", "RSI", "AMZN")
+        This function makes the conversion
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker
+            ent_or_ex: entry or exit
+        '''
         if ent_or_ex=="ent":
             self.symbols_complex=self.entries.columns.values
         else:
@@ -361,6 +477,9 @@ class Strat(VBTfunc):
                          " columns available: "+str(self.symbols_complex))
     
     def save(self):
+        '''
+        Save close, entries... to a file
+        '''
         save_vbt_both(self.close, 
                  self.entries, 
                  self.exits, 
@@ -369,7 +488,7 @@ class Strat(VBTfunc):
                  suffix=self.suffix
                  )
 
-    def get_return(self,**kwargs):
+    def get_return(self):
         pf=vbt.Portfolio.from_signals(self.close, 
                                       entries =self.entries,
                                       exits =  self.exits,
@@ -380,68 +499,53 @@ class Strat(VBTfunc):
         #benchmark_return makes sense only for bull
         delta=pf.total_return().values[0]
         return delta
+###production functions        
+    def get_last_decision(self, symbol_complex_ent: str, symbol_complex_ex: str):
+        for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):
+            if (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]) and not\
+            (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]):
+                return -1
+            elif (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]) and not\
+                (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]):
+                return 1
+        return 0
     
-    def call_strat(self,name,**kwargs):
-        getattr(self,name)(**kwargs)
-########## Strats ##############
-# Example of simple strategy for pedagogic purposes
-    def stratHold(self):
-        t=ic.VBTVERYBULL.run(self.close)
-        self.entries=t.entries
-        self.exits=t.exits
-        self.entries_short=t.exits
-        self.exits_short=t.exits
-
-    def stratRSI(self,**kwargs):
-        t=vbt.RSI.run(self.close,wtype='simple')
-        self.entries=t.rsi_crossed_below(20)
-        self.exits=t.rsi_crossed_above(80)
-        t2=ic.VBTFALSE.run(self.close)
-        self.entries_short=t2.entries
-        self.exits_short=t2.entries
+    def grow_past(self,
+                  distance: numbers.Number, 
+                  ma: bool
+                  ) -> np.array:
+        res=ic.VBTGROW.run(self.close,distance=distance, ma=ma).out
+        self.symbols_complex_yn=res.columns.values
         
-    def stratRSIeq(self,**kwargs):
-        a=[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       0., 0., 0., 0., 0., 
-           0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 
-       0., 0., 0., 0., 0.]
+        return res
 
+    def symbols_simple_to_complex_yn(self, symbol_simple: str):
+        for ii, e in enumerate(self.symbols_complex_yn):
+            if e[-1]==symbol_simple: #9
+                return e     
+        
+    def date(self):
+        '''
+        Return the last index, which is a date
+        '''
+        return self.close.index[-1]     
+    
+    def run_simple(self):
+        '''
+        Calculate the entries and exits for underlying strategy which don't depend on the trend
+        '''
         self.entries, self.exits, self.entries_short, self.exits_short= \
         strat_wrapper_simple(
                             self.open,
                             self.high, 
                             self.low,
                             self.close,
-                            #self.close_ind,
-                            a)     
-        
-# The best strategy without macro is hold, here strat D bear is acceptable and provides some signals
-# to define pattern light
-    def stratDbear(self,**kwargs):
-        a=[0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0.,
-       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
-       0., 1., 0., 0., 0., 0., 0., 0., 1., 0.]
-
-
-        self.entries, self.exits, self.entries_short, self.exits_short= \
-        strat_wrapper_simple(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a)
-        
-    def stratReal(self,**kwargs):
-        a_bull=[1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0.,
-               1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-               1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        a_bear=[1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1,
-         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0]
-        a_uncertain= [1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-               0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1.,
-               1., 0., 0., 0., 0., 1., 0., 1., 1., 0.]
-        
+                            self.strat_arr["simple"])   
+    
+    def run_macro(self):
+        '''
+        Calculate the entries and exits for underlying strategy which depend on the trend
+        '''
         self.entries, self.exits, self.entries_short, self.exits_short, \
         self.macro_trend, self.min_ind, self.max_ind=\
         strat_wrapper_macro(
@@ -449,50 +553,118 @@ class Strat(VBTfunc):
                             self.high, 
                             self.low,
                             self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)  
-
-    def stratDiv(self,**kwargs):
+                            self.strat_arr["bull"], 
+                            self.strat_arr["bear"], 
+                            self.strat_arr["uncertain"],
+                            )  
         
-        #optimal with fee 0,0005
+    def run(self):
+        if "bull" in self.strat_arr:
+            self.run_macro()
+        else:
+            self.run_simple()        
+########## Strats ##############
+# Example of simple strategy for pedagogic purposes
+class StratHold(UnderlyingStrat):
+    '''
+    Simply hold
+    '''
+    def run(self):
+        t=ic.VBTVERYBULL.run(self.close)
+        self.entries=t.entries
+        self.exits=t.exits
+        self.entries_short=t.exits
+        self.exits_short=t.exits
+        
+class StratRSI(UnderlyingStrat):  
+    '''
+    Very basic RSI strategy
+    '''
+    def run(self):      
+        t=vbt.RSI.run(self.close,wtype='simple')
+        self.entries=t.rsi_crossed_below(20)
+        self.exits=t.rsi_crossed_above(80)
+        t2=ic.VBTFALSE.run(self.close)
+        self.entries_short=t2.entries
+        self.exits_short=t2.entries
+        
+class StratRSIeq(UnderlyingStrat):   
+    '''
+    Same a stratRSI but realized with a strategy array
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
+        a=[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+       0., 0., 0., 0., 0., 
+           0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 
+       0., 0., 0., 0., 0.]
+        super().__init__(period,strat_arr_simple=a,**kwargs )
+        
+class StratDbear(UnderlyingStrat):   
+    '''
+    Example of strategy without trend
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
+        a=[0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0.,
+        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
+        0., 1., 0., 0., 0., 0., 0., 0., 1., 0.]
+        super().__init__(period,strat_arr_simple=a,**kwargs )
+        
+class StratDiv(UnderlyingStrat):    
+    '''
+    Underlying strategy for divergence preselection
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a=[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
        0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1.,
        1., 0., 1., 0., 0., 0., 0., 1., 0., 0.]
-        
-        #optimal with fee 0,0001
-       # a=[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       # 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
-        #1., 1., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0.]
+        super().__init__(period,strat_arr_simple=a,**kwargs )
 
-        self.entries, self.exits, self.entries_short, self.exits_short= \
-        strat_wrapper_simple(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a)
-
-        
-    def stratTestSimple(self,**kwargs):
+class StratTestSimple(UnderlyingStrat):    
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a=[0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
        0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        super().__init__(period,strat_arr_simple=a,**kwargs )
+        
+class StratReal(UnderlyingStrat):    
+    '''
+    Underlying strategy for realmadrid preselection
+    '''    
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
+        a_bull=[1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0.,
+               1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+               1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        a_bear=[1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1,
+         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0]
+        a_uncertain= [1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+               0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1.,
+               1., 0., 0., 0., 0., 1., 0., 1., 1., 0.]        
+        super().__init__(
+            period,
+            strat_arr_bull=a_bull,
+            strat_arr_bear=a_bear,
+            strat_arr_uncertain=a_uncertain,
+            **kwargs )        
 
-
-        self.entries, self.exits, self.entries_short, self.exits_short= \
-        strat_wrapper_simple(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a)
-    #In long/both/both, on period 2007-2022, CAC40 return 5.26 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)  
-    def stratD(self,**kwargs):
+class StratD(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on stocks
+    
+    In long/both/both, on period 2007-2022, CAC40 return 5.26 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)  
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a_bull= [1., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 1., 1., 0.,
                 1., 0., 0., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.]
@@ -502,21 +674,22 @@ class Strat(VBTfunc):
                 1., 1., 1., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.,
                 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
         
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)      
-        
-    #In long/both/both, on period 2007-2022, CAC40 return 4.35 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)    
-    def stratE(self,**kwargs):
+        super().__init__(
+            period,
+            strat_arr_bull=a_bull,
+            strat_arr_bear=a_bear,
+            strat_arr_uncertain=a_uncertain,
+            **kwargs ) 
+
+class StratE(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on stocks
+    
+    In long/both/both, on period 2007-2022, CAC40 return 4.35 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)    
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a_bull=[0., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0.,
         1., 1., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0., 0.]
@@ -526,21 +699,22 @@ class Strat(VBTfunc):
          0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.,
          0., 0., 1., 1., 0., 0., 1., 1., 0., 0., 0., 0.]
         
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)         
- 
-#In long/both/both, 
-    def stratF(self,**kwargs):
+        super().__init__(
+            period,
+            strat_arr_bull=a_bull,
+            strat_arr_bear=a_bear,
+            strat_arr_uncertain=a_uncertain,
+            **kwargs )     
+
+class StratF(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on stocks
+    
+    In long/both/both   
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a_bull=[0., 0., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
             1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
             0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
@@ -551,23 +725,22 @@ class Strat(VBTfunc):
             0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
             0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
         
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)         
-        
-#In long/both/both, 
+        super().__init__(
+            period,
+            strat_arr_bull=a_bull,
+            strat_arr_bear=a_bear,
+            strat_arr_uncertain=a_uncertain,
+            **kwargs )  
 
-    #Optimized on 2007-2023, CAC40 7.58 (3.13 bench), DAX 2.31 (1.68), NASDAQ 19.88 (12.1), IT 15.69 (8.44)
-    def stratG(self,**kwargs):
+class StratG(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on stocks
+    
+    In long/both/both, Optimized on 2007-2023, CAC40 7.58 (3.13 bench), DAX 2.31 (1.68), NASDAQ 19.88 (12.1), IT 15.69 (8.44)
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a_bull=[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1.,
                 1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
@@ -578,20 +751,20 @@ class Strat(VBTfunc):
          1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
          0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
         
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs) 
-        
-    def stratIndex(self,**kwargs):
+        super().__init__(
+            period,
+            strat_arr_bull=a_bull,
+            strat_arr_bear=a_bear,
+            strat_arr_uncertain=a_uncertain,
+            **kwargs )  
+
+class StratIndex(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on index
+    '''    
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a_bull=[1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 1., 1., 0., 0., 1.,
        0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
        0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
@@ -601,21 +774,22 @@ class Strat(VBTfunc):
        0., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 1.,
        0., 0., 1., 0., 0., 0., 1., 0., 0., 0.]
         
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs) 
+        super().__init__(
+            period,
+            strat_arr_bull=a_bull,
+            strat_arr_bear=a_bear,
+            strat_arr_uncertain=a_uncertain,
+            **kwargs ) 
+
+class StratIndexB(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on index
     
-    #reoptimization with 2007-2023 FCHI 9.43 (0.15 for the benchmark), GDAXI 3.09 (0.7), IXIC 4.58 (3.31), DJI 1.5 (1.65)
-    def stratIndexB(self,**kwargs):
+    reoptimization with 2007-2023 FCHI 9.43 (0.15 for the benchmark), GDAXI 3.09 (0.7), IXIC 4.58 (3.31), DJI 1.5 (1.65)
+    '''   
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
         a_bull=[1., 0., 0., 1., 1., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
                 1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
                 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 0.]
@@ -626,120 +800,29 @@ class Strat(VBTfunc):
          1., 0., 1., 0., 0., 0., 1., 0., 0., 1., 0., 1., 0., 0., 0., 0.,
          0., 1., 0., 1., 1., 0., 1., 1., 1., 1., 0., 0.] 
         
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)   
-       
-    def stratIndexSL(self,**kwargs):
-        a_bull=[1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1., 1., 1., 1., 0., 0.,
-        1., 1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 1., 0.,
-        0., 0., 0., 0., 0., 0., 0., 1., 1., 1., 1., 0.]
-        a_bear=[0., 0., 1., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1., 0., 0.,
-         1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
-         0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 1., 0.]
-        a_uncertain=[1., 1., 1., 1., 1., 0., 1., 0., 0., 0., 0., 0., 0., 1., 1., 0.,
-         1., 1., 0., 0., 1., 1., 1., 0., 1., 1., 1., 1., 0., 0., 0., 0.,
-         0., 0., 1., 1., 1., 0., 1., 1., 1., 1., 0., 0.]
-        
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)         
+        super().__init__(
+            period,
+            strat_arr_bull=a_bull,
+            strat_arr_bear=a_bear,
+            strat_arr_uncertain=a_uncertain,
+            **kwargs )     
 
-    def stratIndexTSL(self,**kwargs):
-        a_bull=[1., 0., 0., 1., 1., 0., 1., 0., 0., 0., 1., 1., 0., 1., 0., 0.,
-                0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 0.]
-        a_bear=[0., 0., 1., 0., 1., 1., 1., 0., 0., 0., 0., 0., 1., 1., 1., 0.,
-         1., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0.,
-         0., 1., 0., 1., 0., 0., 1., 1., 0., 1., 1., 0.]
-        a_uncertain=[1., 1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 1., 1., 0.,
-         1., 0., 1., 1., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
-         0., 1., 0., 1., 1., 0., 1., 0., 1., 1., 0., 0.]
-        
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)
-        
-    #Optimized on 2007-2023, for sl=0.5 %
-    def stratSL(self,**kwargs):
-        a_bull=[1., 1., 1., 0., 1., 1., 1., 0., 0., 1., 0., 0., 0., 1., 0., 1.,
-        1., 1., 0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 1.,
-        0., 0., 1., 0., 0., 1., 0., 1., 0., 1., 0., 0.]
-        a_bear=[1., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 0., 1., 1., 1., 1.,
-        1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
-        1., 0., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
-        a_uncertain=[1., 1., 1., 1., 1., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 1.,
-        1., 1., 1., 1., 1., 1., 0., 1., 0., 0., 1., 1., 0., 0., 0., 0.,
-        0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0.] 
-        
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)   
-        
-    #Optimized on 2007-2023, for tsl=0.5 %
-    def stratTSL(self,**kwargs):
-        a_bull=[0., 1., 1., 0., 1., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 1.,
-        1., 1., 1., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-        0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.]
-        a_bear=[1., 1., 1., 1., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
-        1., 0., 1., 1., 1., 1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
-        1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0.]
-        a_uncertain= [1., 1., 1., 0., 1., 1., 1., 0., 0., 1., 1., 1., 1., 1., 1., 0.,
-        1., 1., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-        0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]  
-        
-        self.entries, self.exits, self.entries_short, self.exits_short, \
-        self.macro_trend, self.min_ind, self.max_ind=\
-        strat_wrapper_macro(
-                            self.open,
-                            self.high, 
-                            self.low,
-                            self.close,
-                            #self.close_ind,
-                            a_bull, 
-                            a_bear, 
-                            a_uncertain,
-                            **kwargs)           
-        
-    # As strat_kama_stoch for bear and uncertain trend
-    # Use MA for bull, so if the 5 days smoothed price crosses the 15 days smoothed price, a signal is created
-    def strat_kama_stoch_matrend_bbands(self,**kwargs): #ex strat11
+class StratKamaStochMatrendBbands(UnderlyingStrat):  
+    '''
+    As STOCHKAMA for bear and uncertain trend
+    Use MA for bull, so if the 5 days smoothed price crosses the 15 days smoothed price, a signal is created
+    
+    Note: this strategy needs long time to be calculated
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 dir_uncertain: str="long",
+                 **kwargs):
+        super().__init__(period,**kwargs)
+        for k in ["dir_uncertain"]:
+            setattr(self,k,locals()[k])
+    
+    def run(self):
         s = STRATWRAPPER.run(self.open,
                              self.high, 
                              self.low,
@@ -747,7 +830,7 @@ class Strat(VBTfunc):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=False,
-                             dir_uncertain=kwargs.get("dir_uncertain","long"),
+                             dir_uncertain=self.dir_uncertain,
                              f_bull="VBTMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
@@ -755,8 +838,23 @@ class Strat(VBTfunc):
                              f_very_bear="VBTSTOCHKAMA",
                              trend_key="bbands")
         self.get_output(s)  
-        
-    def strat_kama_stoch_matrend_macdbb_macro(self,**kwargs): 
+
+class StratKamaStochMatrendMacdbbMacro(UnderlyingStrat):
+    '''
+    As StratKamaStochMatrendBbands but take care of the trend for the order direction
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 dir_bull: str="long",
+                 dir_bear: str="short",
+                 dir_uncertain: str="long",
+                 macro_trend_index: bool=False,
+                 **kwargs):
+        super().__init__(period,**kwargs)
+        for k in ["dir_bull","dir_bear","dir_uncertain", "macro_trend_index"]:
+            setattr(self,k,locals()[k])
+    
+    def run(self):
         s = STRATWRAPPER.run(self.open,
                              self.high, 
                              self.low,
@@ -764,17 +862,17 @@ class Strat(VBTfunc):
                              self.close_ind,
                              trend_lim=1.5,
                              macro_trend_bool=True,
-                             dir_bull=kwargs.get("dir_bull","long"), 
-                             dir_bear=kwargs.get("dir_bear","short"),
-                             dir_uncertain=kwargs.get("dir_uncertain","long"),
+                             dir_bull=self.dir_bull, 
+                             dir_bear=self.dir_bear,
+                             dir_uncertain=self.dir_uncertain,
                              f_bull="VBTMA",
                              f_bear="VBTSTOCHKAMA",
                              f_uncertain="VBTSTOCHKAMA",
                              f_very_bull="VBTMA",
                              f_very_bear="VBTSTOCHKAMA",                             
                              trend_key="macdbb",
-                             macro_trend_index=kwargs.get("macro_trend_index",False))
-        self.get_output(s)        
+                             macro_trend_index=self.macro_trend_index)
+        self.get_output(s)           
 
 def function_to_res(
         f_name: str, 
