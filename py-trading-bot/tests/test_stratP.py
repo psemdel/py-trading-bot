@@ -86,7 +86,7 @@ class TestStratP(TestCase):
         e.save()
         
         self.actions=[self.a, self.a2, self.a3]
-        self.st=strat.UnderlyingStrat("1y",prd=True, use_IB=False, actions=self.actions)
+        self.st=strat.UnderlyingStrat("1y",prd=True, api_used="YF", actions=self.actions)
         
     def test_stratPRD(self):
         st=self.st
@@ -110,7 +110,7 @@ class TestStratP(TestCase):
         self.assertFalse(res[(50,True,'AIR.PA')].values[-1]==0)        
         
     def test_call_strat(self):
-        self.st=getattr(strat, "StratKamaStochMatrendMacdbbMacro")("1y",prd=True, use_IB=False, actions=self.actions)
+        self.st=getattr(strat, "StratKamaStochMatrendMacdbbMacro")("1y",prd=True, api_used="YF", actions=self.actions)
         self.st.run()
         
         pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,

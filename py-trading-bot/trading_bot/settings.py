@@ -34,9 +34,9 @@ _settings={
 "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
 
 ## Order settings ##
-"USE_IB_FOR_DATA":{
-    "alerting":os.environ.get("USE_IB_FOR_DATA_ALERTING",True), #use IB for Data if true (otherwise YF), for alerting
-    "reporting":os.environ.get("USE_IB_FOR_DATA_REPORTING",False), #use IB for Data if true (otherwise YF), for the generation of the reports
+"USED API_FOR_DATA":{
+    "alerting":os.environ.get("USED API_FOR_DATA_ALERTING","IB"), #"IB" or "YF"
+    "reporting":os.environ.get("USED API_FOR_DATA_REPORTING","YF"), #"IB" or "YF"
     },
     
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],

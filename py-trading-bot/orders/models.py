@@ -30,20 +30,20 @@ def check_ib_permission(symbols: list):
     ----------
        symbols: list of YF tickers
     '''
-    IBok=True
+    api_used="IB"
     for symbol in symbols:
         if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
             logger.info("symbol " + symbol + " has no permission for IB")
-            IBok=False
+            api_used="YF"
             break
         
         a=Action.objects.get(symbol=symbol)      
         if a.stock_ex.ib_auth==False:
             logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
-            IBok=False
+            api_used="YF"
             break
     
-    return IBok
+    return api_used
     
 def get_exchange_actions(exchange:str,**kwargs):
     '''
@@ -76,12 +76,11 @@ def get_exchange_actions(exchange:str,**kwargs):
         c1 = Q(category=cat)
         actions=Action.objects.filter(c1 & c2 & c3)
 
-    #actions=filter_intro_action( actions,None)  
-    use_IB=False
-    if _settings["USE_IB_FOR_DATA"]["reporting"]:
-        use_IB=check_ib_permission([a.symbol for a in actions])
+    api_used="YF"
+    if _settings["USED API_FOR_DATA"]["reporting"]=="IB":
+        api_used=check_ib_permission([a.symbol for a in actions])
 
-    return use_IB, actions
+    return api_used, actions
 
 def period_YF_to_ib(period: str): #see also split_freq_str in vbt
     '''

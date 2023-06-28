@@ -89,9 +89,9 @@ class TestbtP(TestCase):
         
   #hist slow does not need code here
     def test_actualize_hist_vol_slow(self):
-        use_IB, actions=get_exchange_actions("Paris")
+        api_used, actions=get_exchange_actions("Paris")
         
-        self.pr=presel.PreselHistVolSlow("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
+        self.pr=presel.PreselHistVolSlow("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
 
         strategy=Strategy.objects.create(name="hist_slow")
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
@@ -99,9 +99,9 @@ class TestbtP(TestCase):
         #cand=get_candidates("hist_slow","Paris")
         
     def test_actualize_hist_vol_slow2(self):
-        use_IB, actions=get_exchange_actions("Paris")
+        api_used, actions=get_exchange_actions("Paris")
         
-        self.ust=strat.StratDiv("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
+        self.ust=strat.StratDiv("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
         self.ust.run()
         
         self.pr=presel.PreselHistVolSlow("1y",prd=True, input_ust=self.ust)
@@ -112,9 +112,9 @@ class TestbtP(TestCase):
         #cand=get_candidates("hist_slow","Paris")
         
     def test_actualize_realmadrid(self):
-        use_IB, actions=get_exchange_actions("Paris")
+        api_used, actions=get_exchange_actions("Paris")
         
-        self.pr=presel.PreselRealMadrid("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
+        self.pr=presel.PreselRealMadrid("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
         
         strategy=Strategy.objects.create(name="realmadrid")
         Excluded.objects.create(name="realmadrid", strategy=strategy)
@@ -124,9 +124,9 @@ class TestbtP(TestCase):
         self.assertEqual(len(cand.retrieve()),2)
         
     def test_actualize_realmadrid2(self):
-        use_IB, actions=get_exchange_actions("Paris")
+        api_used, actions=get_exchange_actions("Paris")
         
-        self.ust=strat.StratDiv("1y",prd=True, use_IB=use_IB,actions=actions,exchange="Paris")
+        self.ust=strat.StratDiv("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
         self.ust.run()
         
         self.pr=presel.PreselRealMadrid("1y",prd=True, input_ust=self.ust)
@@ -139,7 +139,7 @@ class TestbtP(TestCase):
         self.assertEqual(len(cand.retrieve()),2)   
         
     def test_wq(self):
-        self.ust=strat.StratDiv("1y",prd=True, use_IB=False,actions=self.actions,exchange="Paris")
+        self.ust=strat.StratDiv("1y",prd=True, api_used="YF",actions=self.actions,exchange="Paris")
         self.ust.run()
 
         wq=presel.WQ("1y",input_ust=self.ust)

@@ -75,11 +75,11 @@ class Report(models.Model):
        	""" 
         return [symbols_to_YF[c] for c in candidates]
 
-    def retard(self,use_IB, exchange,ust,**kwargs):
+    def retard(self,api_used, exchange,ust,**kwargs):
         if _settings["RETARD_MACRO"]:
-            pr=presel.name_to_presel("PreselRetardMacro", ust.period,prd=True, use_IB=use_IB,input_ust=ust,exchange=exchange) 
+            pr=presel.name_to_presel("PreselRetardMacro", ust.period,prd=True, api_used=api_used,input_ust=ust,exchange=exchange) 
         else:
-            pr=presel.name_to_presel("PreselRetard", ust.period,prd=True,use_IB=use_IB,input_ust=ust,exchange=exchange) 
+            pr=presel.name_to_presel("PreselRetard", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange) 
         
         candidates, candidates_short=pr.get_candidates()
         
@@ -196,7 +196,7 @@ class Report(models.Model):
                     to_calculate=True
         
         if to_calculate:
-            wq=presel.WQ(ust.period, prd=True, use_IB=ust.use_IB,input_ust=ust,exchange=exchange)
+            wq=presel.WQ(ust.period, prd=True, api_used=ust.api_used,input_ust=ust,exchange=exchange)
             
             for nb in range(102):
                 key="wq"+str(nb)
@@ -211,22 +211,22 @@ class Report(models.Model):
             logger.info("Presel wq done for "+exchange)  
             
 ### Preselected actions strategy    
-    def presel_sub(self,use_IB,l,ust, exchange,**kwargs):
+    def presel_sub(self,api_used,l,ust, exchange,**kwargs):
         if len(l)!=0:
             #hist slow does not need code here
             if Strategy.objects.get(name="retard") in l:
-                self.retard(use_IB,exchange,ust,**kwargs)
+                self.retard(api_used,exchange,ust,**kwargs)
             if Strategy.objects.get(name="retard_keep") in l:
-                self.retard(use_IB,exchange,ust,keep=True,**kwargs)
+                self.retard(api_used,exchange,ust,keep=True,**kwargs)
             if Strategy.objects.get(name="divergence") in l:    
                 if _settings["DIVERGENCE_MACRO"]:
-                    pr=presel.name_to_presel("PreselDivergenceBlocked", ust.period,prd=True,use_IB=use_IB,input_ust=ust,exchange=exchange)
+                    pr=presel.name_to_presel("PreselDivergenceBlocked", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
                 else:
-                    pr=presel.name_to_presel("PreselDivergence", ust.period,prd=True,use_IB=use_IB,input_ust=ust,exchange=exchange)
+                    pr=presel.name_to_presel("PreselDivergence", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
                 candidates, _=pr.get_candidates()
                 self.order_only_exit_substrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), exchange, "divergence", False,**kwargs)
             if Strategy.objects.get(name="macd_vol") in l:
-                pr=presel.name_to_presel("PreselMacdVolMacro", ust.period,prd=True,use_IB=use_IB,input_ust=ust,exchange=exchange)
+                pr=presel.name_to_presel("PreselMacdVolMacro", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
                 candidates, candidates_short=pr.get_candidates()
                 
                 if len(candidates)==0:
@@ -269,12 +269,12 @@ class Report(models.Model):
         if stock_ex.presel_at_sector_level:
             if 'sec' in kwargs:
                 sector=ActionSector.objects.get(name=kwargs.get("sec"))
-                self.presel_sub(ust.use_IB,sector.strategies_in_use.all(),ust,exchange,**kwargs)
+                self.presel_sub(ust.api_used,sector.strategies_in_use.all(),ust,exchange,**kwargs)
             else:    
                 for s in ActionSector.objects.all(): #try for each sector
-                    self.presel_sub(ust.use_IB,s.strategies_in_use.all(),ust,exchange,sec=s,**kwargs)
+                    self.presel_sub(ust.api_used,s.strategies_in_use.all(),ust,exchange,sec=s,**kwargs)
         else:
-            self.presel_sub(ust.use_IB,stock_ex.strategies_in_use.all(),ust,exchange,**kwargs)
+            self.presel_sub(ust.api_used,stock_ex.strategies_in_use.all(),ust,exchange,**kwargs)
                            
 #all symbols should be from same stock exchange
 
@@ -403,7 +403,7 @@ class Report(models.Model):
         return symbol_complex_ent_normal, symbol_complex_ex_normal
             
     #for a group of predefined actions, determine the signals    
-    def perform_normal_strat(self,use_IB,actions, exchange,it_is_index:bool=False, **kwargs):
+    def perform_normal_strat(self,api_used,actions, exchange,it_is_index:bool=False, **kwargs):
         try:
             if self.it_is_index:
                 ust_name=_settings["STRATEGY_NORMAL_INDEX"]
@@ -414,7 +414,7 @@ class Report(models.Model):
                 ust_name,
                 str(_settings["DAILY_REPORT_PERIOD"])+"y",
                 prd=True,
-                use_IB=use_IB,
+                api_used=api_used,
                 actions=actions,
                 exchange=exchange,
                 it_is_index=it_is_index
@@ -592,12 +592,12 @@ class Report(models.Model):
             self.it_is_index=it_is_index
             if self.it_is_index:
                 #symbols=kwargs.get("symbols",[])
-                use_IB=False
-                if _settings["USE_IB_FOR_DATA"]["reporting"]:
-                    use_IB=check_ib_permission(symbols)
+                api_used="YF"
+                if _settings["USED API_FOR_DATA"]["reporting"]:
+                    api_used=check_ib_permission(symbols)
                 actions=[Action.objects.get(symbol=symbol) for symbol in symbols]
             else: #actions, exchange is provided
-                use_IB, actions=get_exchange_actions(exchange,**kwargs)
+                api_used, actions=get_exchange_actions(exchange,**kwargs)
             
             ##handle the sectors
             if exchange is not None:
@@ -628,7 +628,7 @@ class Report(models.Model):
                 actions=filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
                 ##Perform a single strategy on predefined actions
                 #Uses afterward as source for the data to avoid loading them several times
-                ust_normal=self.perform_normal_strat(use_IB,actions, exchange,it_is_index=it_is_index, **kwargs)
+                ust_normal=self.perform_normal_strat(api_used,actions, exchange,it_is_index=it_is_index, **kwargs)
                 ##Populate a report with different statistics
                 ust_kama=ic.VBTSTOCHKAMA.run(ust_normal.high,ust_normal.low,ust_normal.close)
                 ust_ma=ic.VBTMA.run(ust_normal.close)
@@ -641,7 +641,7 @@ class Report(models.Model):
                     ust_trend=strat.name_to_ust(
                         "StratKamaStochMatrendMacdbbMacro",
                         ust_normal.period,
-                        use_IB=use_IB,
+                        api_used=api_used,
                         input_ust=ust_normal,
                         prd=True
                         )    

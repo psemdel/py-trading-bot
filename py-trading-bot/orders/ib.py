@@ -249,7 +249,7 @@ def cash_balance(**kwargs):
 def get_last_price(action,**kwargs):
     try:
         if kwargs['client'] and ib_global["connected"] and\
-            (_settings["USE_IB_FOR_DATA"]["alerting"] and\
+            (_settings["USED API_FOR_DATA"]["alerting"]=="IB" and\
                                action.stock_ex.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
@@ -274,7 +274,7 @@ def get_ratio(action,**kwargs):
         cours_ref=0
 
         if ib_global["connected"] and kwargs['client']  and\
-              (_settings["USE_IB_FOR_DATA"]["alerting"] and\
+              (_settings["USED API_FOR_DATA"]["alerting"]=="IB" and\
                                  action.stock_ex.ib_auth and\
                                   action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
@@ -360,7 +360,7 @@ def place(buy,action,short,**kwargs):
 
 #better to have a separate function for reversing. Exit would not buy anything and would lead to double fees
 #entry alone would not close the last order
-def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convention short==True --> we go to short
+def reverse_order_sub(symbol,strategy, exchange,short,api_used,**kwargs): #convention short==True --> we go to short
     try:
         #type check necessary for indexes
         pf= get_pf(strategy, exchange,short,**kwargs) #destination portfolio
@@ -374,7 +374,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         c2 = Q(active=True)
         orders=Order.objects.filter(c1 & c2)
         
-        if use_IB:
+        if api_used=="IB":
             order_size=_settings["ORDER_SIZE"]
             enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
         else:
@@ -386,7 +386,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         else:
             order=orders[0]
             
-        if use_IB:    
+        if api_used=="IB":    
             order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
         else:
             if order.short:
@@ -416,7 +416,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
 
             new_order=Order(action=action, pf=pf)
             
-            if use_IB:
+            if api_used=="IB":
                 logger_trade.info("place reverse order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 if order.quantity==0: #for the first order
                     new_order.entering_price, _= place(True,
@@ -465,7 +465,7 @@ def reverse_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): #convent
         logger.error(str(e) + "symbol: "+str(symbol), stack_info=True, exc_info=True)
         pass        
 
-def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):   
+def exit_order_sub(symbol,strategy, exchange,short,api_used,**kwargs):   
     #type check necessary for indexes
     try:
         pf= get_pf(strategy, exchange,short,**kwargs)
@@ -486,10 +486,10 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
             else:
                 order=orders[0]
             
-            if use_IB:    
+            if api_used=="IB":    
                 order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
             #profit
-            if use_IB and order.quantity>0:
+            if api_used=="IB" and order.quantity>0:
                 logger_trade.info("place exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 order.exiting_price, quantity= place(False,
                                        action,
@@ -519,14 +519,14 @@ def exit_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
         logger.error(e, stack_info=True, exc_info=True)
         pass
     
-def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs): 
+def entry_order_sub(symbol,strategy, exchange,short,api_used,**kwargs): 
     try:
         #type check necessary for indexes
         pf= get_pf(strategy, exchange,short,**kwargs)
         ocap=get_order_capital(strategy, exchange,**kwargs)
         action=Action.objects.get(symbol=symbol)
         
-        if use_IB:
+        if api_used=="IB":
             order_size=_settings["ORDER_SIZE"]
             enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
         else:
@@ -550,7 +550,7 @@ def entry_order_sub(symbol,strategy, exchange,short,use_IB,**kwargs):
 
             order=Order(action=action, pf=pf, short=short)
 
-            if use_IB:
+            if api_used=="IB":
                 logger_trade.info("place entry order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
                 order.entering_price, order.quantity= place(True,
                                         action,
@@ -801,7 +801,7 @@ def retrieve_data_YF(
 def retrieve_data(o,
                   actions: list,
                   period: str,
-                  use_IB: str=False,
+                  api_used: str="YF",
                   it_is_index: bool=False,
                   ) -> (bool, list):
     """
@@ -813,20 +813,22 @@ def retrieve_data(o,
         o: object were to put the results
         actions: list of products to be downloaded
         period: time period for which data should be downloaded
-        use_IB: use IB for downloading the data
+        api_used: which API should be used to download data
         it_is_index: is it indexes that are provided
         
     """  
     if actions is None or len(actions)==0:
         raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:
-        if use_IB:
+        print("retrieve data")
+
+        if api_used=="IB":
             try:
                 cours, symbols, index_symbol=retrieve_data_ib(actions,period,it_is_index=it_is_index)
             except:
                 logger.info("IB retrieval of symbol failed, fallback on YF")
-                use_IB=False #fallback
-        if not use_IB:
+                api_used="YF" #fallback
+        if api_used=="YF":
             cours, symbols, index_symbol=retrieve_data_YF(actions,period,it_is_index=it_is_index)
 
         o.data=cours.select(symbols)
@@ -840,7 +842,7 @@ def retrieve_data(o,
         if len(o.open_ind)==0 or len(o.open_ind)==0:
             raise ValueError("Retrieve data failed and returned empty Dataframe, check the symbols")
 
-        return use_IB, symbols
+        return api_used, symbols
                
                
                

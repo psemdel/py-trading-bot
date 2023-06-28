@@ -123,7 +123,7 @@ class TestIB(TestCase):
         m.Excluded.objects.create(name="all",strategy=self.strategy)
 
     def test_retrieve_YF(self):
-        use_IB, symbols=ib.retrieve_data(self,self.actions,"1y",False) 
+        api_used, symbols=ib.retrieve_data(self,self.actions,"1y",api_used="YF") 
                
         self.assertEqual(np.shape(self.close)[1],3)
         self.assertTrue(np.shape(self.close)[0]>200)
@@ -134,7 +134,7 @@ class TestIB(TestCase):
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", \
     reason="This test requires a running instance of IB running in parallel, which is impossible in Travis")
     def test_retrieve_ib(self):
-        use_IB, symbols=ib.retrieve_data(self,self.actions,"1y",True) 
+        api_used, symbols=ib.retrieve_data(self,self.actions,"1y",api_used="IB") 
             
         self.assertEqual(np.shape(self.close)[1],3)
         self.assertTrue(np.shape(self.close)[0]>200)
