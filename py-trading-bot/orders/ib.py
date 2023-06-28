@@ -15,9 +15,11 @@ from ib_insync import MarketOrder, util
 from core.indicators import rel_dif
 from django.db.models import Q
 from django.utils import timezone
+import MetaTrader5 as mt5
 
 import vectorbtpro as vbt
 import numpy as np
+import pandas as pd
 import decimal
 
 import logging
@@ -32,6 +34,276 @@ from orders.models import (Action, Order, ActionCategory, StockEx, Excluded, Str
 #Module to handle IB connection
 ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
 ib_global={"connected":False, "client":None}
+
+
+class mt5Data(RemoteData):
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.client = None
+        
+    def connect(self):
+        mt5.initialize()
+        connected = mt5.terminal_info().update_type != 2
+        if not connected:
+            connected = mt5.wait_terminal(60)
+        if not connected:
+            raise ConnectionError("Failed to connect to MetaTrader 5 terminal.")
+        return True
+    
+    def resolve_client(self, client=None, **client_config):
+        if client is None:
+            client = mt5.TerminalInfo()
+            client.update_type = 2
+            client.host = self.host
+            client.port = self.port
+            client.name = "MetaTrader 5"
+            client.config = client_config
+        return client
+
+    def get_contract_mt5(self, symbol, exchange, index):
+        contract = mt5.symbol_info(symbol)
+        if not contract.visible:
+            raise ValueError(f"Symbol {symbol} is not available.")
+        return contract
+
+    def fetch_symbol(self, 
+                     symbol, 
+                     client=None, 
+                     client_config=None, 
+                     period=None, 
+                     start=None, 
+                     end=None, 
+                     timeframe=None,
+                     indexes=None, 
+                     exchanges=None):
+        
+        if client is None:
+            client = self.resolve_client(**client_config)
+        if period is None:
+            period = mt5.TIMEFRAME_D1
+        if start is not None and end is not None:
+            rates = mt5.copy_rates_range(symbol, period, start, end)
+        else:
+            rates = mt5.copy_rates_from_pos(symbol, period, 0, 1000)
+        df = pd.DataFrame(rates)
+        df['time'] = pd.to_datetime(df['time'], unit='s')
+        df.set_index('time', inplace=True)
+        return df
+
+def get_last_price(self, contract):
+    tick = mt5.symbol_info_tick(contract.name)
+    return tick.bid if tick.bid != 0 else tick.last
+
+def connect_mt5(func):
+    def wrapper(self, *args, **kwargs):
+        self.connect()
+        return func(self, *args, **kwargs)
+    return wrapper
+
+@connect_mt5
+def mt5_place(self, buy, action, short, **kwargs):
+    symbol = kwargs.get('symbol')
+    # Place market order using MT5 API
+    if buy:
+        # Place buy order
+        if short:
+            # Place short buy order
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": 0.01,  # Specify the desired volume for the trade
+                "type": mt5.ORDER_TYPE_SELL,
+                "deviation": 10,  # Specify the deviation value
+                "magic": 12345,  # Specify the magic number for the order
+                "comment": "Short Buy Order"  # Specify a comment for the order
+            }
+        else:
+            # Place long buy order
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": 0.01,  # Specify the desired volume for the trade
+                "type": mt5.ORDER_TYPE_BUY,
+                "deviation": 10,  # Specify the deviation value
+                "magic": 12345,  # Specify the magic number for the order
+                "comment": "Long Buy Order"  # Specify a comment for the order
+            }
+    else:
+        # Place sell order
+        if short:
+            # Place short sell order
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": 0.01,  # Specify the desired volume for the trade
+                "type": mt5.ORDER_TYPE_BUY,
+                "deviation": 10,  # Specify the deviation value
+                "magic": 12345,  # Specify the magic number for the order
+                "comment": "Short Sell Order"  # Specify a comment for the order
+            }
+        else:
+            # Place long sell order
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": 0.01,  # Specify the desired volume for the trade
+                "type": mt5.ORDER_TYPE_SELL,
+                "deviation": 10,  # Specify the deviation value
+                "magic": 12345,  # Specify the magic number for the order
+                "comment": "Long Sell Order"  # Specify a comment for the order
+            }
+
+    result = mt5.order_send(request)
+    if result.retcode != mt5.TRADE_RETCODE_DONE:
+        raise ValueError(f"Failed to send trade order: {result.comment}")
+
+    return result.order
+
+def get_tradable_contract_mt5(self, action, short, **kwargs):
+    symbol = kwargs.get('symbol')
+    # Assuming the symbol and other required parameters are provided
+    if action == 'buy':
+        trade_action = mt5.TRADE_ACTION_DEAL
+    elif action == 'sell':
+        trade_action = mt5.TRADE_ACTION_DEAL
+    else:
+        raise ValueError(f"Invalid action: {action}")
+
+    if short:
+        trade_type = mt5.ORDER_TYPE_SELL
+    else:
+        trade_type = mt5.ORDER_TYPE_BUY
+
+    request = {
+        "action": trade_action,
+        "symbol": symbol,
+        "volume": 0.01,  # Specify the desired volume for the trade
+        "type": trade_type,
+        "deviation": 10,  # Specify the deviation value
+        "magic": 12345,  # Specify the magic number for the order
+        "comment": "Trade order"  # Specify a comment for the order
+    }
+
+    result = mt5.order_send(request)
+    if result.retcode != mt5.TRADE_RETCODE_DONE:
+        raise ValueError(f"Failed to send trade order: {result.comment}")
+
+    return result.order
+
+
+def retrieve_quantity_mt5(self, in_action, **kwargs):
+    symbol = kwargs.get('symbol')
+    # Assuming the symbol and other required parameters are provided
+    if in_action == 'buy':
+        position_type = mt5.POSITION_TYPE_BUY
+    elif in_action == 'sell':
+        position_type = mt5.POSITION_TYPE_SELL
+    else:
+        raise ValueError(f"Invalid action: {in_action}")
+
+    # Get the positions for the specified symbol
+    positions = mt5.positions_get(symbol=symbol)
+    if not positions:
+        return 0
+
+    # Filter positions based on the specified action
+    filtered_positions = [p for p in positions if p.type == position_type]
+
+    # Calculate the total quantity for the filtered positions
+    total_quantity = sum(p.volume for p in filtered_positions)
+
+    return total_quantity
+
+def retrieve_mt5_pf(self, **kwargs):
+    # Get the current positions from the MetaTrader 5 API
+    positions = mt5.positions_get()
+
+    long_positions = []
+    short_positions = []
+
+    for position in positions:
+        if position.volume > 0:
+            # Long position
+            long_positions.append({
+                'symbol': position.symbol,
+                'volume': position.volume,
+                'entry_price': position.price_open,
+                'current_price': position.price_current
+            })
+        elif position.volume < 0:
+            # Short position
+            short_positions.append({
+                'symbol': position.symbol,
+                'volume': abs(position.volume),
+                'entry_price': position.price_open,
+                'current_price': position.price_current
+            })
+
+    return long_positions, short_positions
+
+
+def mt5_check_enough_cash(self, order_size, **kwargs):
+    # Get the account information from the MetaTrader 5 API
+    account_info = mt5.account_info()
+
+    # Check if the account has enough cash balance to cover the order size
+    if account_info.balance >= order_size:
+        return True
+    else:
+        return False
+
+def mt5_cash_balance(self, currency=None, **kwargs):
+    # Get the account information from the MetaTrader 5 API
+    account_info = mt5.account_info()
+
+    # If currency is not specified, return the account balance in the account's base currency
+    if currency is None:
+        return account_info.balance
+
+    # Get the balance for the specified currency
+    currency_balance = None
+    for balance in account_info.balances:
+        if balance.currency == currency:
+            currency_balance = balance.amount
+            break
+
+    return currency_balance
+
+def mt5_get_ratio(self, action, symbol, exchange=None, index=None):
+    # Get the current price using the mt5.symbol_info_tick() function
+    tick = mt5.symbol_info_tick(symbol)
+    if tick is None:
+        return None
+
+    # Calculate the ratio based on the action (Buy or Sell)
+    if action == 'Buy':
+        current_price = tick.ask
+    elif action == 'Sell':
+        current_price = tick.bid
+    else:
+        return None
+
+    # Get the reference price based on the provided exchange and index
+    reference_price = None
+    if exchange and index:
+        # Retrieve the reference price using the mt5.copy_rates_from() function
+        rates = mt5.copy_rates_from(symbol, mt5.TIMEFRAME_D1, self.start_date, self.end_date)
+        if rates is None or len(rates) == 0:
+            return None
+
+        # Find the reference price based on the index
+        for rate in rates:
+            if rate.time == index:
+                reference_price = rate.close
+                break
+
+    # Calculate the ratio as a percentage
+    if reference_price is not None:
+        ratio = (current_price / reference_price) * 100.0
+        return ratio
+
+    return None
 
 class IBData(RemoteData):
     @classmethod
