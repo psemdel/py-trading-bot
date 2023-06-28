@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from reporting.telegram import start
+from reporting.telegram import start, send_entry_exit_txt, cleaning_sub
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, ListOfActions
 from orders.models import Action, exchange_to_index_symbol
@@ -66,6 +66,15 @@ def daily_report_index_sub(indexes):
     send_order_test(report3)
 
 def daily_report(request,**kwargs):
+    '''
+    Write report for an exchange and/or sector
+    Identical to the telegrambot function, but here without bot, so sync instead of async
+    Either for test purpose, or if your telegram was stopped
+    
+    Arguments
+   	----------
+       request: incoming http request
+    '''  
     try:
         short_name=kwargs.get("short_name")
         key=kwargs.get("key")
@@ -94,44 +103,31 @@ def trigger_22h(request):
     return daily_report(request,short_name="22h",key="22h_stock_exchanges")
 
 def send_order_test(report):
+    '''
+    Send message if orders have been performed, test for the telegram function
+    
+    Arguments
+   	----------
+       report: report for which the calculation happened
+    '''   
     for auto in [False, True]:
         for entry in [False, True]:
             for short in [False, True]:
                 try:
                     ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
                     for a in ent_ex_symbols.actions.all():
-                        send_entry_exit_msg_test(a.symbol,entry,short,auto) 
+                        print(send_entry_exit_txt(a.symbol,entry,short, auto))
                 except:
                     pass
 
     if report.text:
          print(report.text)      
-    
-def send_entry_exit_msg_test(symbol,entry,short, auto):
-    if auto:
-        part1=""
-        part2=""
-    else:
-        part1="Manual "
-        part2="requested for "
-    
-    if entry:
-        part1+="entry "
-    else:
-        part1+="exit "
-        
-    if short:
-        part3=" short"
-    else:
-        part3=""
-        
-    print(part1+part2+symbol + " "+ part3) 
 
 def cleaning(request):
-    alerts=Alert.objects.filter(active=True)
-    for alert in alerts:
-        alert.active=False
-        alert.save()
+    '''
+    Deactivate the alert at the end of the day
+    '''
+    cleaning_sub()
         
     return HttpResponse("cleaning done")
 

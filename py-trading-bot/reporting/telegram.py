@@ -159,10 +159,7 @@ class MyScheduler():
         '''
         Deactivate the alert at the end of the day
         '''
-        alerts=Alert.objects.filter(active=True)
-        for alert in alerts:
-            alert.active=False
-            alert.save()
+        cleaning_sub()
     
     def check_stock_ex_open(self,action: Action)-> bool:
         '''
@@ -501,7 +498,8 @@ class MyScheduler():
                             entry: bool,
                             short: bool, 
                             auto: bool,
-                            **kwargs):
+                            suffix: str=""
+                            ):
         '''
         Define the message for the Telegram depending on the arguments
         
@@ -511,26 +509,9 @@ class MyScheduler():
            entry: was it an entry or an exit
            short: direction of the order
            auto: was the order automatic or not
+           suffix: some text that can be chosen
         '''  
-        if auto:
-            part1=""
-            part2=""
-        else:
-            part1="Manual "
-            part2="requested for "
-        
-        if entry:
-            part1+="entry "
-        else:
-            part1+="exit "
-            
-        if short:
-            part3=" short"
-        else:
-            part3=""
-        part4=kwargs.get("suffix","")
-            
-        self.telegram_bot.send_message_to_all(part1+part2+symbol + " "+ part3+" " +part4)
+        self.telegram_bot.send_message_to_all(send_entry_exit_txt(symbol, entry, short, auto, suffix=suffix))
 
     def heartbeat_f(self):
         '''
@@ -575,3 +556,46 @@ def actualize_job(
     elif strategy=="realmadrid":
         presel.actualize_realmadrid(exchange)
 
+def send_entry_exit_txt(
+                symbol:str,
+                entry: bool,
+                short: bool, 
+                auto: bool,
+                suffix: str="",
+                ) -> str:
+    '''
+    Define the message for the Telegram depending on the arguments
+    
+    Arguments
+   	----------
+       symbol: YF ticker of the product for which the order was performed
+       entry: was it an entry or an exit
+       short: direction of the order
+       auto: was the order automatic or not
+       suffix: some text that can be chosen
+    '''  
+    if auto:
+        part1=""
+        part2=""
+    else:
+        part1="Manual "
+        part2="requested for "
+    
+    if entry:
+        part1+="entry "
+    else:
+        part1+="exit "
+        
+    if short:
+        part3=" short"
+    else:
+        part3=""
+    return part1+part2+symbol + " "+ part3+" " +suffix
+
+def cleaning_sub():
+    alerts=Alert.objects.filter(active=True)
+    for alert in alerts:
+        alert.active=False
+        alert.save()
+    
+    

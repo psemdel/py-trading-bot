@@ -796,7 +796,7 @@ NYSE_DELIST={
     "NLSN":"2023-10-01",
     "SIVBQ":"2023-03-27",
     "SBNY":"2023-03-24",
-    
+    "TWTR":"2022-11-01"
     }
 
 #S&P by sector, no distinction between NYSE and NASDAQ
