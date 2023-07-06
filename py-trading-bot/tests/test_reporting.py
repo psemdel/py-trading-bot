@@ -13,7 +13,7 @@ import reporting.models as m
 from reporting.models import Alert
 
 from orders.models import (Fees, StockEx, Action, ActionCategory, ActionSector, Strategy, 
-                          Currency, StratCandidates, PF, Excluded, OrderCapital)
+                          Currency, StratCandidates, Excluded)
                           
 from trading_bot.settings import _settings                         
 import vectorbtpro as vbt
@@ -264,27 +264,12 @@ class TestReporting(TestCase):
             etf_short=etf1,
             sector=s,
             )    
-
-         
-        #PF.objects.create(name="divergence",short=False,strategy= strategy3,stock_ex=e,sector=s)
-        #PF.objects.create(name="retard",short=False,strategy= strategy4,stock_ex=e,sector=s)
-        #PF.objects.create(name="retard",short=True,strategy= strategy4,stock_ex=e,sector=s)
        
         Excluded.objects.create(name="retard", strategy=strategy4)
         Excluded.objects.create(name="all",strategy=strategy)
-        OrderCapital.objects.create(capital=1,strategy=strategy3,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy4,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy5,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy6,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy7,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy8,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy9,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy10,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy11,stock_ex=e,sector=s)
         
         self.report1=m.Report(sector=s)
-        self.report1.save()
-        
+        self.report1.save(testing=True)
         _settings["PERFORM_ORDER"]=False #avoid to perform orders
         
         e.main_index=self.a5

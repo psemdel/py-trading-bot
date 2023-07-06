@@ -2,9 +2,11 @@ from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from orders.models import *
 
+
 admin.site.register(Currency)  
 admin.site.register(Fees)
 admin.site.register(ActionCategory)
+admin.site.register(StockStatus)
 admin.site.register(ActionSector)
 admin.site.register(Strategy)
 admin.site.register(Candidates)
@@ -16,16 +18,6 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ('active',)
 
 admin.site.register(Order, OrderAdmin)
-
-class PFAdmin(admin.ModelAdmin):
-    list_filter = ('stock_ex', 'strategy','short','sector')
-   
-admin.site.register(PF, PFAdmin)
-
-class OrderCapitalAdmin(admin.ModelAdmin):
-    list_filter = ('stock_ex', 'strategy','sector')
-    
-admin.site.register(OrderCapital, OrderCapitalAdmin)
 
 class ActionAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):

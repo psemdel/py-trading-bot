@@ -22,6 +22,7 @@ from orders import ib
 from orders import models as m
 from trading_bot.settings import _settings  
 from datetime import datetime, timedelta
+import pandas as pd
 
 class TestIB(TestCase):
     def setUp(self):
@@ -31,8 +32,8 @@ class TestIB(TestCase):
         self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
-        c=m.Currency.objects.create(name="euro")
-        c2=m.Currency.objects.create(name="US")
+        c=m.Currency.objects.create(name="euro",symbol="EUR")
+        c2=m.Currency.objects.create(name="dollar",symbol="USD")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
         cat3=m.ActionCategory.objects.create(name="ETF",short="ETF")
@@ -79,8 +80,46 @@ class TestIB(TestCase):
             #strategy=strategy,
             sector=self.s,
             )
-        
-        
+        self.a5=m.Action.objects.create(
+            symbol='MC.PA',
+            #ib_ticker='AC',
+            name="Airbus",
+            stock_ex=self.e,
+            currency=c,
+            category=cat,
+            #strategy=strategy,
+            sector=self.s,
+            )
+        self.a6=m.Action.objects.create(
+            symbol='KER.PA',
+            #ib_ticker='AC',
+            name="Airbus",
+            stock_ex=self.e,
+            currency=c,
+            category=cat,
+            #strategy=strategy,
+            sector=self.s,
+            )  
+        self.a5=m.Action.objects.create(
+            symbol='TMUS',
+            #ib_ticker='AC',
+            name="T-Mobile",
+            stock_ex=self.e4,
+            currency=c2,
+            category=cat,
+            #strategy=strategy,
+            sector=self.s,
+            )
+        self.a6=m.Action.objects.create(
+            symbol='PAYX',
+            #ib_ticker='AC',
+            name="Pay X",
+            stock_ex=self.e4,
+            currency=c2,
+            category=cat,
+            #strategy=strategy,
+            sector=self.s,
+            )        
         '''
         self.a4=m.Action.objects.create(
             symbol='SIE.DE',
@@ -154,37 +193,161 @@ class TestIB(TestCase):
         self.assertTrue(ib.cash_balance(currency="USD")>=0)   
 
     def test_check_enough_cash(self):
-        self.assertTrue(ib.check_enough_cash(10000,currency="USD"))        
+        self.assertTrue(ib.check_enough_cash(1000,currency="USD"))        
 
     def test_entry_order_manual(self):
-        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,strategy=self.strategy,stock_ex=self.e,sector=self.s)
+        _settings["PERFORM_ORDER"]=True
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        self.strategy.perform_order=False
+        self.e.perform_order=False
+        self.strategy.save()
+        self.e.save()
         
-        t=ib.entry_order_sub("AIR.PA","none","Paris",False,False)
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        op.check_auto_manual()
+        self.assertEqual(op.api_used,"YF")
+        
+        self.strategy.perform_order=True
+        self.strategy.save()
+        
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        op.check_auto_manual()
+        self.assertEqual(op.api_used,"YF")
+        
+        self.strategy.perform_order=False
+        self.e.perform_order=True
+        self.strategy.save()
+        self.e.save()
+        
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        op.check_auto_manual()
+        self.assertEqual(op.api_used,"YF")
+        
+        self.strategy.perform_order=True
+        self.e.perform_order=True
+        self.strategy.save()
+        self.e.save()
+        
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        op.check_auto_manual()
+        self.assertEqual(op.api_used,"IB")
+        
+        _settings["PERFORM_ORDER"]=False
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        op.check_auto_manual()
+        self.assertEqual(op.api_used,"YF")
 
-        self.assertTrue(t)
-        self.assertEqual(len(pf.retrieve()),1)
+    def test_get_order(self):
+        #Entry and buy
+        op=ib.OrderPerformer("AC.PA",self.strategy.id,1)
         
-        ocap=m.get_order_capital("none","Paris")
-        self.assertEqual(ocap.capital,0)
+        op.get_order(True)
+        self.assertTrue(op.new_order_bool)
         
-        t=ib.entry_order_sub("AIR.PA","none","Paris",False,False)
-        self.assertFalse(t)
+        #Entry and sell
+        op=ib.OrderPerformer("AI.PA",self.strategy.id,1)
         
-    def test_exit_order_manual(self):        
-        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-                
-        ib.entry_order_sub("AIR.PA","none","Paris",False,False)   
-        t=ib.exit_order_sub("AIR.PA","none","Paris",False,False)   
-        self.assertTrue(t)
-        self.assertEqual(len(pf.retrieve()),0)
-        ocap=m.get_order_capital("none","Paris")
-        self.assertEqual(ocap.capital,1)
+        op.get_order(False)
+        self.assertTrue(op.new_order_bool)
         
-        order=m.Order.objects.get(action=self.a3)
-        self.assertFalse(order.active)
-        self.assertTrue(order.exiting_date is not None)
+        #Entry and buy
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,1)
+        o=m.Order.objects.create(action=self.a3, strategy=self.strategy, short=True)          
+        op.get_order(True)
+
+        self.assertFalse(op.new_order_bool)      
+        self.assertEqual(o, op.order)
+
+    def test_get_delta_size(self):
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        op.api_used="YF"
+        op.get_order(True) #to create self.order
+        op.get_delta_size()
+        self.assertFalse(op.reverse)
+        self.assertEqual(op.delta_size,10000)
+
+    def test_entry_place(self):
+
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
+        op.reverse=False
+        
+        op.api_used="YF"
+        op.entry_place(True)
+        self.assertEqual(op.new_order.entering_price,1.0)
+        self.assertEqual(op.ss.quantity,1.0)
+        
+        #op.api_used="IB"
+        op.entry_place(True)
+        self.assertEqual(op.new_order.entering_price,1.0)
+        
+        #if excluded no order
+        op=ib.OrderPerformer("AI.PA",self.strategy.id,10000)
+        op.excluded.append("AI.PA")
+        op.api_used="YF"
+        op.reverse=False
+        op.entry_place(True)
+        self.assertFalse("new_order" in op.__dir__())
+        op.entry_place(False)
+        self.assertFalse("new_order" in op.__dir__())
+
+    def test_entry_place2(self):        
+        #If already in pf, no order
+        op=ib.OrderPerformer("AI.PA",self.strategy.id,10000)
+        op.api_used="YF"
+        op.reverse=False
+        
+        op.ss.quantity=1
+        op.ss.save()
+        op.entry_place(True)
+        self.assertFalse("new_order" in op.__dir__())
+        
+        #if reverse
+        op.reverse=True
+        op.entry_place(False)
+        self.assertTrue("new_order" in op.__dir__())
+        self.assertEqual(op.ss.quantity,-1.0)
+        
+        op.entry_place(True)
+        self.assertTrue("new_order" in op.__dir__())
+        self.assertEqual(op.ss.quantity,1.0)
+        
+    def test_buy_order(self):
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000,testing=True)
+        
+        op.api_used="YF"
+        self.assertTrue(op.buy_order_sub())
+        self.assertEqual(op.ss.quantity,1)
+        self.assertEqual(op.new_order.entering_price,1.0)
+        self.assertFalse(op.ss.order_in_ib)
+        self.assertTrue(op.executed)
+
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000000,testing=True)
+        op.api_used="IB"
+        #expected not enough cash
+        self.assertFalse(op.buy_order_sub())
+        
+        op=ib.OrderPerformer("AC.PA",self.strategy.id,1,testing=True)
+        op.api_used="IB"
+        #expected enough cash
+        self.assertTrue(op.buy_order_sub())
+        self.assertEqual(op.new_order.entering_price,1.0)  
+
+    def test_sell_order(self):
+        op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000,testing=True)
+        
+        op.api_used="YF"
+        self.assertTrue(op.sell_order_sub())
+        self.assertEqual(op.ss.quantity,-1)
+        self.assertEqual(op.new_order.entering_price,1.0)
+        self.assertFalse(op.ss.order_in_ib)
+        self.assertTrue(op.executed)
+    
+    def test_actualize_ss(self):
+        ib.actualize_ss()
+        
+        present_ss=pd.DataFrame.from_records(m.StockStatus.objects.all().values(),index="action_id")
+        print(present_ss)
+        
         
     def test_get_tradable_contract_ib(self):
         c=ib.get_tradable_contract_ib(self.a2,False)
@@ -199,63 +362,8 @@ class TestIB(TestCase):
         t=Stock("IBM","SMART", primaryExchange='NYSE')
         print(ib.IBData.client.reqContractDetails(t))
         
-    def test_check_hold_duration(self):
-        st_retard=m.Strategy.objects.create(name="retard")
-        pf=m.PF.objects.create(short=False,strategy=st_retard,stock_ex=self.e,sector=self.s)
-        pf.append(self.a.symbol)
-        d=datetime.now()
-        o=m.Order.objects.create(action=self.a, pf=pf, short=False,entering_date=d) 
-        
-        self.assertEqual(ib.check_hold_duration(self.a.symbol,st_retard.name, self.e.name,False,sector=self.s),0)
-
-        d2=d- timedelta(days=10)
-        o2=m.Order.objects.create(action=self.a2, pf=pf, short=False) 
-        o2.entering_date=d2
-        o2.save()
-        pf.append(self.a2.symbol)
-        self.assertEqual(ib.check_hold_duration(self.a2.symbol,st_retard.name, self.e.name,False,sector=self.s),10)         
-        
-     #   check_hold_duration
-    #def test_retrieve_quantity(self):
-    #    retrieve_quantity()
+    
 
 if __name__ == '__main__':
     unittest.main() 
-####!!!Those functions will cause real orders to be performed, as the _settings["PERFORM_ORDER"] is entry_order but not in entry_order_sub!!
-#Use it only outside of trade time!
-'''
-    def test_entry_order_auto(self):
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        
-        t=ib.entry_order_sub("AIR.PA","none","Paris",False,True)
-
-        self.assertTrue(t)
-        self.assertEqual(len(pf.retrieve()),1)
-        
-        ocap=m.get_order_capital("none","Paris")
-        self.assertEqual(ocap.capital,0)
-
-        order=m.Order.objects.get(action=self.a3) #it is a test.
-        
-        t=ib.entry_order_sub("AIR.PA","none","Paris",False,True)
-        self.assertFalse(t)
-        
-    def test_exit_order_auto(self):        
-        pf=m.PF.objects.create(name="none_Paris",short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap=m.OrderCapital.objects.create(capital=1,name="none_Paris",strategy=self.strategy,stock_ex=self.e,sector=self.s)
-                
-        t=ib.entry_order_sub(self.a.symbol,"none","Paris",False,True)   
-        self.assertTrue(t)
-        t=ib.exit_order_sub(self.a.symbol,"none","Paris",False,True)   
-        self.assertTrue(t)
-        self.assertEqual(len(pf.retrieve()),0)
-        ocap=m.get_order_capital("none","Paris")
-        self.assertEqual(ocap.capital,1)
-        
-        order=m.Order.objects.get(action=self.a)
-        self.assertFalse(order.active)
-        self.assertTrue(order.exiting_date is not None)
-'''
-        
 

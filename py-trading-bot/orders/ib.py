@@ -15,22 +15,26 @@ from ib_insync import MarketOrder, util
 from core.indicators import rel_dif
 from django.db.models import Q
 from django.utils import timezone
-import MetaTrader5 as mt5
+import numbers
+from decimal import Decimal
+
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    mt5 = tp.Any
 
 import vectorbtpro as vbt
 import numpy as np
 import pandas as pd
-import decimal
 
 import logging
 logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
-from orders.models import (Action, Order, ActionCategory, StockEx, Excluded, Strategy,
-                           action_to_etf,
-                           get_pf, get_order_capital, period_YF_to_ib,
-                           exchange_to_index_symbol
-                           )
+from orders.models import (Action, StockStatus, Order, ActionCategory, Excluded, Strategy,
+                          action_to_etf, period_YF_to_ib, exchange_to_index_symbol, 
+                          pf_retrieve_all_symbols)
+
 #Module to handle IB connection
 ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
 ib_global={"connected":False, "client":None}
@@ -91,7 +95,7 @@ class mt5Data(RemoteData):
         df.set_index('time', inplace=True)
         return df
 
-def get_last_price(self, contract):
+def get_last_price_mt5(self, contract):
     tick = mt5.symbol_info_tick(contract.name)
     return tick.bid if tick.bid != 0 else tick.last
 
@@ -160,8 +164,12 @@ def mt5_place(self, buy, action, short, **kwargs):
 
     return result.order
 
-def get_tradable_contract_mt5(self, action, short, **kwargs):
-    symbol = kwargs.get('symbol')
+def get_tradable_contract_mt5(
+        self, 
+        action, 
+        short, 
+        symbol:list=None,
+        **kwargs):
     # Assuming the symbol and other required parameters are provided
     if action == 'buy':
         trade_action = mt5.TRADE_ACTION_DEAL
@@ -348,14 +356,27 @@ class IBData(RemoteData):
         return cls.client
 
     @classmethod 
-    def get_contract_ib(cls, symbol,exchange,index):
+    def get_contract_ib(
+            cls, 
+            symbol_ib: str,
+            exchange_ib: str,
+            it_is_index: bool):
+        """
+        Search the ib contract corresponding to the product
+
+        Arguments
+        ----------
+            symbol_ib: IB ticker of a product
+            exchange_ib: IB ticker of the stock exchange
+            it_is_index: is it indexes that are provided
+        """ 
         from ib_insync import Stock, Index
-        if index:
-            return Index(exchange=exchange,symbol=symbol)
-        elif exchange in ["NASDAQ","NYSE"]:
-            return Stock(symbol,"SMART", primaryExchange=exchange)
+        if it_is_index:
+            return Index(exchange=exchange_ib,symbol=symbol_ib)
+        elif exchange_ib in ["NASDAQ","NYSE"]:
+            return Stock(symbol_ib,"SMART", primaryExchange=exchange_ib)
         else:
-            return Stock(symbol,exchange)
+            return Stock(symbol_ib,exchange_ib)
 
     @classmethod
     def fetch_symbol(
@@ -367,10 +388,19 @@ class IBData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        indexes: tp.Optional[dict] = None,
+        it_is_indexes: tp.Optional[dict] = None,
         exchanges: tp.Optional[dict] = None,
         ) -> tp.Any:
-
+        """
+        Download data for a symbol from IB
+        
+        Arguments
+        ----------        
+        
+        it_is_indexes: dict containing if the symbol is an index or not
+        exchanges: dict containing the stock exchange name associated to the symbol
+        
+        """
         from ib_insync import util
         
         exchange="SMART" #default
@@ -378,17 +408,17 @@ class IBData(RemoteData):
             if symbol in exchanges:
                 exchange=exchanges[symbol]
                 
-        index=False
-        if indexes is not None:
-            if symbol in indexes:
-                index=indexes[symbol]        
+        it_is_index=False
+        if it_is_indexes is not None:
+            if symbol in it_is_indexes:
+                it_is_index=it_is_indexes[symbol]        
         
         if client_config is None:
             client_config = {}
         cls.resolve_client(client=client, **client_config)
 
         if ib_global["connected"]:
-            contract=cls.get_contract_ib(symbol,exchange,index)
+            contract=cls.get_contract_ib(symbol,exchange,it_is_index)
             #check period and timeframe
             bars = cls.client.reqHistoricalData(
                     contract,
@@ -456,22 +486,30 @@ def get_tradable_contract_ib(action,short,**kwargs):
             return None
 
 @connect_ib
-def retrieve_quantity(in_action, **kwargs):
+def retrieve_quantity(action: Action, **kwargs):
+    """
+    Call ib and get the size of present position owned for a product
+
+    Arguments
+    ----------
+    action: stock to be checked
+    """  
     if kwargs['client'] and ib_global["connected"]:
         for pos in kwargs['client'].positions():
             contract=pos.contract
-            if in_action.ib_ticker()==contract.localSymbol:
-                return abs(pos.position), np.sign(pos.position)
-    return 0, 0      
-                    
+            if action.ib_ticker()==contract.localSymbol:
+                return abs(pos.position), np.sign(pos.position), pos.position>0
+    return 0, 0, False   
+
 @connect_ib
-def retrieve_ib_pf(**kwargs):
+def actualize_ss(**kwargs):
+    """
+    Synchronize ib and our bot, to know which stocks are owned (+direction)     
+    """      
     if kwargs['client'] and ib_global["connected"]:
         print("myIB retrieve")
         action=None
-        pf=[]
-        pf_short=[]
-        
+
         for pos in kwargs['client'].positions():
             contract=pos.contract
             actions=Action.objects.filter(symbol__contains=contract.localSymbol)
@@ -483,32 +521,36 @@ def retrieve_ib_pf(**kwargs):
                 for a in actions:
                     if a.ib_ticker()==contract.localSymbol:
                         action=a
-            
-            if action is not None:            
-                if pos.position>0:
-                    pf.append(action)
-                else:
-                    pf_short.append(action)
-
-        return pf, pf_short
-    else:
-        return None, None
+                        
+            if action is not None: 
+                present_ss=StockStatus.objects.get(action=action)
+                present_ss.quantity=pos.position
+                present_ss.order_in_ib=True
+                present_ss.save()
 
 @connect_ib   
-def check_enough_cash(order_size,**kwargs):
-    if cash_balance(**kwargs)>=order_size:
+def check_enough_cash(order_size: numbers.Number,currency:str=None,**kwargs)-> bool:
+    """
+    Simple check, to determine if we have enough currency to perform an 
+    
+    Arguments
+    ----------
+    order_size: Size of the order to be performed
+    """ 
+    if cash_balance(currency=currency,**kwargs) is not None and cash_balance(currency=currency,**kwargs)>=order_size:
         return True
     else:
-        kwargs["currency"]="EUR" #fallback, if there is enough EUR, IB will convert
-        if cash_balance(**kwargs)>=order_size:
+        #fallback, if there is enough EUR, IB will convert
+        if cash_balance(currency="EUR",**kwargs)>=order_size:
             return True
         else:
             return False
         
 @connect_ib        
-def cash_balance(**kwargs):
-    currency=kwargs.get('currency',"EUR")
-
+def cash_balance(currency:str="EUR",**kwargs) -> numbers.Number:
+    """
+    Return the cash balance for a certain currency
+    """ 
     if kwargs['client'] and ib_global["connected"]:
         for v in kwargs['client'].accountValues():
             if v.tag == 'CashBalance' and v.currency==currency:
@@ -518,7 +560,16 @@ def cash_balance(**kwargs):
 
 #for SL check
 @connect_ib
-def get_last_price(action,**kwargs):
+def get_last_price(
+        action:Action,
+        **kwargs):
+    """
+    Return the last price for a product
+    
+    Arguments
+    ----------
+    action: stock to be checked
+    """     
     try:
         if kwargs['client'] and ib_global["connected"] and\
             (_settings["USED API_FOR_DATA"]["alerting"]=="IB" and\
@@ -537,10 +588,30 @@ def get_last_price(action,**kwargs):
 
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
-
+         
+def check_if_index(action):
+    """
+    Check if a product is an index
+    
+    Arguments
+    ----------
+    action: stock to be checked
+    """   
+    if action.category==ActionCategory.objects.get(short="IND"):
+        return True
+    else:
+        return False
+    
 #For alerting and TSL check        
 @connect_ib  
 def get_ratio(action,**kwargs):
+    """
+    Return the price change today, use both IB and YF
+    
+    Arguments
+    ----------
+    action: Action to be checked
+    """     
     try:
         cours_pres=0
         cours_ref=0
@@ -580,357 +651,383 @@ def get_ratio(action,**kwargs):
          logger.error(e, stack_info=True, exc_info=True)
 
 @connect_ib  
-def place(buy,action,short,**kwargs): 
+def place(
+        buy,
+        action,
+        quantity: numbers.Number=0,
+        order_size: numbers.Number=0,
+        testing: bool=False,
+        **kwargs): 
+    """
+    Place an order
+    
+    Arguments
+    ----------
+    buy: should the order buy or sell the stock
+    action: Action to be checked
+    quantity: quantity, in number of stocks, of the stock to be ordered
+    order_size: size, in currency, of the stock to be ordered
+    """       
     try:
         if kwargs['client'] and ib_global["connected"]:
-            contract =get_tradable_contract_ib(action,short)
+            contract =get_tradable_contract_ib(action,buy) #to check if it is enough
             
             if contract is None:
-                return "", decimal.Decimal(1.0), decimal.Decimal(0.0)
+                return "", Decimal(1.0), Decimal(0.0)
             else:
                 kwargs['client'].qualifyContracts(contract)
-                quantity=kwargs.get("quantity",0)
                 
-                if buy:
-                    if quantity==0:
-                        order_size=kwargs.get("order_size",0)
-                        last_price=IBData.get_last_price(contract)
-                        quantity=math.floor(order_size/last_price)
-                    
-                    if short:
-                        order = MarketOrder('SELL', quantity)
-                    else:
+                if quantity==0:
+                    last_price=IBData.get_last_price(contract)
+                    quantity=math.floor(order_size/last_price)
+                
+                if not testing:
+                    if buy:
                         order = MarketOrder('BUY', quantity)
-                else:
-                    
-                    if short:
-                        order = MarketOrder('BUY', quantity)
+                        txt="buying "
                     else:
                         order = MarketOrder('SELL', quantity)
-                trade = kwargs['client'].placeOrder(contract, order)
-                logger_trade.info("order sent to IB, action " + str(action)+", short: " + str(short) + ", quantity: "+str(quantity))
+                        txt="selling "
+                    trade = kwargs['client'].placeOrder(contract, order)
+                    logger_trade.info(txt+"order sent to IB, action " + str(action)+ ", quantity: "+str(quantity))
+            
+                    max_time=20
+                    t=0
+                    
+                    while t<max_time:
+                        kwargs['client'].sleep(1.0)
+                        t+=1
         
-                max_time=20
-                t=0
-                
-                while t<max_time:
-                
-                    kwargs['client'].sleep(1.0)
-                    t+=1
-    
-                    if trade.orderStatus.status == 'Filled':
-                        fill = trade.fills[-1]
-                        logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
-                        price=fill.execution.avgPrice     
-                        return decimal.Decimal(price), decimal.Decimal(quantity)
-                    
-                logger_trade.info("order not filled, pending")
-                return decimal.Decimal(1.0), decimal.Decimal(1.0)
+                        if trade.orderStatus.status == 'Filled':
+                            fill = trade.fills[-1]
+                            logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
+                            price=fill.execution.avgPrice     
+                            return Decimal(price), Decimal(quantity)
+                        
+                    logger_trade.info("order not filled, pending")
+                    return Decimal(1.0), Decimal(1.0)
+                else:
+                    return Decimal(1.0), Decimal(1.0)
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
 
+class OrderPerformer():
+    def __init__(
+            self,
+            symbol: str,
+            strategy_id: int,
+            target_size: numbers.Number,
+            testing: bool=False):
+        """
+        Class which contains all methods related to performing order, independently from the brocker
 
-#better to have a separate function for reversing. Exit would not buy anything and would lead to double fees
-#entry alone would not close the last order
-def reverse_order_sub(symbol,strategy, exchange,short,api_used,**kwargs): #convention short==True --> we go to short
-    try:
-        #type check necessary for indexes
-        pf= get_pf(strategy, exchange,short,**kwargs) #destination portfolio
-        pf_inv= get_pf(strategy, exchange,not short,**kwargs)
-        ocap=get_order_capital(strategy, exchange,**kwargs)
-        
-        action=Action.objects.get(symbol=symbol)
-        action=action_to_etf(action,short)
-        
-        c1 = Q(action=action)
-        c2 = Q(active=True)
-        orders=Order.objects.filter(c1 & c2)
-        
-        if api_used=="IB":
-            order_size=_settings["ORDER_SIZE"]
-            enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
-        else:
-            enough_cash=True
-        
-        if len(orders)==0: #necessary for the first trade of a stock for instance, or if it was closed on a stop loss
-            order=Order(action=action, pf=pf, short=short) #use full if you did the entry order manually...
-            logger.info("order not found " + symbol+ ", created")
-        else:
-            order=orders[0]
-            
-        if api_used=="IB":    
-            order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
-        else:
-            if order.short:
-                sign=-1
-            else:
-                sign=1
-        
-        order.save()
-        strategy_none, _ = Strategy.objects.get_or_create(name="none")
-        
-        if (symbol in pf.retrieve() ):
-            logger.info(str(symbol) + " already in portfolio")
-        if not enough_cash and not short:
-            logger.info(str(symbol) + " order not executed, not enough cash available")
-            print("Reversal order "+str(symbol) + "not executed, not enough cash available!!!!")
-        
-        if (symbol not in pf.retrieve() and 
-            (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
-            enough_cash or short):
-            
-            #pf should be enough, but it is a double security
-            if (short and sign<0) or (not short and sign>0):
-                logger.info("pf correction performed, no order executed")
-                pf.remove(action.symbol)
-                pf_inv.append(action.symbol)       
-                return False
+        Arguments
+        ----------
+        symbol: YF ticker of the stock
+        strategy_id: id of the strategy used to determine which orders must be performed
+        target_size: after the order, which position should we have for this stock
+        testing: set to True to perform unittest on the function
+        """
+        for k in ["symbol","strategy_id","target_size","testing"]:
+            setattr(self,k,locals()[k])
 
-            new_order=Order(action=action, pf=pf)
-            
-            if api_used=="IB":
-                logger_trade.info("place reverse order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
-                if order.quantity==0: #for the first order
-                    new_order.entering_price, _= place(True,
-                                            action,
-                                            short,
-                                            order_size=order_size)
-                else:
-                    new_order.entering_price, _= place(True,
-                                            action,
-                                            short,
-                                            quantity=order.quantity*2) #*2 to revert the order
-                logger_trade.info("entering_price: "+ str(new_order.entering_price))
-                new_order.quantity, _=retrieve_quantity(action)
-                new_order.short=short
-                
-                logger_trade.info("sl" + str(kwargs.get("sl",False)))
-                logger_trade.info("daily sl" + str(kwargs.get("daily_sl",False)))
-                if kwargs.get("sl",False):
-                    sl=kwargs.get("sl")
-                    if short:
-                        new_order.sl_threshold=order.entering_price*(1+sl)
-                    else:
-                        new_order.sl_threshold=order.entering_price*(1-sl)
-                
-                if new_order.entering_price is not None and order.entering_price is not None: 
-                    order.profit=new_order.entering_price-order.entering_price
-                    if order.entering_price != 0:
-                        order.profit_percent=(new_order.entering_price/order.entering_price-1)*100
-            else:
-                new_order.entering_price=1.0 
-                logger_trade.info("Manual reverse order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
-                
-            if kwargs.get("daily_sl",False):
-                new_order.daily_sl_threshold=kwargs.get("daily_sl")
-            
-            order.exiting_date=timezone.now()
-            order.active=False
-            order.save()
-            new_order.save()
-            pf.append(action.symbol)
-            pf_inv.remove(action.symbol)
-            return True
-        return False
-    
-    except Exception as e:
-        logger.error(str(e) + "symbol: "+str(symbol), stack_info=True, exc_info=True)
-        pass        
-
-def exit_order_sub(symbol,strategy, exchange,short,api_used,**kwargs):   
-    #type check necessary for indexes
-    try:
-        pf= get_pf(strategy, exchange,short,**kwargs)
-        ocap=get_order_capital(strategy, exchange,**kwargs)
-               
-        action=Action.objects.get(symbol=symbol)
-        action=action_to_etf(action,short)
+        self.executed=False
         
-        if symbol in pf.retrieve():
-            c1 = Q(action=action)
-            c2 = Q(active=True)
-            
-            orders=Order.objects.filter(c1 & c2)
-            if len(orders)==0:
-                order=Order(action=action, pf=pf) #use full if you did the entry order manually...
-                logger.info("order not found " + str(symbol) + " present position: "+ str(order.quantity))
-                order.save()
-            else:
-                order=orders[0]
-            
-            if api_used=="IB":    
-                order.quantity, sign=retrieve_quantity(action) #safer than looking in what we saved
-            #profit
-            if api_used=="IB" and order.quantity>0:
-                logger_trade.info("place exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
-                order.exiting_price, quantity= place(False,
-                                       action,
-                                       short,
-                                       quantity=order.quantity)
-                
-                if order.entering_price is not None: 
-                    order.profit=order.exiting_price-order.entering_price
-                    if order.entering_price != 0:
-                        order.profit_percent=(order.exiting_price/order.entering_price-1)*100
-            else:
-                logger_trade.info("Manual exit order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
-                
-            order.exiting_date=timezone.now()
-            order.active=False
-            order.save()
-
-            ocap.capital+=1
-            ocap.save()
-            pf.remove(symbol)
-            return True
-        else:
-            logger.info(str(symbol) + " not found in portfolio for exit order")
-        return False
-    
-    except Exception as e:
-        logger.error(e, stack_info=True, exc_info=True)
-        pass
-    
-def entry_order_sub(symbol,strategy, exchange,short,api_used,**kwargs): 
-    try:
-        #type check necessary for indexes
-        pf= get_pf(strategy, exchange,short,**kwargs)
-        ocap=get_order_capital(strategy, exchange,**kwargs)
-        action=Action.objects.get(symbol=symbol)
-        
-        if api_used=="IB":
-            order_size=_settings["ORDER_SIZE"]
-            enough_cash=check_enough_cash(order_size,currency=action.currency.symbol)
-        else:
-            enough_cash=True
-
-        strategy_none, _ = Strategy.objects.get_or_create(name="none")
-        excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
-        if (symbol in pf.retrieve() ):
-            logger.info(str(symbol) + " already in portfolio")
-        if (symbol in excluded.retrieve() ):
-            logger.info(str(symbol) + " excluded")    
-        #if (ocap.capital==0):
-            #print(symbol + " order not executed, no order capital available: " + ocap.name)
-        if not enough_cash and not short:
-            logger.info(str(symbol) + " order not executed, not enough cash available")
-        
-        if (symbol not in pf.retrieve() and 
-            symbol not in excluded.retrieve() and  
-            (ocap.capital>0 or _settings["BYPASS_ORDERCAPITAL_IF_IB"]) and
-            enough_cash or short):
-
-            order=Order(action=action, pf=pf, short=short)
-
-            if api_used=="IB":
-                logger_trade.info("place entry order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
-                order.entering_price, order.quantity= place(True,
-                                        action,
-                                        short,
-                                        order_size=order_size)
-                logger_trade.info("entering_price: "+ str(order.entering_price))
-                logger_trade.info("sl" + str(kwargs.get("sl",False)))
-                logger_trade.info("daily sl" + str(kwargs.get("daily_sl",False)))
-                if kwargs.get("sl",False):
-                    sl=kwargs.get("sl")
-                    if short:
-                        order.sl_threshold=order.entering_price*(1+sl)
-                    else:
-                        order.sl_threshold=order.entering_price*(1-sl)
-            else:
-                order.entering_price=1.0   
-                logger_trade.info("Manual entry order symbol: "+symbol+" , strategy: " + strategy + " short: "+str(short))
-                 
-            if kwargs.get("daily_sl",False):
-                order.daily_sl_threshold=kwargs.get("daily_sl")
-                
-            order.save()
-            pf.append(action.symbol)
-            ocap.capital-=1
-            ocap.save()
-            return True
-        return False
-    
-    except Exception as e:
-        logger.error(str(e) + "symbol: "+str(symbol), stack_info=True, exc_info=True)
-        pass
-   
-def check_hold_duration(symbol,strategy, exchange,short,**kwargs): 
-        #type check necessary for indexes
-    try:
-        pf= get_pf(strategy, exchange,short,**kwargs)
-        action=Action.objects.get(symbol=symbol)
-        action=action_to_etf(action,short)
-
-        #accountSummary
-        if action.symbol in pf.retrieve():
-            c1 = Q(action=action)
-            c2 = Q(active=True)
-            order=Order.objects.filter(c1 & c2)
-            if len(order)>0:
-                delta=timezone.now()-order[0].entering_date
-                return delta.days
-        
-        return 0
-    except Exception as e:
-         logger.error(e, stack_info=True, exc_info=True)
-         return 0
-
-def check_auto_manual(func,symbol,strategy, exchange,short,auto,**kwargs):
-    def wrapper(*args,**kwargs):
         try: 
-            action=Action.objects.get(symbol=symbol)
-            stock_ex=StockEx.objects.get(name=exchange)
-            strat=Strategy.objects.get(name=strategy)
+            self.action=Action.objects.get(symbol=symbol) #action_to_etf not anymore needed normally
+            self.st=Strategy.objects.get(id=strategy_id)
+            self.ss=StockStatus.objects.get(action=self.action)
+            
+            strategy_none, _ = Strategy.objects.get_or_create(name="none")
+            self.excluded, _=Excluded.objects.get_or_create(name="all",strategy=strategy_none) #list of actions completely excluded from entries
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
-            logger.error("action: " + str(symbol) + ", stock_ex: "+str(exchange) + ", strat: " + str(strategy) + " not found")
-            
-        try:
-
-            if (kwargs['client'] and ib_global["connected"] and
+            logger.error("action: " + str(symbol)+ ", strat: " + str(strategy_id) + " not found")
+    
+    @connect_ib    
+    def check_auto_manual(self,**kwargs):
+        """
+        Check if an order should be performed automatically (in IB) or manually (here noted as YF, but you cannot perform orders with YF)
+        """
+        if (kwargs['client'] and ib_global["connected"] and
                _settings["PERFORM_ORDER"] and
-               (not check_if_index(action) or (check_if_index(action) and _settings["ETF_IB_auth"])) and #ETF trading requires too high 
-               stock_ex.perform_order and  #ETF trading requires too high permissions on IB, XETRA data too expansive
-               strat.perform_order and
-               not auto==False):
+               (not check_if_index(self.action) or (check_if_index(self.action) and _settings["ETF_IB_auth"])) and #ETF trading requires too high 
+               self.action.stock_ex.perform_order and  #ETF trading requires too high permissions on IB, XETRA data too expansive
+               self.st.perform_order):
 
-                auto_checked=True
-    
-            else: 
-                auto_checked=False
+            self.api_used="IB"
+        else: 
+            self.api_used="YF"
+
+    def get_order(self,buy: bool):
+        """
+        Search for an open order corresponding to the new one
+        
+        Arguments
+        ----------
+        buy: should the order buy or sell the stock
+        """
+        c1 = Q(action=self.action)
+        c2 = Q(active=True)
+        orders=Order.objects.filter(c1 & c2)
+
+        if len(orders)>1:
+            print("several active orders have been found for: "+self.action.symbol+" , check the database")
+            logger.error("several active orders have been found for: "+self.action.symbol+" , check the database")      
+
+        if len(orders)==0:
+            self.new_order_bool=True
+        else: #Already and order
+            self.new_order_bool=False
+            self.order=orders[0]
+            '''
+            if (buy and self.order.short==True) or (sell and self.order.short==False):
+                entry=False
+            else:
+                entry=True -> means normally no new order is needed
+            '''
+    def entry_place(
+            self, 
+            buy: bool,
+            quantity: numbers.Number=None,
+            order_size: numbers.Number=None,
+            ):
+        """
+        Function to perform an entry order, the Django part is within it. Place has the IB part
+        
+        Arguments
+        ----------
+        buy: should the order buy or sell the stock
+        quantity: quantity, in number of stocks, of the stock to be ordered
+        order_size: size, in currency, of the stock to be ordered
+        """
+        try:
+            if (self.symbol in self.excluded.retrieve() ):
+                logger.info(str(self.symbol) + " excluded")  
             
-            return func(symbol,strategy, exchange,short,auto_checked,**kwargs), auto_checked
+            #entry
+            if ((self.reverse or self.symbol not in pf_retrieve_all_symbols()) and 
+                 self.symbol not in self.excluded.retrieve()):
+                self.new_order=Order(action=self.action, strategy=self.st, short=not buy)
+                self.entry=True
+                buy_sell_txt={True:"buying ", False: "selling "}
+                #add reverse info
+                if self.api_used=="IB":
+                    logger_trade.info("place "+  buy_sell_txt[buy] + "order symbol: "+self.symbol+" , strategy: " + self.st.name)
+                    self.new_order.entering_price, _= place(buy,
+                                            self.action,
+                                            quantity=quantity,
+                                            order_size=order_size,
+                                            testing=self.testing
+                                            )
+            
+                    logger_trade.info("entering_price: "+ str(self.new_order.entering_price))
+                    self.new_order.quantity, sign, short=retrieve_quantity(self.action)
+                    self.ss.quantity=sign*self.new_order.quantity
+                    self.new_order.short=short
+            
+                    if self.st.sl_threshold is not None and self.st.sl_threshold !=0:
+                        if short:
+                            self.new_order.sl_threshold=self.new_order.entering_price*(1+self.st.sl_threshold)
+                        else:
+                            self.new_order.sl_threshold=self.new_order.entering_price*(1-self.st.sl_threshold)
+                    if self.st.daily_sl_threshold is not None and self.st.daily_sl_threshold !=0:
+                        self.new_order.daily_sl_threshold=self.st.daily_sl_threshold
+            
+                    self.new_order.entering_price=Decimal(self.new_order.entering_price)
+                    self.ss.order_in_ib=True               
+                else:
+                    self.new_order.entering_price=Decimal(1.0) 
+                    logger_trade.info("Manual " + buy_sell_txt[buy] + "order symbol: "+self.symbol+" , strategy: " + self.st.name)
+                    self.ss.order_in_ib=False
+
+                    if not buy:
+                        self.ss.quantity=Decimal(-1.0)
+                    else:
+                        self.ss.quantity=Decimal(1.0)
+                self.new_order.save()
+                self.ss.save()
+                self.executed=True
         except Exception as e:
+            import sys
+            _, e_, exc_tb = sys.exc_info()
+            print(e)
+            print("line " + str(exc_tb.tb_lineno))
+
+    def calc_profit(self):
+        """
+        Calculate the profit realized on an order that is going to be closed
+        """
+        if self.order.exiting_price is not None and self.order is not None and self.order.entering_price is not None: 
+            self.order.profit=self.order.exiting_price-self.order.entering_price
+            if self.order.entering_price != 0:
+                self.order.profit_percent=(self.order.exiting_price/self.order.entering_price-1)*100
+        self.order.save()
+        
+    def get_delta_size(self):
+        """
+        Calculate the difference between the desired final position (self.target_size)
+        and the present position (self.order.quantity) for a stock (self.action)
+        """
+        if self.api_used=="IB":
+            #safer than looking in what we saved
+            present_quantity, present_sign, _=retrieve_quantity(self.action) 
+        else:
+            present_quantity=abs(self.ss.quantity)
+            present_sign=Decimal(np.sign(self.ss.quantity))
+        if "order" in self.__dir__():
+            self.order.quantity=present_quantity
+            self.order.save()
             
-             logger.error(e, stack_info=True, exc_info=True)
-             return False, False
+        if present_quantity!=0:
+            present_size= present_sign*present_quantity*Decimal(get_last_price(self.action))
+            self.reverse=True
+        else:
+            present_size=0
+            self.reverse=False
+        self.delta_size=self.target_size-present_size
+
+    def close_order(self):
+        """
+        Perform change related with a close order
+        """
+        self.order.exiting_date=timezone.now()
+        self.order.active=False
+        self.order.save()
     
-    return wrapper(symbol,strategy, exchange,short,auto,**kwargs)     
-@connect_ib     
-def reverse_order(symbol,strategy, exchange,short,auto,**kwargs):
-    return check_auto_manual(reverse_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
+    def close_quantity(self):        
+        self.ss.quantity=0
+        self.ss.save()
+    
+    def sell_order_sub(self):
+        """
+        Subfunction for sell order
+        """
+        try:
+            self.get_order(False)
+            
+            if self.new_order_bool:   #we open a short order
+                self.reverse=False
+                self.entry_place(False, order_size=self.target_size)
+                return self.executed   
+            else:#we close or reverse an old long order
+                self.entry=False
+                self.get_delta_size()
+                #profit
+                if self.delta_size<0:
+                    #if reverse but excluded then close without further conditions
+                    if self.reverse and self.symbol not in self.excluded.retrieve():
+                        self.entry_place(False, order_size=self.delta_size,testing=self.testing)     
+                        self.order.exiting_price=self.new_order.entering_price
+                    elif self.api_used=="IB":
+                        if self.reverse:
+                            logger.info(str(self.symbol) + " excluded, reverse order converted to close") 
+                        
+                        logger_trade.info("place exit order symbol: "+self.symbol+" , strategy: " + self.st.name + " which was in long direction")
+                        self.order.exiting_price, quantity= place(False,
+                                               self.action,
+                                               quantity=self.order.quantity,
+                                               testing=self.testing
+                                               )
+                        self.order.exiting_price=Decimal(self.order.exiting_price)
+                        self.close_quantity()
+                    else:
+                        logger_trade.info("Manual exit order symbol: "+self.symbol+" , strategy: " + self.st.name + " which is in long direction")
+                        self.close_quantity()
+                    self.calc_profit()
+                    self.close_order()
+                    return True 
 
-@connect_ib       
-def entry_order(symbol,strategy, exchange,short,auto,**kwargs):
-    return check_auto_manual(entry_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
+        except Exception as e:
+            import sys
+            _, e_, exc_tb = sys.exc_info()
+            print(e)
+            print("line " + str(exc_tb.tb_lineno))
+            logger.error(str(e) + "symbol: "+str(self.symbol), stack_info=True, exc_info=True)
+            pass
+    #Can be open a buy position or close a short position
+    def buy_order_sub(self): 
+        """
+        Subfunction for buy order
+        
+        Compared to sell, we need to check in the beginning if there is enough cash
+        """
+        try:
+            #type check necessary for indexes
+            self.get_order(True)
+            self.get_delta_size()
+            
+            if self.api_used=="IB":
+                enough_cash=check_enough_cash(self.delta_size,currency=self.action.currency.symbol)
+            else:
+                enough_cash=True
+                
+            if not enough_cash:
+                logger.info(str(self.symbol) + " order not executed, not enough cash available")
+            else:
+                if self.new_order_bool: #we open a new long order
+                    self.reverse=False
+                    self.entry_place(True, order_size=self.target_size)
+                    return self.executed
+                else: 
+                    self.entry=False
+                    #we close or reverse an old short order
+                    #profit
+                    if self.delta_size>0:
+                        #if reverse but excluded then close without further conditions
+                        if self.reverse and self.symbol not in self.excluded.retrieve():
+                            self.entry_place(True, order_size=self.delta_size)
+                            self.order.exiting_price=self.new_order.entering_price
+                        elif self.api_used=="IB" :
+                            if self.reverse:
+                                logger.info(str(self.symbol) + " excluded, reverse order converted to close") 
+                                
+                            logger_trade.info("place exit order symbol: "+self.symbol+" , strategy: " + self.st.name + " which was in short position")
+                            self.order.exiting_price, quantity= place(True,
+                                                   self.action,
+                                                   quantity=self.order.quantity,
+                                                   testing=self.testing)
+                            self.order.exiting_price=Decimal(self.order.exiting_price)
+                            self.close_quantity()
+                        else:
+                            logger_trade.info("Manual exit order symbol: "+self.symbol+" , strategy: " + self.st.name +  "which is in short position")
+                            self.close_quantity()
+                        self.calc_profit()
+                        self.close_order()
+                        return True
+            return False
+        
+        except Exception as e:
+            import sys
+            _, e_, exc_tb = sys.exc_info()
+            print(e)
+            print("line " + str(exc_tb.tb_lineno))
+            logger.error(str(e) + "symbol: "+str(self.symbol), stack_info=True, exc_info=True)
+            pass
 
-@connect_ib
-def exit_order(symbol,strategy, exchange,short,auto,**kwargs): 
-    return check_auto_manual(exit_order_sub,symbol,strategy, exchange,short,auto,**kwargs)
+    @connect_ib     
+    def buy_order(self,**kwargs):
+        '''
+        Main function to place a buy order
+        '''
+        self.check_auto_manual(**kwargs)
+        return self.buy_order_sub()
+    
+    @connect_ib     
+    def sell_order(self,**kwargs):
+        '''
+        Main function to place a sell order
+        '''
+        self.check_auto_manual(**kwargs)
+        return self.sell_order_sub()
 
-def check_if_index(action):
-    if action.category==ActionCategory.objects.get(short="IND"):
-        return True
-    else:
-        return False    
-
+###Functions to retrieve data
 @connect_ib 
 def retrieve_data_ib(
         actions: list,
         period: str,
         it_is_index: bool=False
-        ):
+        ) -> (pd.core.frame.DataFrame, list, str):
     """
     Retrieve the data using IB
 
@@ -946,14 +1043,14 @@ def retrieve_data_ib(
     try:
         period=period_YF_to_ib(period)
         exchanges={}
-        indexes={}
+        it_is_indexes={}
         ib_symbols=[]
         
         for a in actions:
             ib_symbol=a.ib_ticker()
             ib_symbols.append(ib_symbol)
             exchanges[ib_symbol]=a.stock_ex.ib_ticker
-            indexes[ib_symbol]=it_is_index
+            it_is_indexes[ib_symbol]=it_is_index
         
         #add the index to the list of stocks downloaded. Useful to make calculation on the index to determine trends
         #by downloading at the same time, we are sure the signals are aligned
@@ -963,7 +1060,7 @@ def retrieve_data_ib(
         else:
             index_symbol_ib, index_symbol=exchange_to_index_symbol(actions[0].stock_ex) 
             all_symbols= ib_symbols+[index_symbol_ib]
-            indexes[index_symbol_ib]=True
+            it_is_indexes[index_symbol_ib]=True
             action=Action.objects.get(symbol=index_symbol)
             exchanges[index_symbol_ib]=action.stock_ex.ib_ticker    
 
@@ -977,7 +1074,7 @@ def retrieve_data_ib(
                 missing_index='drop',
                 timeframe="1 day", #see also interval_YF_to_ib
                 exchanges=exchanges,
-                indexes=indexes)
+                it_is_indexes=it_is_indexes)
             ok=True
             o=res.get('Open')
             for s in ib_symbols:
@@ -994,13 +1091,13 @@ def retrieve_data_ib(
             index_symbol_ib
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
-         
+      
 
 def retrieve_data_YF(
         actions: list,
         period: str,
         it_is_index: bool=False
-        ):
+        )-> (pd.core.frame.DataFrame, list, str):
     """
     Retrieve the data using YF
 

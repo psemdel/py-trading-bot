@@ -12,5 +12,5 @@ from orders import views
 app_name = 'orders'
 
 urlpatterns = [ 
-    path('portfolio/', views.pf_view, name="portfolio"),
+    #path('portfolio/', views.pf_view, name="portfolio"),
     ]

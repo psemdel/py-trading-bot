@@ -12,13 +12,11 @@ import logging
 logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
-from django.db.models import Q
-from orders.ib import exit_order, entry_order, reverse_order
-
 from orders.models import Action, Order, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission, filter_intro_action
+from orders.ss_manager import StockStatusManager
       
 class ListOfActions(models.Model):
     """
@@ -27,8 +25,9 @@ class ListOfActions(models.Model):
     """
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     entry=models.BooleanField(blank=False,default=False) #otherwise exit
-    short=models.BooleanField(blank=False,default=False)
-    auto=models.BooleanField(blank=False,default=False)
+    buy=models.BooleanField(blank=False,default=False)
+    reverse=models.BooleanField(blank=False,default=False,null=True) 
+    api_used=models.CharField(max_length=100, blank=False, default="YF")
     actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
     text=models.TextField(blank=True)
     
@@ -46,18 +45,64 @@ class Report(models.Model):
     text=models.TextField(blank=True)
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
     it_is_index=models.BooleanField(blank=False,default=False)
-    sector=models.ForeignKey('orders.ActionSector',on_delete=models.CASCADE,blank=True,default=1)
+    sector=models.ForeignKey('orders.ActionSector',on_delete=models.CASCADE,blank=True,null=True)
     
     def __str__(self):
         return str(self.date)
     
     class Meta:
         ordering = ['-date', 'stock_ex']
-    
-    def concat(self,text):
+        
+    def save(self, *args, testing:bool=False,**kwargs):
+        if "ss_m" not in self.__dir__():
+            self.ss_m=StockStatusManager(self,testing=testing)
+        super().save(*args, **kwargs)  
+            
+    def concat(self,text: str):
+        '''
+        Add text to the report
+        
+        Arguments
+       	----------
+           text: text to be added to the report
+        '''
         print(text)     
         self.text+=text +"\n"
         self.save()
+
+    def handle_listOfActions(
+            self, 
+            action: Action, 
+            entry: bool, 
+            api_used: str, 
+            buy: bool, 
+            strategy: str,
+            reverse: bool=None, 
+            ):
+        '''
+        Create a list of action and edit it after an order
+        
+        Arguments
+       	----------
+           action: stock where an order was performed
+           ent: was the order an entry
+           reverse: was the order a reversion (from short to long or the other way around)
+           buy: was the order a buy order
+           auto: was the order automatic or not
+           strategy: name of the strategy which decided of this order        
+        '''
+        buy_sell_txt={True:"buying ", False: "selling "}
+        txt=buy_sell_txt[buy]+"Order executed, symbol: " +action.symbol +" strategy: " + strategy
+        logger_trade.info(txt)
+        ent_ex_symbols, _=ListOfActions.objects.get_or_create(
+            report=self,
+            entry=entry,
+            reverse=reverse,
+            buy=buy,
+            api_used=api_used
+            )
+        ent_ex_symbols.actions.add(action)
+        ent_ex_symbols.concat(txt)    
 
 ### Logic for buying and selling actions preselected with retard strategy
     def candidates_to_YF(self,
@@ -71,11 +116,25 @@ class Report(models.Model):
        	----------
            symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
            candidates: list of product symbols, that can be either YF or IB tickers
-           
        	""" 
         return [symbols_to_YF[c] for c in candidates]
 
-    def retard(self,api_used, exchange,ust,**kwargs):
+    def retard(
+            self,
+            api_used: str, 
+            exchange: str,
+            ust,
+            **kwargs):
+        """
+       	Perform the retard strategy order 
+        Note: to be replace through a Retard method      
+           
+        Arguments
+       	----------
+           api_used: API to be used for the orders
+           exchange: name of the stock exchange
+           ust: underlying strategy 
+       	""" 
         if _settings["RETARD_MACRO"]:
             pr=presel.name_to_presel("PreselRetardMacro", ust.period,prd=True, api_used=api_used,input_ust=ust,exchange=exchange) 
         else:
@@ -92,105 +151,27 @@ class Report(models.Model):
         self.concat("Retard, " + "direction " + direction + ", stockex: " + exchange +\
                     ", action duration: " +str(pr.out))
   
-        auto=True
-        self.order_nosubstrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), exchange, "retard", pr.last_short, auto,**kwargs) #retard can be automatized
-
-    #YF symbol expected here
-    def order_only_exit_substrat(self,candidates, exchange, key, short,**kwargs):
-        auto=True
-        if len(candidates)==0:
-            self.concat(key +" no candidates")        
-        else:
-            #buy without condition
-            for symbol in candidates:
-                self.concat(key +" candidates " + symbol)
-                ent, auto=entry_order(symbol,key, exchange,short, auto,**kwargs)
-                
-                if ent:
-                    action=Action.objects.get(symbol=symbol)
-                    ent_symbols, _=ListOfActions.objects.get_or_create(
-                        report=self,
-                        entry=True,
-                        short=short,
-                        auto=auto
-                        )
-                    ent_symbols.actions.add(action)
-                    
-    #YF symbol expected here
-    def order_nosubstrat_sub(self,symbol, short, ex, auto):
-        if ex:
-            action=Action.objects.get(symbol=symbol)
-            ex_symbols, _=ListOfActions.objects.get_or_create(
-                report=self,
-                entry=False,
-                short=short,
-                auto=auto
-                )
-            
-            ex_symbols.actions.add(action)
-            
-    #YF symbol expected here
-    def order_nosubstrat(self,candidates, exchange, key, short,auto,**kwargs):
-        #if there is a reversal the opposite pf needs to emptied
-        pf_inv=get_pf(key,exchange,not short,**kwargs)
-        
-        if kwargs.get("keep",False):
-            pf_keep=get_pf("retard_keep",exchange,short,**kwargs)
-
-        for symbol in pf_inv.retrieve(): 
-            if symbol not in candidates:
-                ex, auto=exit_order(symbol,key, exchange,short, auto,**kwargs) #not short?
-                self.order_nosubstrat_sub(symbol, short, ex, auto)
-
-        #sell
-        pf=get_pf(key,exchange,short,**kwargs)
-        for symbol in pf.retrieve():
-            if symbol not in candidates:
-                if kwargs.get("keep",False):
-                    action=Action.objects.get(symbol=symbol)
-                    pf_keep.append(action) #move the symbol from retard to keep pf
-                    pf.remove(action)
-                    logger_trade.info(symbol + " moved from retard to retard_keep portfolio")
-                    
-                    #tsl part
-                    c1 = Q(action=action)
-                    c2 = Q(active=True)
-                    order=Order.objects.filter(c1 & c2)
-                    
-                    if len(order)>0:
-                        order[0].pf=pf_keep
-                        order[0].save()
-                else:
-                    ex, auto=exit_order(symbol,key, exchange,short,auto, **kwargs)
-                    self.order_nosubstrat_sub(symbol, short, ex, auto)
-        
-        if len(candidates)==0:
-            self.concat(key +" no candidates")
-        
-        #buy
-        for symbol in candidates:
-            self.concat(key +" candidates " + symbol)
-            
-            ent, auto=entry_order(symbol,key, exchange,short,auto, **kwargs)
-            if ent:
-                action=Action.objects.get(symbol=symbol)
-                ent_symbols, _=ListOfActions.objects.get_or_create(
-                    report=self,
-                    entry=True,
-                    short=short,
-                    auto=auto
-                    )
-                ent_symbols.actions.add(action)
+        self.ss_m.order_nosubstrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), exchange, "retard", pr.last_short, **kwargs)
       
-### Preselected actions strategy, using 101 Formulaic Alphas
-    def presel_wq(self,ust,exchange,**kwargs):
+    def presel_wq(
+            self,
+            ust,
+            exchange: str,
+            **kwargs):
+        '''
+        Preselected actions strategy, using 101 Formulaic Alphas
+        
+        Arguments
+       	----------
+           ust: underlying strategy 
+           exchange: name of the stock exchange
+        '''
         to_calculate=False
-        auto=kwargs.get("autok",True)
         stock_ex=StockEx.objects.get(name=exchange)
         
         for nb in range(102):
-            key="wq"+str(nb)
-            strats=Strategy.objects.filter(name=key)
+            strategy="wq"+str(nb)
+            strats=Strategy.objects.filter(name=strategy)
             if len(strats)>0:
                 if strats[0] in stock_ex.strategies_in_use.all():
                     to_calculate=True
@@ -199,15 +180,15 @@ class Report(models.Model):
             wq=presel.WQ(ust.period, prd=True, api_used=ust.api_used,input_ust=ust,exchange=exchange)
             
             for nb in range(102):
-                key="wq"+str(nb)
-                strats=Strategy.objects.filter(name=key) #normally there should be only one
+                strategy="wq"+str(nb)
+                strats=Strategy.objects.filter(name=strategy) #normally there should be only one
                 if len(strats)>0:
                     if strats[0] in stock_ex.strategies_in_use.all():
                         wq.call_wqa(nb=nb)
                         wq.def_cand()
                         candidates=wq.get_candidates()
                         
-                        self.order_nosubstrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), exchange, key,False,auto,**kwargs) #fees are too high on IB for wq strategy
+                        self.ss_m.order_nosubstrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), exchange, strategy,False,**kwargs)
             logger.info("Presel wq done for "+exchange)  
             
 ### Preselected actions strategy    
@@ -224,7 +205,7 @@ class Report(models.Model):
                 else:
                     pr=presel.name_to_presel("PreselDivergence", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
                 candidates, _=pr.get_candidates()
-                self.order_only_exit_substrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), exchange, "divergence", False,**kwargs)
+                self.ss_m.order_only_exit_substrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), "divergence", False,**kwargs)
             if Strategy.objects.get(name="macd_vol") in l:
                 pr=presel.name_to_presel("PreselMacdVolMacro", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
                 candidates, candidates_short=pr.get_candidates()
@@ -239,27 +220,23 @@ class Report(models.Model):
                 for symbol in cand:
                     symbol_complex=pr.ust.symbols_simple_to_complex(symbol,"ent")
                     if short:
-                        self.define_ent_ex(
+                        self.ss_m.ex_ent_to_target(
                             False,
                             False,
                             pr.ust.exits[symbol_complex].values[-1],
                             pr.ust.entries[symbol_complex].values[-1],
                             pr.ust.symbols_to_YF[symbol], 
-                            "macd_vol",
-                            exchange,
-                            **kwargs
+                            "macd_vol"
                             )
                     else:
-                        self.define_ent_ex(
+                        self.ss_m.ex_ent_to_target(
                             pr.ust.entries[symbol_complex].values[-1],
                             pr.ust.exits[symbol_complex].values[-1],
                             False,
                             False,
                             pr.ust.symbols_to_YF[symbol], 
-                            "macd_vol",
-                            exchange,
-                            **kwargs
-                            ) 
+                            "macd_vol"
+                            )
   
             logger.info("Presel done for "+exchange)    
 
@@ -275,49 +252,26 @@ class Report(models.Model):
                     self.presel_sub(ust.api_used,s.strategies_in_use.all(),ust,exchange,sec=s,**kwargs)
         else:
             self.presel_sub(ust.api_used,stock_ex.strategies_in_use.all(),ust,exchange,**kwargs)
-                           
-#all symbols should be from same stock exchange
-
-    def define_ent_ex(self,entries,exits,entries_short,exits_short,symbol, 
-                      strategy, exchange, **kwargs):
-        try:
-            ent=False
-            ex=False
-            auto=False
-            short=False
-            action=Action.objects.get(symbol=symbol)
-            if exchange is None: #for index
-                exchange=action.stock_ex.name
-            
-            if entries and exits_short:
-                ent, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
-            elif entries_short and exits:
-                short=True
-                ex, auto=reverse_order(symbol,strategy, exchange,short,True,**kwargs)
-            else:   
-                if (entries_short and not exits_short) or (exits_short and not entries_short):
-                    short=True
-                #ent/ex and auto need to be re-evaluated: we want an entry in auto, but maybe there are limitation that will stop the execution or impose manual execution for instance
-                if (entries and not exits) or (entries_short and not exits_short):
-                    ent, auto=entry_order(symbol,strategy, exchange,short,True,**kwargs) #YF symbol expected here
-                if (exits and not entries) or (exits_short and not entries_short):  
-                    ex, auto=exit_order(symbol,strategy, exchange,short,True, **kwargs) #YF symbol expected here
-                
-            if ent or ex:
-                logger_trade.info("define_ent_ex, Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
-                ent_ex_symbols, _=ListOfActions.objects.get_or_create(
-                    report=self,
-                    entry=ent,
-                    short=short,
-                    auto=auto
-                    )
-                ent_ex_symbols.actions.add(action)
-                ent_ex_symbols.concat("define_ent_ex, Order executed short: " + str(short) + " symbol: " + symbol + " strategy: " + strategy)
-        except Exception as e:
-            print(e)
-            logger.error(e, stack_info=True, exc_info=True)    
-            
-    def populate_report(self, symbols, symbols_to_YF,ust_normal, ust_trend, ust_kama, ust_ma, ust_pattern):
+  
+    def populate_report(
+            self, 
+            symbols: list, 
+            symbols_to_YF: dict,
+            ust_normal,
+            ust_trend,
+            ust_kama,
+            ust_ma,
+            ust_pattern):
+        '''
+        Fill the report with result of the calculations
+        
+        Arguments
+       	----------
+           symbols: list of YF ticker
+           symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
+           ust_normal, ust_trend, ust_kama, ust_ma, ust_pattern: underlying strategies containing some calculation results 
+           exchange: name of the stock exchange
+        '''
         for symbol in symbols:
             if math.isnan(ust_normal.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
@@ -390,20 +344,43 @@ class Report(models.Model):
                             if ust_trend.min_ind[symbol_complex_ent][-1]!=0:
                                 self.concat(" Index " + symbol + " V minimum detected!")                            
                     ar.save()  
-  
         
-    def display_last_decision(self,symbol,ust_normal, key):
+    def display_last_decision(
+            self,
+            symbol: str,
+            ust_normal, 
+            strategy: str):
+        '''
+        Display the present direction expected for a stock
+        Note: to be replaced with SS_manager        
+        '''
         symbol_complex_ent_normal=ust_normal.symbols_simple_to_complex(symbol,"ent")
         symbol_complex_ex_normal=ust_normal.symbols_simple_to_complex(symbol,"ex")
         decision=ust_normal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
         if decision==1:
-            self.concat(symbol + " present decision for "+str(key)+" strategy : sell")
+            self.concat(symbol + " present decision for "+str(strategy)+" strategy : sell")
         elif decision==-1:
-            self.concat(symbol + " present decision for "+str(key)+" strategy : buy")
+            self.concat(symbol + " present decision for "+str(strategy)+" strategy : buy")
         return symbol_complex_ent_normal, symbol_complex_ex_normal
             
     #for a group of predefined actions, determine the signals    
-    def perform_normal_strat(self,api_used,actions, exchange,it_is_index:bool=False, **kwargs):
+    def perform_normal_strat(
+            self,
+            api_used,
+            actions, 
+            exchange,
+            it_is_index:bool=False, 
+            **kwargs):
+        '''
+        Perform the strategy called "normal"
+        
+        Arguments
+       	----------
+        api_used: API to be used for the orders
+        actions: list of action 
+        exchange: name of the stock exchange
+        it_is_index: is it indexes that are provided
+        '''
         try:
             if self.it_is_index:
                 ust_name=_settings["STRATEGY_NORMAL_INDEX"]
@@ -431,15 +408,14 @@ class Report(models.Model):
                     symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,ust_normal, "normal")
                     
                     #list present status
-                    self.define_ent_ex(
+                    self.ss_m.ex_ent_to_target(
                         ust_normal.entries[symbol_complex_ent_normal].values[-1],
                         ust_normal.exits[symbol_complex_ex_normal].values[-1],
                         ust_normal.entries_short[symbol_complex_ex_normal].values[-1],
                         ust_normal.exits_short[symbol_complex_ent_normal].values[-1],
                         ust_normal.symbols_to_YF[symbol], 
-                        "normal",
-                        exchange,
-                        **kwargs)
+                        "normal"
+                        )
             return ust_normal
         except Exception as e:
             import sys
@@ -447,7 +423,17 @@ class Report(models.Model):
             print(e)
             print("line " + str(exc_tb.tb_lineno))  
                                          
-    def perform_keep_strat(self,ust_normal, **kwargs):
+    def perform_keep_strat(
+            self,
+            ust_normal, 
+            **kwargs):
+        '''
+        Perform the strategy called "retard keep"
+        
+        Arguments
+       	----------
+        ust_normal: underlying strategy containing most of the needed information
+        '''        
         if not self.it_is_index:
             ust_keep=strat.name_to_ust(
                 _settings["STRATEGY_RETARD_KEEP"],
@@ -456,38 +442,47 @@ class Report(models.Model):
                 prd=True
                 ) 
 
-            pf_keep=get_pf("retard_keep",ust_keep.exchange,False,**kwargs)
-            pf_short_keep=get_pf("retard_keep",ust_keep.exchange,True,**kwargs)
+            pf_keep=get_pf("retard_keep",ust_keep.exchange,False)
+            pf_short_keep=get_pf("retard_keep",ust_keep.exchange,True)
             
             for symbol in ust_keep.symbols:
-                if symbol in pf_keep.retrieve():
+                if symbol in pf_keep:
                     self.concat("symbol presently in keep: "+symbol)
                     symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,ust_keep,"keep")
 
-                    self.define_ent_ex(
+                    self.ss_m.ex_ent_to_target(
                         False, #only exit
-                        ust_keep.exits[symbol_complex_ex_normal].values[-1],
+                        ust_normal.exits[symbol_complex_ex_normal].values[-1],
                         False,
                         False,
-                        ust_keep.symbols_to_YF[symbol], 
+                        ust_normal.symbols_to_YF[symbol], 
                         "retard_keep",
-                        ust_keep.exchange,
-                        **kwargs)
-                if symbol in pf_short_keep.retrieve(): 
+                        )
+                if symbol in pf_short_keep: 
                     self.concat("symbol presently in keep short: "+symbol)
                     symbol_complex_ent_normal, symbol_complex_ex_normal=self.display_last_decision(symbol,ust_keep,"keep")
-                    self.define_ent_ex(
+                    self.ss_m.ex_ent_to_target(
                         False, #only exit
                         False,
                         False,
-                        ust_keep.exits_short[symbol_complex_ent_normal].values[-1],
-                        ust_keep.symbols_to_YF[symbol], 
+                        ust_normal.exits_short[symbol_complex_ent_normal].values[-1],
+                        ust_normal.symbols_to_YF[symbol], 
                         "retard_keep",
-                        ust_keep.exchange,
-                        **kwargs)
+                        )
                                   
-    def perform_slow_strats(self, ust_normal, strats, **kwargs):   
-        # Slow candidates
+    def perform_slow_strats(
+            self, 
+            ust_normal, 
+            strats, 
+            **kwargs):
+        '''
+        Slow candidates
+        
+        Arguments
+       	----------
+        ust_normal: underlying strategy containing most of the needed information
+        strats: list of strategy names
+        '''    
         try:
             slow_strats=[Strategy.objects.get(name="hist_slow"),\
                          Strategy.objects.get(name="realmadrid")] #only those in use
@@ -513,17 +508,16 @@ class Report(models.Model):
             for symbol in ust_slow.symbols:
                 symbol_complex_ent=ust_slow.symbols_simple_to_complex(symbol,"ent")                            
                 
-                for s in slow_strats_active:
+                for st in slow_strats_active:
                     if ust_slow.symbols_to_YF[symbol] in slow_cands[s.name]: #list of candidates
-                        self.define_ent_ex(
+                        self.ss_m.ex_ent_to_target(
                             ust_slow.entries[symbol_complex_ent].values[-1],
                             ust_slow.exits[symbol_complex_ent].values[-1],
                             False, #both strategy use only long
                             False,
                             ust_slow.symbols_to_YF[symbol], 
-                            s.name,
-                            ust_slow.exchange,
-                            **kwargs)
+                            st.name,
+                            )
         except:
             print("check that hist_slow and realmadrid strategies are created")                
                         
@@ -537,8 +531,8 @@ class Report(models.Model):
         try: 
             if not self.it_is_index and ust_normal.exchange is not None: #index
                 #even if divergence is not anymore used, we should be able to exit
-                pf_div=get_pf("divergence",ust_normal.exchange,False,**kwargs)
-                self.concat("symbols in divergence: " +str(pf_div.retrieve()))
+                pf_div=get_pf("divergence",ust_normal.exchange,False)
+                self.concat("symbols in divergence: " +str(pf_div))
                 ##Change underlying strategy
                 ust_div=strat.name_to_ust(
                     "StratDiv",
@@ -548,24 +542,23 @@ class Report(models.Model):
                     ) 
                 
                 ##only_exit_substrat
-                if len(pf_div.retrieve())>0:
+                if len(pf_div)>0:
                     for symbol in ust_div.symbols:
                         symbol_complex_ent=ust_div.symbols_simple_to_complex(symbol,"ent")  
                         
                         if st in strats and\
-                                ust_div.symbols_to_YF[symbol] in pf_div.retrieve() and ust_div.exits[symbol_complex_ent].values[-1]: 
+                                ust_div.symbols_to_YF[symbol] in pf_div and ust_div.exits[symbol_complex_ent].values[-1]: 
     
                                 logger_trade.info("Divergence exit " + str(ust_div.exits[symbol_complex_ent].values[-1]))    
  
-                                self.define_ent_ex(
-                                    False,
-                                    ust_div.exits[symbol_complex_ent].values[-1],
-                                    False,
-                                    False,
-                                    ust_div.symbols_to_YF[symbol], 
-                                    ust_div.name,
-                                    ust_div.exchange,
-                                    **kwargs)
+                                self.ss_m.ex_ent_to_target(
+                                     False,
+                                     ust_div.exits[symbol_complex_ent].values[-1],
+                                     False,
+                                     False,
+                                     ust_div.symbols_to_YF[symbol], 
+                                     st.name,
+                                     )   
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass   
@@ -579,13 +572,12 @@ class Report(models.Model):
         """
     	Method that write the report itself
     
-    	Optional arguments
+    	Arguments
     	----------
         it_is_index: is it indexes that are provided
         exchange: name of the stock exchange
         symbols: list of YF symbols
         sec: sector of the stocks for which we write the report
-        
     	"""     
         try: 
             ##preprocessing
@@ -660,6 +652,7 @@ class Report(models.Model):
                 if sec is not None:
                     self.sector=ActionSector.objects.get(name=sec) 
                 self.save()
+                self.ss_m.resolve()
                 return ust_normal
 
         except ValueError as e:

@@ -4,6 +4,7 @@ from reporting.telegram import start, send_entry_exit_txt, cleaning_sub
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, ListOfActions
 from orders.models import Action, exchange_to_index_symbol
+from orders.ib import actualize_ss
 from trading_bot.settings import _settings
 
 from .filter import ReportFilter
@@ -47,9 +48,8 @@ def start_bot(request):
 
 #For testing purpose
 def daily_report_sub(exchange,**kwargs):
-    report1=Report()
-    report1.save()
-    
+    report1=Report.objects.create()
+
     st=report1.daily_report(exchange=exchange,**kwargs)
     if st is None:
         raise ValueError("The creation of the strategy failed, report creation interrupted, <a href={% url 'reporting:reports' %}>Main page</a>")
@@ -59,8 +59,7 @@ def daily_report_sub(exchange,**kwargs):
     send_order_test(report1)
     
 def daily_report_index_sub(indexes):
-    report3=Report()
-    report3.save()    
+    report3=Report.objects.create()
 
     report3.daily_report(symbols=indexes, it_is_index=True) # "BZ=F" issue
     send_order_test(report3)
@@ -116,6 +115,7 @@ def send_order_test(report):
                 try:
                     ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
                     for a in ent_ex_symbols.actions.all():
+                        #reverse, buy
                         print(send_entry_exit_txt(a.symbol,entry,short, auto))
                 except:
                     pass
@@ -130,6 +130,10 @@ def cleaning(request):
     cleaning_sub()
         
     return HttpResponse("cleaning done")
+
+def actualize_ss_view(request):
+    actualize_ss()
+    return HttpResponse("Stock status actualized")
 
 def test_order(request):
     symbol=""

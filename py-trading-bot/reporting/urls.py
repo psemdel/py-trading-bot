@@ -24,4 +24,5 @@ urlpatterns = [
     path('22h/', views.trigger_22h,name="22h"),
     path('cleaning/', views.cleaning,name="cleaning"),
     path('test_order/', views.test_order,name="test_order"),
+    path('actualize_ss/',views.actualize_ss_view, name="actualize_ss")
     ]

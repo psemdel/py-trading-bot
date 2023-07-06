@@ -27,10 +27,10 @@ else:
 
 from reporting.models import Report, Alert, ListOfActions
 
-from orders.ib import retrieve_ib_pf, get_last_price, get_ratio, exit_order
+from orders.ib import actualize_ss, get_last_price, get_ratio
 from orders.models import Action, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
-                          get_exchange_actions   
+                          get_exchange_actions, action_to_short  
                  
 from core import constants, presel
 
@@ -100,6 +100,7 @@ class MyScheduler():
         self.heartbeat=_settings["HEARTBEAT"] # to test if telegram is working ok
         self.heartbeat_ib=_settings["HEARTBEAT_IB"]
         self.update_slow =_settings["UPDATE_SLOW_STRAT"]
+        self.update_ss=True
         self.cleaning=True
         
         tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
@@ -125,6 +126,8 @@ class MyScheduler():
             self.do_weekday(time(16,2,tzinfo=tz_NY),self.cleaning_f)
         if self.update_slow:
             self.do_weekday(time(10,00,tzinfo=tz_Paris), self.update_slow_strat) #performed away from the opening
+        if self.update_ss:
+            self.manager.every(_settings["TIME_INTERVAL_UPDATE"], 'minutes').do(actualize_ss)
 
         #the "background is created by celery"
         #OOTB vbt start_in_background does not seem to be compatible with django
@@ -138,7 +141,8 @@ class MyScheduler():
                            +"\n 22h " + str(self.report_22h)
                            +"\n heartbeat " + str(self.heartbeat)
                            +"\n heartbeat IB " + str(self.heartbeat_ib)
-                           +"\n cleaning " + str(self.cleaning) 
+                           +"\n cleaning " + str(self.cleaning)
+                           +"\n update stock status " + str(self.update_ss)
                            )   
 
     
@@ -175,8 +179,8 @@ class MyScheduler():
                      ratio: numbers.Number, 
                      action: Action,
                      short: bool,
-                     opening: bool=False,
-                     **kwargs):
+                     opening: bool=False
+                     ):
         '''
         Check if the price variation for a product is within predefined borders
         Create an alert if it is not the case
@@ -263,8 +267,9 @@ class MyScheduler():
 
     def check_cours(self,
                     actions: list, 
-                    short: bool,
-                    **kwargs):
+                    both:bool=False,
+                    opening: str=None,
+                    ):
         '''
         Preliminary steps for verification of the price variation
         Replace the etf through their respective index    
@@ -272,30 +277,38 @@ class MyScheduler():
         Arguments
        	----------
            actions: list of action to be checked for price variation
-           short: if the products are presently in a short direction
         '''
         try:
             for action in actions: #otherwise issue with NaN
-                #check ETF --> better to check the underlying
-                indexes=None
-                if action.category==ActionCategory.objects.get(short="ETFLONG"):
-                    indexes=Action.objects.filter(etf_long=action)
-                elif action.category==ActionCategory.objects.get(short="ETFSHORT"):
-                    indexes=Action.objects.filter(etf_short=action)
-               
-                if indexes is not None and len(indexes)>0:
-                    action=indexes[0]
+                try:
+                    #check ETF --> better to check the underlying
+                        indexes=None
+                        if action.category==ActionCategory.objects.get(short="ETFLONG"):
+                            indexes=Action.objects.filter(etf_long=action)
+                        elif action.category==ActionCategory.objects.get(short="ETFSHORT"):
+                            indexes=Action.objects.filter(etf_short=action)
+                       
+                        if indexes is not None and len(indexes)>0:
+                            action=indexes[0]
+                except Exception as msg:
+                     print("exception in check change ETF")
+                     print(msg)
+                     print(action.symbol)
 
-                ratio=get_ratio(action,**kwargs)
-                self.check_change(ratio, action,short,**kwargs)
+                ratio=get_ratio(action)
+                short=action_to_short(action)
                 
+                self.check_change(ratio, action,short,opening=opening)
+                if both:
+                    self.check_change(ratio, action,not short,opening=opening)
+
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
-            pass   
+            pass           
 
     def check_index(self,
                     opening: str=None,
-                    **kwargs):
+                    ):
         '''
         Check price variation for indexes , so independently from their belonging or not 
         
@@ -311,58 +324,47 @@ class MyScheduler():
                 c=None
                 for exchange in _settings["17h_stock_exchanges"]:
                     c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
-                    if c is None:
-                        c=c1
-                    else:
-                        c=c|c1
+                    c=c|c1
                 indexes = Action.objects.filter(c&c3)
             elif opening=="15h":
                 c=None
                 for exchange in _settings["22h_stock_exchanges"]:
                     c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
-                    if c is None:
-                        c=c1
-                    else:
-                        c=c|c1
+                    c=c|c1
                 indexes = Action.objects.filter(c&c3)
             else:
                 indexes = Action.objects.filter(c3)
 
-            self.check_cours(indexes, False,index=True,**kwargs)
-            self.check_cours(indexes, True,index=True,**kwargs)
+            self.check_cours(indexes, False,both=True, opening=opening)
             
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
-            pass
+            pass        
         
-    def check_pf(self,**kwargs):
+    def check_pf(
+            self,
+            opening: str=None,
+            ):
         '''
         Check price variation for portofolio, so products that we own
+        
+        Arguments
+       	----------
+           opening: test at stock exchange opening (need to compare with the day before then)
         ''' 
         try:
-            actions=pf_retrieve_all(**kwargs)
-            actions_short=pf_retrieve_all(short=True,**kwargs)
-            ib_pf, ib_pf_short=retrieve_ib_pf()
-            
-            if ib_pf is not None:
-                actions.extend(x for x in ib_pf if x not in actions)
-                actions_short.extend(x for x in ib_pf_short if x not in actions_short)
-            
+            actions=pf_retrieve_all(opening=opening)
             if len(actions)>0:
                 self.check_sl(actions)
-                self.check_cours(actions, False,**kwargs)
-        
-            if len(actions_short)>0:
-                self.check_sl(actions_short)
-                self.check_cours(actions_short, True,**kwargs)
+                self.check_cours(actions, False,opening=opening)
                 
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
-            pass
+            pass        
 
     def check_sl(self,
                  actions: list,
-                 **kwargs):
+                 ):
         '''
         Check price variation for product that have a stop loss
         Trigger the selling if the limit is reached
@@ -388,12 +390,15 @@ class MyScheduler():
                             if (not o.short and cours_pres<o.sl_threshold) or\
                             (o.short and cours_pres>o.sl_threshold):
                                 
-                                ex, auto=exit_order(action.symbol,
-                                           o.pf.strategy.name, 
-                                           o.pf.stock_ex.name,
-                                           o.short,
-                                           auto,
-                                           **kwargs)
+                                ###To be fixed!!!! ####
+                                print("sl exit")
+                                ex=True
+                                #ex, auto=exit_order(action.symbol,
+                                #           o.pf.strategy.name, 
+                                #           o.pf.stock_ex.name,
+                                #           o.short,
+                                #           auto,
+                                #           )
                                 if ex:
                                     self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="stop loss") 
                         
@@ -403,12 +408,15 @@ class MyScheduler():
                             if (not o.short and ratio<-o.daily_sl_threshold*100) or\
                             (o.short and ratio>o.daily_sl_threshold*100):
     
-                                ex, auto=exit_order(action.symbol,
-                                           o.pf.strategy.name, 
-                                           o.pf.stock_ex.name,
-                                           o.short,
-                                           auto,
-                                           **kwargs)
+                                ###To be fixed!!!! ####
+                                print("sl exit")
+                                ex=True
+                                #ex, auto=exit_order(action.symbol,
+                                #           o.pf.strategy.name, 
+                                #           o.pf.stock_ex.name,
+                                #           o.short,
+                                #           auto,
+                                #           )
                                 if ex:
                                     self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="daily stop loss")                        
            
@@ -422,13 +430,13 @@ class MyScheduler():
        	----------
            report: report for which the calculation happened
         '''   
-        for auto in [False, True]:
+        for api_used in ["YF", "IB"]:
             for entry in [False, True]:
-                for short in [False, True]:
+                for buy in [False, True]:
                     try:
-                        ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
+                        ent_ex_symbols=ListOfActions.objects.get(report=report,api_used=api_used,entry=entry,buy=buy)
                         for a in ent_ex_symbols.actions.all():
-                            self.send_entry_exit_msg(a.symbol,entry,short,auto) 
+                            self.send_entry_exit_msg(a.symbol,None, buy,api_used) 
                         self.telegram_bot.send_message_to_all(ent_ex_symbols.text)
                     except:
                         pass
@@ -495,9 +503,9 @@ class MyScheduler():
 
     def send_entry_exit_msg(self,
                             symbol:str,
-                            entry: bool,
-                            short: bool, 
-                            auto: bool,
+                            reverse: bool,
+                            buy: bool, 
+                            api_used: str,
                             suffix: str=""
                             ):
         '''
@@ -506,12 +514,12 @@ class MyScheduler():
         Arguments
        	----------
            symbol: YF ticker of the product for which the order was performed
-           entry: was it an entry or an exit
-           short: direction of the order
+           reverse: was the order a reversion (from short to long or the other way around)
+           buy: was the order a buy order
            auto: was the order automatic or not
            suffix: some text that can be chosen
         '''  
-        self.telegram_bot.send_message_to_all(send_entry_exit_txt(symbol, entry, short, auto, suffix=suffix))
+        self.telegram_bot.send_message_to_all(send_entry_exit_txt(symbol, reverse, buy, api_used, suffix=suffix))
 
     def heartbeat_f(self):
         '''
@@ -540,6 +548,49 @@ class MyScheduler():
                 j.last_execution=today
                 j.save()
        
+def send_entry_exit_txt(
+        symbol: str,
+        reverse: bool,
+        buy: bool, 
+        api_used: str,
+        suffix: str="",
+        )-> str:
+    '''
+    Define the message for the Telegram depending on the arguments
+    
+    Arguments
+   	----------
+       symbol: YF ticker of the product for which the order was performed
+       reverse: was the order a reversion (from short to long or the other way around)
+       buy: was the order a buy order
+       auto: was the order automatic or not
+       suffix: some text that can be chosen
+    '''  
+    if api_used=="YF":
+        part1=""
+        part2=""
+    else:
+        part1="Manual "
+        part2="requested for "
+    
+    if reverse:
+        part1+="reverse "
+    else:
+        part1+=""
+        
+    if buy:
+        part3=" buy order"
+    else:
+        part3=" sell order"
+        
+    return part1+part2+symbol + " "+ part3+" " +suffix
+
+def cleaning_sub():
+    alerts=Alert.objects.filter(active=True)
+    for alert in alerts:
+        alert.active=False
+        alert.save()
+
 def actualize_job(
         strategy: str, 
         period_year: numbers.Number, 
@@ -556,48 +607,5 @@ def actualize_job(
         actions=actions,
         use_IB=use_IB,
         exchange=exchange) 
-    pr.actualize()
-
-def send_entry_exit_txt(
-                symbol:str,
-                entry: bool,
-                short: bool, 
-                auto: bool,
-                suffix: str="",
-                ) -> str:
-    '''
-    Define the message for the Telegram depending on the arguments
-    
-    Arguments
-   	----------
-       symbol: YF ticker of the product for which the order was performed
-       entry: was it an entry or an exit
-       short: direction of the order
-       auto: was the order automatic or not
-       suffix: some text that can be chosen
-    '''  
-    if auto:
-        part1=""
-        part2=""
-    else:
-        part1="Manual "
-        part2="requested for "
-    
-    if entry:
-        part1+="entry "
-    else:
-        part1+="exit "
-        
-    if short:
-        part3=" short"
-    else:
-        part3=""
-    return part1+part2+symbol + " "+ part3+" " +suffix
-
-def cleaning_sub():
-    alerts=Alert.objects.filter(active=True)
-    for alert in alerts:
-        alert.active=False
-        alert.save()
-    
+    pr.actualize()    
     

@@ -48,6 +48,7 @@ class TestOrders(TestCase):
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
         self.cat2=cat2
         self.strategy=m.Strategy.objects.create(name="none")
+        self.strategy2=m.Strategy.objects.create(name="strat2")
         self.s=m.ActionSector.objects.create(name="undefined")
         
         m.Action.objects.create(
@@ -134,49 +135,63 @@ class TestOrders(TestCase):
         self.assertEqual(len(t),1)     
         
     def test_get_pf(self):
-        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        pf2= m.get_pf("none", "Paris",False)
-        
-        self.assertEqual(pf,pf2)
-        #test auto creation
-        pf3= m.get_pf("none", "XETRA",False)
-        m.PF.objects.get(short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
-        
-    def test_pf_retrieve(self):
-        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        self.assertEqual(pf.retrieve(),[])      
-        pf.actions.add(self.a)
-        self.assertEqual(pf.retrieve(),[self.a.symbol])        
-        
-    def test_pf_retrieve_all(self):
-        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        pf.append(self.a.symbol)
-        pf2=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e2,sector=self.s)
-        pf2.append(self.a3.symbol)
-        self.assertEqual(m.pf_retrieve_all(),[self.a, self.a3])      
+        ss1=m.StockStatus.objects.get(action=self.a)
+        ss1.quantity=1
+        ss1.strategy=self.strategy
+        ss1.save()
 
-    def test_pf_append(self):
-        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        pf.append(self.a.symbol)
+        ss2=m.StockStatus.objects.get(action=self.a2)
+        ss2.quantity=1
+        ss2.strategy=self.strategy2
+        ss2.save()
         
-        self.assertEqual(pf.retrieve(),[self.a.symbol])  
+        r=m.get_pf("none","Paris",False)
+        self.assertEqual(r,["AI.PA"])
         
-        pf.append(self.a2)
+        r=m.get_pf("strat2","Paris",False)
+        self.assertEqual(r,["AIR.PA"])
+
+        r=m.get_pf("strat2","Paris",True)
+        self.assertEqual(r,[])
         
-        self.assertEqual(pf.retrieve(),[self.a2.symbol,self.a.symbol])  
+        r=m.get_pf("strat2","XETRA",False)
+        self.assertEqual(r,[])
         
-    def test_pf_remove(self):
-        pf=m.PF.objects.create(short=False,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        pf.append(self.a.symbol)
-        pf.remove(self.a.symbol)
+        ss1=m.StockStatus.objects.get(action=self.a)
+        ss1.quantity=-1
+        ss1.strategy=self.strategy
+        ss1.save()
         
-        self.assertEqual(pf.retrieve(),[])          
+        r=m.get_pf("none","Paris",False)
+        self.assertEqual(r,[])
+        r=m.get_pf("none","Paris",True)
+        self.assertEqual(r,["AI.PA"])
+
+    def test_pf_retrieve_all(self):
+        ss1=m.StockStatus.objects.get(action=self.a)
+        ss1.quantity=1
+        ss1.save()
         
-    def test_get_order_capital(self):
-        ocap=m.OrderCapital.objects.create(capital=1,strategy=self.strategy,stock_ex=self.e,sector=self.s)
-        ocap2=m.get_order_capital("none","Paris")
+        ss2=m.StockStatus.objects.get(action=self.a3)
+        ss2.quantity=-1
+        ss2.save()
         
-        self.assertEqual(ocap,ocap2)
+        self.assertTrue(self.a in m.pf_retrieve_all())
+        self.assertFalse(self.a2 in m.pf_retrieve_all())
+        self.assertTrue(self.a3 in m.pf_retrieve_all())
+        
+    def test_pf_retrieve_all_symbols(self):
+        ss1=m.StockStatus.objects.get(action=self.a)
+        ss1.quantity=1
+        ss1.save()
+        
+        ss2=m.StockStatus.objects.get(action=self.a3)
+        ss2.quantity=-1
+        ss2.save()
+
+        self.assertTrue(self.a.symbol in m.pf_retrieve_all_symbols())
+        self.assertFalse(self.a2.symbol in m.pf_retrieve_all_symbols())
+        self.assertTrue(self.a3.symbol in m.pf_retrieve_all_symbols())
         
     def test_filter_intro_action(self):
         res=m.filter_intro_action([self.a2],5)

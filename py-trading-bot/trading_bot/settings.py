@@ -32,6 +32,7 @@ _settings={
 "ALERT_HYST":1, #margin to avoid alert/recovery at high frequency
 
 "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
+"TIME_INTERVAL_UPDATE":60,
 
 ## Order settings ##
 "USED API_FOR_DATA":{
@@ -42,10 +43,6 @@ _settings={
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
 "PERFORM_ORDER":True, #test or use IB to perform orders
-"BYPASS_ORDERCAPITAL_IF_IB":False, #bypass the restriction linked to order capital if using IB. with other words, 
-#if there is enough money on your account, the order will be performed, 
-#without considering how many orders/strategy you want to perform
-"ORDER_SIZE":15000, 
 ## Configuration of the strategies ##
 "DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
 "RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
@@ -176,7 +173,7 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb'),
+        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb2023'),
         'USER': DB_USER,
         'PASSWORD': DB_SECRET_KEY,
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),

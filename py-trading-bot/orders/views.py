@@ -1,10 +1,10 @@
 from django.shortcuts import render
-from orders.models import PF, Order, OrderCapital, StratCandidates
+from orders.models import Order, StratCandidates
 from orders.form import ManualOrderForm
 from django.db.models import Q
 from django.http import HttpResponse
 # Create your views here.
-
+'''
 def pf_view(request):
     form=ManualOrderForm(request.POST or None)
     
@@ -110,3 +110,4 @@ def closing(action,pf, c3, c5, c6, c7, oc):
     o.active=False
     o.save()
     return o
+'''

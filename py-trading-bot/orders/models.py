@@ -1,8 +1,9 @@
 import numbers
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, signals
 
 from trading_bot.settings import _settings
+
 import datetime
 import logging
 logger = logging.getLogger(__name__)
@@ -138,8 +139,8 @@ class Action(models.Model):
     name=models.CharField(max_length=100, blank=False)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
-    category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=None)
+    category=models.ForeignKey('ActionCategory',on_delete=models.CASCADE,blank=True, null=True)
+    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,null=True)
     delisted=models.BooleanField(blank=False,default=False)
     etf_long=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_long2',blank=True,null=True)
     etf_short=models.ForeignKey('self',on_delete=models.CASCADE,related_name='etf_short2',blank=True,null=True)
@@ -149,6 +150,14 @@ class Action(models.Model):
     
     class Meta:
         ordering = ["name"]
+        
+    def save(self, *args, **kwargs):
+        is_new=False
+        if "id" not in self.__dir__():
+            is_new = True
+        super().save(*args, **kwargs)  
+        if is_new:
+            StockStatus.objects.create(action=self)        
         
     def ib_ticker(self):
         if self.ib_ticker_explicit!="AAA" and self.ib_ticker_explicit is not None:
@@ -185,7 +194,31 @@ def filter_intro_sub(
         if a.delisting_date<limit_date :
            return False
     return True
-  
+
+class StockStatus(models.Model):
+    '''
+    Complement action, separated from action as Action contains the essence of the action, here it is some that the user can change
+    '''
+    action = models.OneToOneField(
+        Action,
+        on_delete=models.CASCADE,
+        primary_key=True,
+    )
+    quantity=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True,default=0) #no need for short as quantity can be negative
+    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
+    order_in_ib=models.BooleanField(blank=False,default=True)
+
+    class Meta:
+        ordering = ["action__name"]
+        
+    def __str__(self):
+        return self.action.name    
+    
+def action_to_short(action):
+    a=Action.objects.get(action=action)
+    ss = StockStatus.objects.get(action=a)
+    return ss.quantity<0  
+
 def filter_intro_action(
         input_actions: list,
         y_period: numbers.Number
@@ -281,6 +314,11 @@ class Strategy(models.Model):
     '''
     name=models.CharField(max_length=100, blank=False)
     perform_order=models.BooleanField(blank=False,default=False)
+    priority=models.IntegerField(null=False, blank=False, default=1000)
+    order_size=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
+    maximum_money_engaged=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
+    sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as price
+    daily_sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as pu
     
     class Meta:
         ordering = ["name"]
@@ -306,11 +344,10 @@ class StockEx(models.Model):
     
     def __str__(self):
         return self.name 
-    
 
 class Order(models.Model):
     action=models.ForeignKey('Action',on_delete=models.CASCADE)
-    pf=models.ForeignKey('PF',on_delete=models.SET_NULL,blank=True,null=True)
+    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True, null=True)
     active=models.BooleanField(blank=False,default=True)
     short=models.BooleanField(blank=False,default=False)
     entering_date=models.DateTimeField(null=False, blank=False, auto_now_add=True)#default=timezone.now())
@@ -326,106 +363,80 @@ class Order(models.Model):
     def __str__(self):
         return self.action.name + " "+ str(self.entering_date)
 
-def pf_retrieve_all(**kwargs)-> list:
+def pf_retrieve_all(
+        opening: str=None,
+        )-> list:
+    """
+    Retrieve all stocks owned in long or short direction from the action status
+    
+    Arguments
+   	----------
+       opening: test at stock exchange opening (need to compare with the day before then)
+    """
+    c0=~Q(stockstatus__quantity=0)
+
+    if opening=="9h":
+        stockEx1=StockEx.objects.filter(name="Paris")
+        stockEx2=StockEx.objects.filter(name="XETRA")
+        c2 = Q(stock_ex=stockEx1[0])
+        c3 = Q(stock_ex=stockEx2[0])
+        actions=Action.objects.filter(c0&(c2|c3))#c1 &
+    elif opening=="15h":
+        stockEx1=StockEx.objects.filter(name="Nasdaq")
+        stockEx2=StockEx.objects.filter(name="NYSE")
+        c2 = Q(stock_ex=stockEx1[0])
+        c3 = Q(stock_ex=stockEx2[0])
+        actions=Action.objects.filter(c0&(c2|c3)) #c1 &
+    else:
+        actions=Action.objects.filter(c0) #filter(c1)
+
+    return list(set(actions)) #unique
+
+def pf_retrieve_all_symbols(opening: str=None,
+    )-> list:
+    """
+    Retrieve all stocks symbols owned in long or short direction from the action status
+    
+    Arguments
+    ----------
+       opening: test at stock exchange opening (need to compare with the day before then)
+    """
+    p=pf_retrieve_all(opening=opening)
+    return [action.symbol for action in p]
+  
+def get_pf(
+        strategy: str,
+        exchange:str,
+        short:bool,
+        ):
     '''
-    Retrieve a list of all products presently owned
+    To get a list of the stocks presently using a strategy for an exchange
+    
+    Arguments
+    ----------
+        strategy: name of the strategy
+        exchange: name of the stock exchange
+        short: if the products are presently in a short direction
     '''
-    a=[]
-    for pf in PF.objects.filter(short=kwargs.get("short",False)):
-        if kwargs.get("opening")=="9h":
-            stockEx1=StockEx.objects.filter(name="Paris")
-            stockEx2=StockEx.objects.filter(name="XETRA")
-            c2 = Q(stock_ex=stockEx1[0])
-            c3 = Q(stock_ex=stockEx2[0])
-            actions=pf.actions.filter((c2|c3))#c1 &
-        elif kwargs.get("opening")=="15h":
-            stockEx1=StockEx.objects.filter(name="Nasdaq")
-            stockEx2=StockEx.objects.filter(name="NYSE")
-            c2 = Q(stock_ex=stockEx1[0])
-            c3 = Q(stock_ex=stockEx2[0])
-            actions=pf.actions.filter( (c2|c3)) #c1 &
-        else:
-            actions=pf.actions.all() #filter(c1)
-        a+=actions
-
-    return list(set(a)) #unique
-
-### Portfolio for a given strategy (used as name presently)
-class PF(models.Model):
-    # can be replaced with ib.positions() or ib.portfolio()
-    actions=models.ManyToManyField(Action,blank=True)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
-    short=models.BooleanField(blank=False,default=False)
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=0)
-    
-    class Meta:
-        ordering = ["strategy","stock_ex"]
-    
-    def get_len(self):
-        return len(self.actions.all())
-    
-    def retrieve(self):
-        return [action.symbol for action in self.actions.all()]
-
-    def remove(self,symbol):
-        try:
-            a=symbol_to_action(symbol)
-            self.actions.remove(a)
-            self.save()
-        except Exception as e:
-            logger.error(e + " symbol: " + symbol, stack_info=True, exc_info=True)          
-            pass
-
-    def append(self,symbol):
-        try:
-            if type(symbol)==str:
-                a = Action.objects.get(symbol=symbol)
-            else: #assumed action
-                a=symbol
-            self.actions.add(a)
-            self.save()
-        except Exception as e:
-            logger.error(e + " symbol: "+symbol, stack_info=True, exc_info=True)
-            pass
+    try:
+        stockEx1=StockEx.objects.get(name=exchange)
+        c1=Q(stock_ex=stockEx1)
+        st1=Strategy.objects.get(name=strategy)
+        c2=Q(stockstatus__strategy=st1)
         
-    def __str__(self):
-        t=self.strategy.name + "_" + self.stock_ex.name
-        if self.short:
-            t+="_short"
-        if self.sector.name!="undefined":
-            t+=("_" +self.sector.name)
-        return t
+        if short:
+            c0=Q(stockstatus__quantity__lt=0)
+        else:
+            c0=Q(stockstatus__quantity__gt=0)
 
-def get_sub(strategy, exchange,short,**kwargs): #check the input
-    if type(strategy)!=str or type(exchange)!=str:
-        raise ValueError("get sub got non str input, strategy: "+str(strategy)+ " "+str(type(strategy)) + \
-                         ", exchange: "+str(exchange) + " " + str(type(exchange)))
+        actions=Action.objects.filter(c0&c1&c2)
+        return [action.symbol for action in actions] 
 
-    try:
-        stock_ex=StockEx.objects.get(name=exchange) 
-    except:
-        raise ValueError("Stock exchange: "+str(exchange)+" not found, create it in the admin panel")
-
-    sector="undefined"
-    if stock_ex.presel_at_sector_level:
-        if kwargs.get("sec"):
-            sector=kwargs.get("sec")
-            
-    return sector
-
-def get_pf(strategy, exchange,short,**kwargs):
-    try:
-        sector=get_sub(strategy, exchange,short,**kwargs)
-        res, _ = PF.objects.get_or_create(
-                stock_ex=StockEx.objects.get(name=exchange),
-                strategy=Strategy.objects.get(name=strategy),
-                short=short,
-                sector=ActionSector.objects.get(name=sector),
-                )
-
-        return res
     except Exception as e:
+        import sys
+        _, e_, exc_tb = sys.exc_info()
+        print(e)
+        print("line " + str(exc_tb.tb_lineno))  
         logger.error(strategy)
         logger.error(e, stack_info=True, exc_info=True)
 
@@ -451,40 +462,6 @@ class ActionSector(models.Model):
         
     def __str__(self):
         return self.name     
-    
-###To define the number of orders assigned to one strategy
-###1 means that only one action can be owned at a time using this strategy
-
-class OrderCapital(models.Model):
-    capital=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
-    sector=models.ForeignKey('ActionSector',on_delete=models.CASCADE,blank=True,default=0)
-
-    class Meta:
-        ordering = ["strategy","stock_ex"]
-        
-    def __str__(self):
-        t=self.strategy.name + "_" + self.stock_ex.name
-        if self.sector.name!="undefined":
-            t+=("_" +self.sector.name)
-        return t
-
-def get_order_capital(strategy, exchange,**kwargs):
-    try:
-        sector=get_sub(strategy, exchange,False,**kwargs)
-        res, created = OrderCapital.objects.get_or_create(
-            stock_ex=StockEx.objects.get(name=exchange),
-            strategy=Strategy.objects.get(name=strategy),
-            sector=ActionSector.objects.get(name=sector),
-            )
-        
-        if created or res.capital is None:
-            res.capital=0
-        
-        return res
-    except Exception as e:
-        logger.error(e, stack_info=True, exc_info=True)           
 
 class Candidates(models.Model):
     '''
@@ -492,8 +469,8 @@ class Candidates(models.Model):
     And on daily basis the other strategy decides which of the candidate is really bought or sold
     '''
     actions=models.ManyToManyField(Action,blank=True)    
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=1)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
+    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
+    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,null=True)
     
     def reset(self):
         for a in self.actions.all():
@@ -524,7 +501,7 @@ class Excluded(models.Model):
     ''' 
     name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)   
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True)
+    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
     
     def reset(self):
         for a in self.actions.all():
@@ -556,7 +533,7 @@ class StratCandidates(models.Model):
     Define a list of actions and indexes that can be traded using the defined strategy
     '''
     actions=models.ManyToManyField(Action,blank=True)    
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
+    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
     
     def retrieve(self):
         return [action.symbol for action in self.actions.all()]
@@ -565,8 +542,8 @@ class StratCandidates(models.Model):
         return self.strategy.name   
     
 class Job(models.Model):
-    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,default=0)
-    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,default=2)
+    strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
+    stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,null=True)
     
     last_execution=models.DateTimeField(null=False, blank=False, auto_now_add=True)
     frequency_days=models.IntegerField(null=False, blank=False, default=14)
