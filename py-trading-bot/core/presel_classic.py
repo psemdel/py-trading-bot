@@ -25,8 +25,10 @@ or once a year) and periodic strategies. For strategies that are already "fast" 
 "one action" strategy is implemented.
 
 This file is for backtesting.
-"""
 
+As those strategies are very slow, there is no automatic implementation. I would recommend to perform the calculation once and set the 
+actions in StratCandidates / normal (in the admin panel)
+"""
 @njit
 def signal_to_size(entries,exits, entries_short, exits_short, idx_arr):
     idx=0

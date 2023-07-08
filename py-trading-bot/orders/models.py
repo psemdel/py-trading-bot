@@ -23,6 +23,11 @@ for tz in zoneinfo.available_timezones():
     all_tz.append((tz,tz))
 all_tz=sorted(all_tz)  
 
+'''
+This file contains the models for the orders
+
+The logic to perform them in the different platforms is in ib.py
+'''
 def check_ib_permission(symbols: list):
     '''
     Check if IB can be used

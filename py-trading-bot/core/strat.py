@@ -14,7 +14,7 @@ from core.common import save_vbt_both, remove_multi
 import core.indicators as ic
 from core.macro import VBTMACROFILTER, VBTMACROMODE, VBTMACROTREND, VBTMACROTRENDPRD, major_int
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
-from core.data_manager import retrieve
+from core.data_manager import retrieve_data_offline #don't load here retrieve_data_online, otherwise backtesting with Django off won't work
 import inspect
 import pandas as pd
 
@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 Strategies on one action, no preselection
 
 So it determines entries and exits for one action to optimize the return
+
+Some of the strategies have been optimized to work with a preselection (see presel.py), for instance StratDiv.
 """
 def defi_i_fast_sub(
         all_t: list,
@@ -396,7 +398,7 @@ class UnderlyingStrat():
                     if self.symbol_index is None:
                         raise ValueError("symbol_index is none for ust")
                         
-                    retrieve(self,self.symbol_index,self.period)
+                    retrieve_data_offline(self,self.symbol_index,self.period)
             
                     if it_is_index:
                         for k in ["close","open","low","high"]:
@@ -405,14 +407,14 @@ class UnderlyingStrat():
                         self.symbols_simple=self.close.columns.values
                 else:
                     from orders.models import Action
-                    from orders.ib import retrieve_data
+                    from core.data_manager_online import retrieve_data_online
                     if self.api_used is None:
                         raise ValueError("api_used should not be none for Strat in production")
                     if self.actions is None:
                         if self.symbols is None:
                             raise ValueError("StratPRD, no symbols provided")
                         self.actions=[Action.objects.get(symbol=symbol) for symbol in self.symbols]
-                    self.api_used, self.symbols=retrieve_data(self,self.actions,period,self.api_used,it_is_index=it_is_index)  #the symbols as output are then the YF symbols
+                    self.api_used, self.symbols=retrieve_data_online(self,self.actions,period,self.api_used,it_is_index=it_is_index)  #the symbols as output are then the YF symbols
                     for s in self.symbols:
                         self.symbols_to_YF[s]=s
                     

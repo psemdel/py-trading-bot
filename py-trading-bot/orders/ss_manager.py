@@ -19,6 +19,9 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
+'''
+This file contains StockStatusManager, see description below
+'''
 class StockStatusManager():
     def __init__(self, report, testing:bool=False):
         """

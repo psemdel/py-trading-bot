@@ -6,17 +6,16 @@ Created on Sun Jan  9 13:09:58 2022
 @author: maxime
 """
 import numbers
-import math
 from datetime import datetime
 from core.constants import INTRO, DELIST
 import pandas as pd
 
-from core.data_manager import retrieve
+from core.data_manager import retrieve_data_offline
 
 class VBTfunc():
     def __init__(self,symbol_index: str,period: numbers.Number):
         '''
-        Parent class for all preselection and underlying strategy
+        Parent class for all preselections and underlying strategies
 
         Arguments
         ----------
@@ -25,17 +24,7 @@ class VBTfunc():
         '''
         self.period=period
         self.symbol_index=symbol_index
-        retrieve(self,symbol_index,period)
-    
-
-    def rel_dif(self,n: numbers.Number,d: numbers.Number):
-        '''
-        Perform a division
-        '''
-        if d==0 or math.isnan(n) or math.isnan(d):
-            return 0
-        else:
-            return round(n/d-1,4) 
+        retrieve_data_offline(self,symbol_index,period)
 
 def filter_intro_symbol_sub(s: str,y_period: numbers.Number)-> bool:
     '''

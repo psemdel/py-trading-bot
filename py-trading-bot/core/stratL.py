@@ -13,9 +13,8 @@ from core.strat import UnderlyingStrat
 from core.presel import Presel, WQ
 from core import common, constants
 from core.common import copy_attr
+from core.data_manager import retrieve_data_live
 
-
-import numpy as np
 import pandas as pd
 
 class StratLIVE(UnderlyingStrat):
@@ -37,30 +36,9 @@ class StratLIVE(UnderlyingStrat):
             period: period of time in year for which we shall retrieve the data
             symbol_index: main index to be retrieved
         """
-        self.period=period
-        self.symbols=symbols
-        self.symbol_index=symbol_index
-        self.retrieve_live()
-        
-        if it_is_index:
-            for l in ["close","open","high","low","volume","data"]:
-                setattr(self,l,getattr(self,l+"_ind"))
-        
-    def retrieve_live(self):
-        '''
-        To plot the last days for instance
-        Different from retrieve_data in strat as it needs to work outside of Django
-        '''
-        all_symbols=self.symbols+[self.symbol_index]
-        
-        cours=vbt.YFData.fetch(all_symbols, period=self.period,missing_index='drop')
-        self.data=cours.select(self.symbols)
-        self.data_ind=cours.select(self.symbol_index)
-        for l in ["Close","Open","High","Low","Volume"]:
-            setattr(self,l.lower(),self.data.get(l))
-            setattr(self,l.lower()+"_ind",self.data_ind.get(l))
-        
-        print("number of days retrieved: " + str(np.shape(self.close)[0]))
+        for k in ["period","symbols","symbol_index", "it_is_index"]:
+            setattr(self,k,locals()[k])
+        retrieve_data_live(self, symbols, symbol_index, period, it_is_index=it_is_index )
 
 def scan(
         strategy: str,

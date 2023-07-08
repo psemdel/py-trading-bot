@@ -39,7 +39,7 @@ from reporting import telegram_sub #actually it is the file from vbt, I have it 
 
 from datetime import time, datetime, timedelta
 '''
-Contains the logic for:
+This file contains the logic for:
  - Telegram bot
  - Sending alert if the market price variation exceeds a certain threshold
  - Triggering the report writting at regular hour

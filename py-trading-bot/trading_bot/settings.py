@@ -36,8 +36,9 @@ _settings={
 
 ## Order settings ##
 "USED API_FOR_DATA":{
-    "alerting":os.environ.get("USED API_FOR_DATA_ALERTING","IB"), #"IB" or "YF"
-    "reporting":os.environ.get("USED API_FOR_DATA_REPORTING","YF"), #"IB" or "YF"
+    "orders": os.environ.get("USED API_FOR_ORDER_PERF","IB"), #"IB", "MT5" or "CCTX" (YF does not allow performing orders)
+    "alerting":os.environ.get("USED API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5" or "CCTX"
+    "reporting":os.environ.get("USED API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5" or "CCTX"
     },
     
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],

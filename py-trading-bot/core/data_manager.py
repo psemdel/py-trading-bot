@@ -9,28 +9,38 @@ Created on Sat May 14 21:28:42 2022
 import vectorbtpro as vbt
 import math
 import os
+import numpy as np
 
 if __name__ != '__main__':
     from trading_bot.settings import BASE_DIR
     from core import constants
 
+'''
+This file contains the logic to retrieve data.
+
+To save data, just run this script (see at the bottom). It will generate 2 files: actions.h5 and index.h5. In the first, all prices for the actions is listed, in 
+the second, the price of the main index (Nasdaq 100, Dow jones...) is listed. Their generation simulteneously ensures their alignment.
+The idea behind it, is to determine in some strategies the trend using the index, and adapting the strategy depending on this trend.
+'''
+
+### Offline retrieval ###
 def save_data(
-        symbols: list, 
-        index: str, 
+        symbol_index: str, 
         stock_symbols: list, 
         start_date: str, 
         end_date: str):
     '''
-    Prepare and save data for local usage
+    Prepare and save data to file for local usage
 
     Arguments
     ----------
-       symbols: list of all YF tickers to be downloaded (see comment below for the reason)
-       index: YF ticker of the index
-       action_symbols: list of YF tickers to be downloaded for the stocks
+       symbol_index: YF ticker of the index
+       stock_symbols: list of YF tickers to be downloaded for the stocks
        start_date: start date for the download
        end_date: end date for the download
     '''
+    symbols=stock_symbols+[symbol_index]
+    
     #Everything is downloaded together to use missing_index function
     data=vbt.YFData.fetch(symbols,start=start_date,end=end_date,\
                              timeframe='1d')
@@ -57,8 +67,9 @@ def save_data(
     data_others=data.select(stock_symbols)
     data_others.to_hdf(file_path="actions.h5")
 
-def retrieve(o, 
-             index: str, 
+def retrieve_data_offline(
+             o, 
+             symbol_index: str, 
              period: str):
     '''
     Read local data
@@ -66,26 +77,61 @@ def retrieve(o,
     Arguments
     ----------
        o: object where to put the data
-       index: YF ticker of the index
+       symbol_index: YF ticker of the index
        period: period in which we want to have the data
-
     '''
-    if index=="CAC40":
+    if symbol_index=="CAC40":
         ind_sym="FCHI"
-    elif index=="DAX":
+    elif symbol_index=="DAX":
         ind_sym="GDAXI"
-    elif index=="NASDAQ":
+    elif symbol_index=="NASDAQ":
         ind_sym="IXIC"
-    elif index=="Brent":
+    elif symbol_index=="Brent":
         ind_sym="Brent"
     else:
         ind_sym="DJI"
         
-    o.data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+index+'_' + period+'.h5'))
+    o.data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+symbol_index+'_' + period+'.h5'))
     o.data_ind=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+ind_sym+'_' + period+'.h5'))
     for l in ["Close","Open","High","Low","Volume"]:
         setattr(o,l.lower(),o.data.get(l))
         setattr(o,l.lower()+"_ind",o.data_ind.get(l))
+
+### Online retrieval for backtesting purpose, it is downloaded everytime then
+def retrieve_data_live(
+        o,
+        stock_symbols: list,
+        symbol_index: str,
+        period: str,
+        it_is_index: bool=False
+        ):
+    '''
+    To plot the last days for instance
+    Different from retrieve_data in strat as it needs to work outside of Django
+    
+    Arguments
+    ----------
+       o: object where to put the data
+       stock_symbols: list of YF tickers to be downloaded for the stocks
+       symbol_index: YF ticker of the index
+       period: period in which we want to have the data
+       t_is_index: is it indexes that are provided
+    '''
+    symbols=stock_symbols+[symbol_index]
+    
+    cours=vbt.YFData.fetch(symbols, period=period,missing_index='drop')
+    data=cours.select(symbols)
+    data_ind=cours.select(symbol_index)
+    for l in ["Close","Open","High","Low","Volume"]:
+        setattr(o,l.lower(),data.get(l))
+        setattr(o,l.lower()+"_ind",data_ind.get(l))
+    
+    print("number of days retrieved: " + str(np.shape(o.close)[0]))
+    
+    #If we want to optimize underlying strategies implying the main index
+    if it_is_index:
+        for l in ["close","open","high","low","volume","data"]:
+            setattr(o,l,getattr(o,l+"_ind"))
 
 if __name__ == '__main__':
     '''
@@ -150,6 +196,5 @@ if __name__ == '__main__':
                 new_list.append(s)
         else:
             new_list.append(s)
-                
-    total_symbols=new_list+[index]
-    save_data(total_symbols,index,all_symbols, start_date, end_date)
+
+    save_data(index,new_list, start_date, end_date)
