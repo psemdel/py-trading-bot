@@ -20,6 +20,7 @@ import numpy as np
 from django.test import TestCase
 from orders import models as m
 from core.data_manager_online import retrieve_data_online
+from trading_bot.settings import _settings
 
 class TestDatamanagerOnline(TestCase):
     def setUp(self):
@@ -159,7 +160,8 @@ class TestDatamanagerOnline(TestCase):
         m.Excluded.objects.create(name="all",strategy=self.strategy)
 
     def test_retrieve_YF(self):
-        api_used, symbols=retrieve_data_online(self,self.actions,"1y",api_used="YF") 
+        _settings["USED_API"]["reporting"]="YF"
+        symbols=retrieve_data_online(self,self.actions,"1y") 
                
         self.assertEqual(np.shape(self.close)[1],3)
         self.assertTrue(np.shape(self.close)[0]>200)
@@ -170,7 +172,8 @@ class TestDatamanagerOnline(TestCase):
     @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", \
     reason="This test requires a running instance of IB running in parallel, which is impossible in Travis")
     def test_retrieve_ib(self):
-        api_used, symbols=retrieve_data_online(self,self.actions,"1y",api_used="IB") 
+        _settings["USED_API"]["reporting"]="IB"
+        symbols=retrieve_data_online(self,self.actions,"1y") 
             
         self.assertEqual(np.shape(self.close)[1],3)
         self.assertTrue(np.shape(self.close)[0]>200)

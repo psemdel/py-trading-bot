@@ -84,6 +84,11 @@ _settings={
 ## IB configuration
 "IB_LOCALHOST":'127.0.0.1',
 "IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
+
+"CCXT_EXCHANGE":"ace",
+"MT5_HOST":os.environ.get("MT5_HOST",0),
+"MT5_PORT":os.environ.get("MT5_PORT",0),
+"TD_API_KEY":os.environ.get("TD_API_KEY","YOUR_KEY")
 }
 
 ### For other API ###

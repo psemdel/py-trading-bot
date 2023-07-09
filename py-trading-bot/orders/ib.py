@@ -24,6 +24,15 @@ try:
 except ImportError:
     mt5 = tp.Any
 
+try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
+    from ccxt.base.exchange import Exchange as CCXTExchangeT
+except ImportError:
+    CCXTExchangeT = tp.Any
+    
+###TS???
+
 import vectorbtpro as vbt
 import numpy as np
 import pandas as pd
@@ -40,303 +49,33 @@ ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
 ib_global={"connected":False, "client":None}
 
 '''
-This file contains the interfaces to IB, YF, MT5 and CCTX. For instance to perform orders or retrieve data.
+This file contains the interfaces to IB, YF, MT5, TS and CCXT. For instance to perform orders or retrieve data.
 
 Aditionnally the class OrderPerformer handles the Django part of the order performance.
 '''
-
-#decorators
-#To connect the different API/client
-def connect_ib(func):
-    def wrapper(*args,**kwargs):
-        kwargs['client'] = IBData.resolve_client(None)
-        return func(*args,**kwargs)
-    return wrapper
-'''
-def connect_ts(func):
-    # Decorator for connecting to TradeStation before executing a function
-    # Implementation specific to TradeStation API connection
-    # Example implementation:
-    def wrapper(self, *args, **kwargs):
-        self.connect()
-        return func(self, *args, **kwargs)
-    return wrapper
-
-def get_last_price_mt5(self, contract):
-    tick = mt5.symbol_info_tick(contract.name)
-    return tick.bid if tick.bid != 0 else tick.last
-
-def connect_mt5(func):
-    def wrapper(self, *args, **kwargs):
-        self.connect()
-        return func(self, *args, **kwargs)
-    return wrapper
-
-@connect_mt5
-def mt5_place(self, buy, action, short, **kwargs):
-    symbol = kwargs.get('symbol')
-    # Place market order using MT5 API
-    if buy:
-        # Place buy order
-        if short:
-            # Place short buy order
-            request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": 0.01,  # Specify the desired volume for the trade
-                "type": mt5.ORDER_TYPE_SELL,
-                "deviation": 10,  # Specify the deviation value
-                "magic": 12345,  # Specify the magic number for the order
-                "comment": "Short Buy Order"  # Specify a comment for the order
-            }
-        else:
-            # Place long buy order
-            request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": 0.01,  # Specify the desired volume for the trade
-                "type": mt5.ORDER_TYPE_BUY,
-                "deviation": 10,  # Specify the deviation value
-                "magic": 12345,  # Specify the magic number for the order
-                "comment": "Long Buy Order"  # Specify a comment for the order
-            }
-    else:
-        # Place sell order
-        if short:
-            # Place short sell order
-            request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": 0.01,  # Specify the desired volume for the trade
-                "type": mt5.ORDER_TYPE_BUY,
-                "deviation": 10,  # Specify the deviation value
-                "magic": 12345,  # Specify the magic number for the order
-                "comment": "Short Sell Order"  # Specify a comment for the order
-            }
-        else:
-            # Place long sell order
-            request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": 0.01,  # Specify the desired volume for the trade
-                "type": mt5.ORDER_TYPE_SELL,
-                "deviation": 10,  # Specify the deviation value
-                "magic": 12345,  # Specify the magic number for the order
-                "comment": "Long Sell Order"  # Specify a comment for the order
-            }
-
-    result = mt5.order_send(request)
-    if result.retcode != mt5.TRADE_RETCODE_DONE:
-        raise ValueError(f"Failed to send trade order: {result.comment}")
-
-    return result.order
-
-def get_tradable_contract_mt5(
-        self, 
-        action, 
-        short, 
-        symbol:list=None,
-        **kwargs):
-    # Assuming the symbol and other required parameters are provided
-    if action == 'buy':
-        trade_action = mt5.TRADE_ACTION_DEAL
-    elif action == 'sell':
-        trade_action = mt5.TRADE_ACTION_DEAL
-    else:
-        raise ValueError(f"Invalid action: {action}")
-
-    if short:
-        trade_type = mt5.ORDER_TYPE_SELL
-    else:
-        trade_type = mt5.ORDER_TYPE_BUY
-
-    request = {
-        "action": trade_action,
-        "symbol": symbol,
-        "volume": 0.01,  # Specify the desired volume for the trade
-        "type": trade_type,
-        "deviation": 10,  # Specify the deviation value
-        "magic": 12345,  # Specify the magic number for the order
-        "comment": "Trade order"  # Specify a comment for the order
-    }
-
-    result = mt5.order_send(request)
-    if result.retcode != mt5.TRADE_RETCODE_DONE:
-        raise ValueError(f"Failed to send trade order: {result.comment}")
-
-    return result.order
-
-
-def retrieve_quantity_mt5(self, in_action, **kwargs):
-    symbol = kwargs.get('symbol')
-    # Assuming the symbol and other required parameters are provided
-    if in_action == 'buy':
-        position_type = mt5.POSITION_TYPE_BUY
-    elif in_action == 'sell':
-        position_type = mt5.POSITION_TYPE_SELL
-    else:
-        raise ValueError(f"Invalid action: {in_action}")
-
-    # Get the positions for the specified symbol
-    positions = mt5.positions_get(symbol=symbol)
-    if not positions:
-        return 0
-
-    # Filter positions based on the specified action
-    filtered_positions = [p for p in positions if p.type == position_type]
-
-    # Calculate the total quantity for the filtered positions
-    total_quantity = sum(p.volume for p in filtered_positions)
-
-    return total_quantity
-
-def retrieve_mt5_pf(self, **kwargs):
-    # Get the current positions from the MetaTrader 5 API
-    positions = mt5.positions_get()
-
-    long_positions = []
-    short_positions = []
-
-    for position in positions:
-        if position.volume > 0:
-            # Long position
-            long_positions.append({
-                'symbol': position.symbol,
-                'volume': position.volume,
-                'entry_price': position.price_open,
-                'current_price': position.price_current
-            })
-        elif position.volume < 0:
-            # Short position
-            short_positions.append({
-                'symbol': position.symbol,
-                'volume': abs(position.volume),
-                'entry_price': position.price_open,
-                'current_price': position.price_current
-            })
-
-    return long_positions, short_positions
-
-
-def mt5_check_enough_cash(self, order_size, **kwargs):
-    # Get the account information from the MetaTrader 5 API
-    account_info = mt5.account_info()
-
-    # Check if the account has enough cash balance to cover the order size
-    if account_info.balance >= order_size:
-        return True
-    else:
-        return False
-
-def mt5_cash_balance(self, currency=None, **kwargs):
-    # Get the account information from the MetaTrader 5 API
-    account_info = mt5.account_info()
-
-    # If currency is not specified, return the account balance in the account's base currency
-    if currency is None:
-        return account_info.balance
-
-    # Get the balance for the specified currency
-    currency_balance = None
-    for balance in account_info.balances:
-        if balance.currency == currency:
-            currency_balance = balance.amount
-            break
-
-    return currency_balance
-
-def mt5_get_ratio(self, action, symbol, exchange=None, index=None):
-    # Get the current price using the mt5.symbol_info_tick() function
-    tick = mt5.symbol_info_tick(symbol)
-    if tick is None:
-        return None
-
-    # Calculate the ratio based on the action (Buy or Sell)
-    if action == 'Buy':
-        current_price = tick.ask
-    elif action == 'Sell':
-        current_price = tick.bid
-    else:
-        return None
-
-    # Get the reference price based on the provided exchange and index
-    reference_price = None
-    if exchange and index:
-        # Retrieve the reference price using the mt5.copy_rates_from() function
-        rates = mt5.copy_rates_from(symbol, mt5.TIMEFRAME_D1, self.start_date, self.end_date)
-        if rates is None or len(rates) == 0:
-            return None
-
-        # Find the reference price based on the index
-        for rate in rates:
-            if rate.time == index:
-                reference_price = rate.close
-                break
-
-    # Calculate the ratio as a percentage
-    if reference_price is not None:
-        ratio = (current_price / reference_price) * 100.0
-        return ratio
-
-    return None
-'''
-@connect_ib
-def get_tradable_contract_ib(action,short,**kwargs):
-    if action.ib_ticker()=="AAA":
-        logger.info("stock "+action.ib_ticker() + " not found")
-        return None
-    else:
-        if action.stock_ex.ib_auth:
-            action=action_to_etf(action,short) #if index replace the index through the corresponding ETF
-            return IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,False)
-        else:
-            logger.info("stock "+action.ib_ticker() + " not in authorized stock exchange")
-            return None
-
-@connect_ib
-def retrieve_quantity(action: Action, **kwargs):
+###General functions that will route to the used API
+def retrieve_quantity(action: Action):
     """
-    Call ib and get the size of present position owned for a product
+    Get the size of present position owned for a product
 
+    Note: assuming check permission already took place
+    
     Arguments
     ----------
     action: stock to be checked
     """  
-    if kwargs['client'] and ib_global["connected"]:
-        for pos in kwargs['client'].positions():
-            contract=pos.contract
-            if action.ib_ticker()==contract.localSymbol:
-                return abs(pos.position), np.sign(pos.position), pos.position>0
-    return 0, 0, False   
+    if _settings["USED_API"]["orders"]=="IB":
+        return retrieve_quantity_ib(action)
+    elif _settings["USED_API"]["orders"]=="CCXT":
+        ccxtData=CCXTDataExt()
+        return ccxtData.retrieve_quantity(action.symbol)
+    elif _settings["USED_API"]["orders"]=="MT5":
+        mt5Data=Mt5Data()
+        return mt5Data.retrieve_quantity(action.symbol)
+    elif _settings["USED_API"]["orders"] =="TS":        
+        tradeStationData=TradeStationData()
+        return tradeStationData.retrieve_quantity(action.symbol)
 
-@connect_ib
-def actualize_ss(**kwargs):
-    """
-    Synchronize ib and our bot, to know which stocks are owned (+direction)     
-    """      
-    if kwargs['client'] and ib_global["connected"]:
-        print("myIB retrieve")
-        action=None
-
-        for pos in kwargs['client'].positions():
-            contract=pos.contract
-            actions=Action.objects.filter(symbol__contains=contract.localSymbol)
-            if len(actions)==0:
-                action=None
-            elif len(actions)==1:
-                action=actions[0]
-            else:
-                for a in actions:
-                    if a.ib_ticker()==contract.localSymbol:
-                        action=a
-                        
-            if action is not None: 
-                present_ss=StockStatus.objects.get(action=action)
-                present_ss.quantity=pos.position
-                present_ss.order_in_ib=True
-                present_ss.save()
-
-@connect_ib   
 def check_enough_cash(order_size: numbers.Number,currency:str=None,**kwargs)-> bool:
     """
     Simple check, to determine if we have enough currency to perform an 
@@ -345,7 +84,8 @@ def check_enough_cash(order_size: numbers.Number,currency:str=None,**kwargs)-> b
     ----------
     order_size: Size of the order to be performed
     """ 
-    if cash_balance(currency=currency,**kwargs) is not None and cash_balance(currency=currency,**kwargs)>=order_size:
+    t=cash_balance(currency=currency,**kwargs)
+    if t is not None and t>=order_size:
         return True
     else:
         #fallback, if there is enough EUR, IB will convert
@@ -353,21 +93,46 @@ def check_enough_cash(order_size: numbers.Number,currency:str=None,**kwargs)-> b
             return True
         else:
             return False
-        
-@connect_ib        
+   
 def cash_balance(currency:str="EUR",**kwargs) -> numbers.Number:
     """
     Return the cash balance for a certain currency
+    
+    Note: assuming check permission already took place
+    
+    Arguments
+    ----------
+    currency: symbol of the currency to be checked
     """ 
-    if kwargs['client'] and ib_global["connected"]:
-        for v in kwargs['client'].accountValues():
-            if v.tag == 'CashBalance' and v.currency==currency:
-                return float(v.value)
-    else:
-        return 0
-
+    if _settings["USED_API"]["orders"]=="IB":
+        return cash_balance_ib(currency)
+    elif _settings["USED_API"]["orders"]=="CCXT":
+        ccxtData=CCXTDataExt()
+        return ccxtData.cash_balance(currency)
+    elif _settings["USED_API"]["orders"]=="MT5":
+        mt5Data=Mt5Data()
+        return mt5Data.cash_balance(currency)
+    elif _settings["USED_API"]["alerting"] =="TS":
+        tradeStationData=TradeStationData()
+        return tradeStationData.cash_balance(currency)
+        
+def actualize_ss():
+    '''
+    Synchronize ib and our bot, to know which stocks are owned (+direction)     
+    '''
+    if _settings["USED_API"]["alerting"]=="IB":
+        actualize_ss_ib()
+    elif _settings["USED_API"]["alerting"]=="CCXT":
+        ccxtData=CCXTDataExt()
+        ccxtData.actualize_ss_ib()
+    elif _settings["USED_API"]["alerting"]=="MT5": 
+        mt5Data=Mt5Data()
+        mt5Data.actualize_ss()
+    elif _settings["USED_API"]["alerting"] =="TS": 
+        tradeStationData=TradeStationData()
+        tradeStationData.actualize_ss()
+            
 #for SL check
-@connect_ib
 def get_last_price(
         action:Action,
         **kwargs):
@@ -380,19 +145,24 @@ def get_last_price(
     """     
     try:
         check_ib_permission([action.symbol]) 
+        cours_pres=0
         
-        if _settings["USED_API"]["alerting"] in ["IB","CCXT","MT5","TS"]:
-            print("ok")
-        
-        elif kwargs['client'] and ib_global["connected"] and\
-            (_settings["USED_API"]["alerting"]=="IB" and\
-                               action.stock_ex.ib_auth and\
-                                  action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
+        if _settings["USED_API"]["alerting"] =="CCXT":
+            ccxtData=CCXTDataExt()
+            cours_pres=ccxtData.get_last_price(action)
+        elif _settings["USED_API"]["alerting"] =="MT5":
+            mt5Data=Mt5Data()
+            cours_pres=mt5Data.get_last_price(action)            
+        elif _settings["USED_API"]["alerting"] =="TS": 
+            tradeStationData=TradeStationData()
+            cours_pres=tradeStationData.get_last_price(action)       
+        elif (_settings["USED_API"]["alerting"]=="IB" and\
+             action.stock_ex.ib_auth and\
+             action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
-            contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
-            if contract is not None:
-                cours_pres=IBData.get_last_price(contract)
-        else: #YF
+             cours_pres=get_last_price_ib(action)            
+            
+        if cours_pres==0: #YF and fallback
             cours=vbt.YFData.fetch([action.symbol], period="2d")
             cours_close=cours.get("Close")
             cours_pres=cours_close[action.symbol].iloc[-1]
@@ -402,10 +172,8 @@ def get_last_price(
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
 
-
-#For alerting and TSL check        
-@connect_ib  
-def get_ratio(action,**kwargs):
+#For alerting and TSL check  
+def get_ratio(action):
     """
     Return the price change today, use both IB and YF
     
@@ -419,30 +187,22 @@ def get_ratio(action,**kwargs):
         
         check_ib_permission([action.symbol])
         
-        if _settings["USED_API"]["alerting"] in ["IB","CCXT","MT5","TS"]:
-            print("ok")
+        if _settings["USED_API"]["alerting"] =="CCXT":
+            ccxtData=CCXTDataExt()
+            cours_pres, cours_ref= ccxtData.get_ratio_input(action)
+        elif _settings["USED_API"]["alerting"] =="MT5":
+            mt5Data=Mt5Data()
+            cours_pres, cours_ref= mt5Data.get_ratio_input(action)      
+        elif _settings["USED_API"]["alerting"] =="TS":  
+            tradeStationData=TradeStationData()
+            cours_pres, cours_ref= tradeStationData.get_ratio_input(action)      
+        elif (_settings["USED_API"]["alerting"]=="IB" and\
+            action.stock_ex.ib_auth and\
+            action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
             
-        elif ib_global["connected"] and kwargs['client']  and\
-              (_settings["USED_API"]["alerting"]=="IB" and\
-                                 action.stock_ex.ib_auth and\
-                                  action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
-            
-            contract=IBData.get_contract_ib(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
-            if contract is not None:
-                bars = kwargs['client'].reqHistoricalData(
-                        contract,
-                        endDateTime='',
-                        durationStr="2 D", #"10 D","1 M"
-                        barSizeSetting='1 day', #"1 day", "1 min"
-                        whatToShow='TRADES',
-                        useRTH=True,
-                        formatDate=1)
-                if len(bars)!=0:
-                    df=util.df(bars)
-                    cours_ref=df.iloc[0]["close"] #closing price of the day before
-                    cours_pres=IBData.get_last_price(contract)
-   
-        else: #YF
+            cours_pres, cours_ref= get_ratio_input_ib(action)
+
+        if cours_pres==0: #YF and fallback
             cours=vbt.YFData.fetch([action.symbol], period="2d")
             cours_close=cours.get("Close")
             cours_ref=cours_close[action.symbol].iloc[0]
@@ -455,11 +215,11 @@ def get_ratio(action,**kwargs):
 
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
-
-@connect_ib  
+         
+#Place order
 def place(
-        buy,
-        action,
+        buy: bool,
+        action:Action,
         quantity: numbers.Number=0,
         order_size: numbers.Number=0,
         testing: bool=False,
@@ -470,62 +230,54 @@ def place(
     Arguments
     ----------
     buy: should the order buy or sell the stock
-    action: Action to be checked
+    action: stock to be checked
     quantity: quantity, in number of stocks, of the stock to be ordered
     order_size: size, in currency, of the stock to be ordered
     """       
     try:
-        if kwargs['client'] and ib_global["connected"]:
-            contract =get_tradable_contract_ib(action,buy) #to check if it is enough
-            
-            if contract is None:
-                return "", Decimal(1.0), Decimal(0.0)
-            else:
-                kwargs['client'].qualifyContracts(contract)
-                
-                if quantity==0:
-                    last_price=IBData.get_last_price(contract)
+        if _settings["USED_API"]["orders"]=="IB":
+            #IB is a bit different
+            place_ib(buy,action,quantity=quantity,order_size=order_size,testing=testing)
+        else:
+            if quantity==0:
+                last_price=get_last_price(action)
+                if last_price!=0:
                     quantity=math.floor(order_size/last_price)
+                else:
+                    return "", Decimal(1.0), Decimal(0.0)
                 
                 if not testing:
+                    if _settings["USED_API"]["orders"] =="CCXT":
+                        ccxtData=CCXTDataExt()
+                        ccxt_order=ccxtData.make_order(buy,action.symbol,quantity=quantity)
+                    elif _settings["USED_API"]["alerting"] =="MT5":
+                        mt5Data=Mt5Data()
+                        mt5_order=mt5Data.make_order(buy,action.symbol,quantity=quantity)
+                    elif _settings["USED_API"]["orders"]=="TS":
+                        tradeStationData=TradeStationData()
+                        order_id=tradeStationData.make_order(buy,action.symbol,quantity=quantity)
+                    
                     if buy:
-                        order = MarketOrder('BUY', quantity)
                         txt="buying "
                     else:
-                        order = MarketOrder('SELL', quantity)
                         txt="selling "
-                    trade = kwargs['client'].placeOrder(contract, order)
-                    logger_trade.info(txt+"order sent to IB, action " + str(action)+ ", quantity: "+str(quantity))
-            
-                    max_time=20
-                    t=0
-                    
-                    while t<max_time:
-                        kwargs['client'].sleep(1.0)
-                        t+=1
-        
-                        if trade.orderStatus.status == 'Filled':
-                            fill = trade.fills[-1]
-                            logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
-                            price=fill.execution.avgPrice     
-                            return Decimal(price), Decimal(quantity)
-                        
-                    logger_trade.info("order not filled, pending")
+                    logger_trade.info(txt+"order sent to IB, action " + str(action.symbol)+ ", quantity: "+str(quantity))
+                    #get entering price???
                     return Decimal(1.0), Decimal(1.0)
                 else:
                     return Decimal(1.0), Decimal(1.0)
     except Exception as e:
-         logger.error(e, stack_info=True, exc_info=True)
+         logger.error(e, stack_info=True, exc_info=True)   
 
 ### Tradestation ###
-'''
 class TradeStationData(RemoteData):
     def __init__(
             self, 
-            api_key: str
+            api_key: str=_settings["TD_API_KEY"]
             ):
         self.api_key = api_key
         self.base_url = 'https://api.tradestation.com/v2'
+        self.connect()
 
     def connect(self):
         # Connect to TradeStation using the specified host and port
@@ -542,19 +294,17 @@ class TradeStationData(RemoteData):
             client = TradeStationClient(**client_config)
         return client
     
-    def get_contract_ts(self, symbol, exchange, index):
-        # Get a TradeStation contract object for the specified symbol, exchange, and index status
-    
-        response = requests.get(f'{self.base_url}/contracts/{symbol}', headers={'Authorization': f'Bearer {self.api_key}'})
-        if response.status_code == 200:
-            contract_data = response.json()
-            contract = TradeStationContract(contract_data['symbol'], contract_data['exchange'], index)
-            return contract
-        else:
-            raise ValueError(f"Failed to retrieve contract for symbol: {symbol}")
-    
-    def fetch_symbol_ts(self, symbol, client=None, client_config=None, period=None, start=None, end=None, timeframe=None,
-                     indexes=None, exchanges=None):
+    def fetch_symbol(
+            self, 
+            symbol, 
+            client=None, 
+            client_config=None, 
+            period=None, 
+            start=None, 
+            end=None, 
+            timeframe=None,
+            indexes=None, 
+            exchanges=None):
         # Fetch historical market data for the specified symbol using TradeStation API
     
         if client is None:
@@ -582,48 +332,123 @@ class TradeStationData(RemoteData):
             return df
         else:
             raise ValueError(f"Failed to fetch symbol data for symbol: {symbol}")
+            
+    def make_order(
+            self, 
+            buy: bool, 
+            symbol: str,
+            quantity=None,
+            ):
+        # Place a market order (buy/sell) for the specified action and short status using TradeStation API
+        ##To be checked
+        if buy:
+            a="buy"
+        else:
+            a="sell"
+
+        endpoint = f"{self.base_url}/orders"
+        payload = {
+            'action': a,
+            'symbol': symbol,
+            'quantity': quantity,
+            'orderType': 'market',
+            'timeInForce': 'day'
+        }
+        response = requests.post(endpoint, headers={'Authorization': f'Bearer {self.api_key}'}, json=payload)
+        if response.status_code == 200:
+            order_data = response.json()
+            order_id = order_data['orderId']
+            return order_id
+        else:
+            raise ValueError("Failed to place order")
+            
+    def retrieve_quantity(
+            self, 
+            buy: bool,
+            symbol:str,
+            **kwargs):
+        """
+        Get the size of present position owned for a product
+        
+        Arguments
+        ----------
+        action: stock to be checked
+        """  
+        # Retrieve the quantity and sign of the specified action using TradeStation API
+        return 0
+            
+    def cash_balance(self,  currency:str="EUR")-> numbers.Number:
+        '''
+        Return the cash balance for a certain currency
+        
+        Arguments
+        ----------
+        currency: symbol of the currency to be checked
+        '''    
+        endpoint = f"{self.base_url}/account"
+        response = requests.get(endpoint, headers={'Authorization': f'Bearer {self.api_key}'})
+        if response.status_code == 200:
+            account_data = response.json()
+            cash_balance = account_data['cashBalance']
+            return cash_balance
+        else:
+            raise ValueError("Failed to retrieve cash balance")
     
+    def actualize_ss(self):
+        pass
     
-    def get_last_price_ts(self, contract):
+    def get_last_price(self, action:Action):
         # Retrieve the last price for the specified contract using TradeStation API
     
-        endpoint = f"{self.base_url}/symbol/{contract.symbol}/quote"
+        symbol=action.symbol
+        endpoint = f"{self.base_url}/symbol/{symbol}/quote"
         response = requests.get(endpoint, headers={'Authorization': f'Bearer {self.api_key}'})
         if response.status_code == 200:
             quote_data = response.json()
             last_price = quote_data['lastPrice']
             return last_price
         else:
-            raise ValueError(f"Failed to retrieve last price for contract: {contract}")
-'''
-### CCXT ###
-'''
-class CCXTData(RemoteData):
-    def __init__(
-            self, 
-            exchange: str, 
-            api_key:str=None, 
-            api_secret:str=None):
-     
-        self.exchange = exchange
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.exchange = None
+            raise ValueError(f"Failed to retrieve last price for contract: {symbol}")
 
-    def connect(self):
-        self.exchange = getattr(ccxt, self.exchange)({
-            'apiKey': self.api_key,
-            'secret': self.api_secret
-        })
-    
-    def fetch_symbol(self, symbol, timeframe='1d', limit=1000):
-        ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)  #self.exchange
-        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df.set_index('timestamp', inplace=True)
-        return df
-    
-    def place_order(self, symbol, side, type_, price=None, quantity=None):
+    def get_ratio_input(self, action: Action)->numbers.Number:
+        symbol=action.symbol
+        cours_pres=self.get_last_price(action)
+        
+        #How to get price from yesterday??
+        return cours_pres,0
+
+### CCXT ###
+class CCXTDataExt(CCXTData):
+    def __init__(
+            self,
+            exchange=_settings["CCXT_EXCHANGE"]
+            ):
+        super().__init__()
+        self.exchange = self.resolve_exchange(exchange=exchange)
+
+    #fetch symbol and resolve exchange are in CCXTData
+    def make_order(
+            self, 
+            buy: bool,
+            symbol: str, 
+            type_: str='market', 
+            price=None, 
+            quantity=None):
+        """
+
+        Arguments
+        ----------
+            symbol: CCXT ticker of a product
+            side: 'buy' or 'sell'
+            type_: 'limit' or 'market'
+            price: price for a limit order
+            quantity: amount of product to trade
+        """ 
+        if buy:
+            side="buy"
+        else:
+            side="sell"
+        
         order_params = {
             'symbol': symbol,
             'side': side,
@@ -631,17 +456,71 @@ class CCXTData(RemoteData):
             'price': price,
             'quantity': quantity
         }
-        order = self.exchange.create_order(**order_params)
-        return order
-'''
+        ccxt_order = self.exchange.create_order(**order_params)
+        return ccxt_order
 
+    def retrieve_quantity(
+            self, 
+            symbol,
+            **kwargs
+            ):
+        """
+        Get the size of present position owned for a product
+        
+        Arguments
+        ----------
+        action: stock to be checked
+        """  
+        return self.exchange.fetchPosition(symbol)
+
+    def cash_balance(self,  currency:str="EUR")-> numbers.Number:
+        '''
+        Return the cash balance for a certain currency
+        
+        Arguments
+        ----------
+        currency: symbol of the currency to be checked
+        '''
+        # Get the account information from the CCXT API
+        account_info = self.exchange.fetch_balance()
+    
+        # If currency is not specified, return the account balance in the account's base currency
+        if currency is None:
+            return account_info['total'][account_info['base']]
+    
+        # Get the balance for the specified currency
+        currency_balance = account_info['total'][currency]
+        return currency_balance
+    
+    def actualize_ss(self):
+        pass    
+    
+    def get_last_price(self, action: Action)->numbers.Number:
+        ticker = self.exchange.fetch_ticker(action.symbol)
+        if ticker is None:
+            return 0
+        return ticker['ask']
+
+    def get_ratio_input(self, action: Action)->numbers.Number:
+        symbol=action.symbol
+        cours_pres=self.get_last_price(action)
+        
+        #Reference price??
+        return cours_pres,0
+        
 ### MT5 ###
-'''
-class mt5Data(RemoteData):
-    def __init__(self, host, port):
+class Mt5Data(RemoteData):
+    def __init__(
+            self, 
+            host=_settings["MT5_HOST"], 
+            port=_settings["MT5_PORT"]
+            ):
+        
+        #super().__init__() #needed??
         self.host = host
         self.port = port
         self.client = None
+        self.connect()
         
     def connect(self):
         mt5.initialize()
@@ -662,12 +541,6 @@ class mt5Data(RemoteData):
             client.config = client_config
         return client
 
-    def get_contract(self, symbol, exchange, index):
-        contract = mt5.symbol_info(symbol)
-        if not contract.visible:
-            raise ValueError(f"Symbol {symbol} is not available.")
-        return contract
-
     def fetch_symbol(self, 
                      symbol, 
                      client=None, 
@@ -677,7 +550,7 @@ class mt5Data(RemoteData):
                      end=None, 
                      timeframe=None,
                      indexes=None, 
-                     exchanges=None):
+                     exchanges=None)-> tp.Any:
         
         if client is None:
             client = self.resolve_client(**client_config)
@@ -691,8 +564,140 @@ class mt5Data(RemoteData):
         df['time'] = pd.to_datetime(df['time'], unit='s')
         df.set_index('time', inplace=True)
         return df
-'''
+    
+    def make_order(self,
+              buy: bool, 
+              symbol: str, 
+              quantity: numbers.Number=0,
+              ):
+        # Place market order using MT5 API
+        if buy:
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": quantity,  # Specify the desired volume for the trade
+                "type": mt5.ORDER_TYPE_BUY,
+                "deviation": 10,  # Specify the deviation value
+                "magic": 12345,  # Specify the magic number for the order
+                "comment": "Buy Order"  # Specify a comment for the order
+            }
+        else:
+            # Place long sell order
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": quantity,  # Specify the desired volume for the trade
+                "type": mt5.ORDER_TYPE_SELL,
+                "deviation": 10,  # Specify the deviation value
+                "magic": 12345,  # Specify the magic number for the order
+                "comment": "Long Sell Order"  # Specify a comment for the order
+            }
+    
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            raise ValueError(f"Failed to send trade order: {result.comment}")
+    
+        return result.order    
+    
+    def retrieve_quantity(self, action: Action) -> numbers.Number:
+        """
+        Get the size of present position owned for a product
+        
+        Arguments
+        ----------
+        action: stock to be checked
+        """  
+        return mt5.positions_get(symbol=action.symbol)
+    
+    def cash_balance(
+            self, 
+            currency:str="EUR", 
+            **kwargs):
+        '''
+        Return the cash balance for a certain currency
+        
+        Arguments
+        ----------
+        currency: symbol of the currency to be checked
+        '''
+        account_info = mt5.account_info()
+    
+        # If currency is not specified, return the account balance in the account's base currency
+        if currency is None:
+            return account_info.balance
+    
+        # Get the balance for the specified currency
+        currency_balance = None
+        for balance in account_info.balances:
+            if balance.currency == currency:
+                currency_balance = balance.amount
+                break
+    
+        return currency_balance
+
+    def actualize_ss(self):
+        for pos in mt5.positions_get():
+            actions=Action.objects.filter(symbol__contains=pos.symbol)
+            if len(actions)==0:
+                action=None
+            elif len(actions)==1:
+                action=actions[0]
+            else:
+                for a in actions:
+                    if a.symbol==pos.symbol:
+                        action=a
+                        
+            if action is not None: 
+                present_ss=StockStatus.objects.get(action=action)
+                present_ss.quantity=pos.volume
+                present_ss.order_in_ib=True
+                present_ss.save()
+                
+    def get_last_price(self, action: Action)->numbers.Number:
+        symbol=action.symbol
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None:
+            return 0     
+        return tick.bid if tick.bid != 0 else tick.last
+
+    def get_ratio_input(
+            self, 
+            action: Action,
+            exchange=None, 
+            index=None
+            )->(numbers.Number, numbers.Number):
+        # Get the current price using the mt5.symbol_info_tick() function
+        symbol=action.symbol
+        cours_pres=self.get_last_price(action)
+        
+        # Get the reference price based on the provided exchange and index
+        reference_price = None
+        if exchange and index:
+            # Retrieve the reference price using the mt5.copy_rates_from() function
+            rates = mt5.copy_rates_from(symbol, mt5.TIMEFRAME_D1, self.start_date, self.end_date)
+            if rates is None or len(rates) == 0:
+                return None, None
+    
+            # Find the reference price based on the index
+            for rate in rates:
+                if rate.time == index:
+                    reference_price = rate.close
+                    break
+    
+        return cours_pres, reference_price
+
 ### Interactive brokers ###
+def connect_ib(func):
+    '''
+    Wrapper to check that the connection to IB has been established
+    
+    Establishing the connection if one is already opened leads to a crash, that's why we need such a complex logic
+    '''
+    def wrapper(*args,**kwargs):
+        kwargs['client'] = IBData.resolve_client(None)
+        return func(*args,**kwargs)
+    return wrapper
+
 class IBData(RemoteData):
     @classmethod
     def connect(cls):
@@ -711,7 +716,10 @@ class IBData(RemoteData):
             warnings.warn("connection to IB failed, check that IB is started")   
             
     @classmethod
-    def resolve_client(cls, client: tp.Optional[tp.Any] = None, **client_config) -> tp.Any:
+    def resolve_client(
+            cls, 
+            client: tp.Optional[tp.Any] = None, 
+            **client_config) -> tp.Any:
         from ib_insync import IB
         import asyncio
 
@@ -734,29 +742,6 @@ class IBData(RemoteData):
             ib_global["connected"]=False
         
         return cls.client
-
-    @classmethod 
-    def get_contract_ib(
-            cls, 
-            symbol_ib: str,
-            exchange_ib: str,
-            it_is_index: bool):
-        """
-        Search the ib contract corresponding to the product
-
-        Arguments
-        ----------
-            symbol_ib: IB ticker of a product
-            exchange_ib: IB ticker of the stock exchange
-            it_is_index: is it indexes that are provided
-        """ 
-        from ib_insync import Stock, Index
-        if it_is_index:
-            return Index(exchange=exchange_ib,symbol=symbol_ib)
-        elif exchange_ib in ["NASDAQ","NYSE"]:
-            return Stock(symbol_ib,"SMART", primaryExchange=exchange_ib)
-        else:
-            return Stock(symbol_ib,exchange_ib)
 
     @classmethod
     def fetch_symbol(
@@ -798,7 +783,7 @@ class IBData(RemoteData):
         cls.resolve_client(client=client, **client_config)
 
         if ib_global["connected"]:
-            contract=cls.get_contract_ib(symbol,exchange,it_is_index)
+            contract=cls.get_contract(symbol,exchange,it_is_index)
             #check period and timeframe
             bars = cls.client.reqHistoricalData(
                     contract,
@@ -829,7 +814,7 @@ class IBData(RemoteData):
             return df
         
     @classmethod
-    def get_last_price(cls,contract):
+    def get_last_price_sub(cls,contract):
         timeout=2
         t=0
         cls.resolve_client(client=None)
@@ -841,6 +826,228 @@ class IBData(RemoteData):
             m_data.last=0
         cls.client.cancelMktData(contract)
         return m_data.last
+
+    @classmethod 
+    def get_contract(
+            cls, 
+            symbol_ib: str,
+            exchange_ib: str,
+            it_is_index: bool):
+        """
+        Search the ib contract corresponding to the product
+
+        Arguments
+        ----------
+            symbol_ib: IB ticker of a product
+            exchange_ib: IB ticker of the stock exchange
+            it_is_index: is it indexes that are provided
+        """ 
+        from ib_insync import Stock, Index
+        if it_is_index:
+            return Index(exchange=exchange_ib,symbol=symbol_ib)
+        elif exchange_ib in ["NASDAQ","NYSE"]:
+            return Stock(symbol_ib,"SMART", primaryExchange=exchange_ib)
+        else:
+            return Stock(symbol_ib,exchange_ib)
+
+#Following functions should be part of IBData
+@connect_ib
+def get_last_price_ib(
+        action:Action, 
+        **kwargs):
+    '''
+    Get the present price for a product
+    
+    Arguments
+    ----------
+    action: stock to be checked
+    '''
+    if kwargs['client'] and ib_global["connected"]:
+        contract=IBData.get_contract(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
+        if contract is not None:
+            return IBData.get_last_price_sub(contract)
+    return 0
+
+@connect_ib        
+def cash_balance_ib(
+        currency:str="EUR",
+        **kwargs
+        ) -> numbers.Number:
+    """
+    Return the cash balance for a certain currency
+    
+    Arguments
+    ----------
+    currency: symbol of the currency to be checked
+    """ 
+    if kwargs['client'] and ib_global["connected"]:
+        for v in kwargs['client'].accountValues():
+            if v.tag == 'CashBalance' and v.currency==currency:
+                return float(v.value)
+    else:
+        return 0
+
+@connect_ib
+def actualize_ss_ib(**kwargs):
+    """
+    Synchronize ib and our bot, to know which stocks are owned (+direction)     
+    """      
+    if kwargs['client'] and ib_global["connected"]:
+        print("myIB retrieve")
+        action=None
+
+        for pos in kwargs['client'].positions():
+            contract=pos.contract
+            actions=Action.objects.filter(symbol__contains=contract.localSymbol)
+            if len(actions)==0:
+                action=None
+            elif len(actions)==1:
+                action=actions[0]
+            else:
+                for a in actions:
+                    if a.ib_ticker()==contract.localSymbol:
+                        action=a
+                        
+            if action is not None: 
+                present_ss=StockStatus.objects.get(action=action)
+                present_ss.quantity=pos.position
+                present_ss.order_in_ib=True
+                present_ss.save()  
+                
+@connect_ib
+def retrieve_quantity_ib(
+        action: Action,
+        **kwargs):
+    """
+    Call ib and get the size of present position owned for a product
+
+    Arguments
+    ----------
+    action: stock to be checked
+    """  
+    if kwargs['client'] and ib_global["connected"]:
+        for pos in kwargs['client'].positions():
+            contract=pos.contract
+            if action.ib_ticker()==contract.localSymbol:
+                return abs(pos.position), np.sign(pos.position), pos.position>0
+    return 0, 0, False  
+        
+@connect_ib
+def get_tradable_contract(
+        action:Action,
+        short:bool=False,
+        **kwargs):
+    """
+    IB works with contract, this function find the contract
+
+    Arguments
+    ----------
+        action: Action for which the contract must be retrieved
+        short: direction of the trade
+    """       
+    if action.ib_ticker()=="AAA":
+        logger.info("stock "+action.ib_ticker() + " not found")
+        return None
+    else:
+        if action.stock_ex.ib_auth:
+            action=action_to_etf(action,short) #if index replace the index through the corresponding ETF
+            return IBData.get_contract(action.ib_ticker(),action.stock_ex.ib_ticker,False)
+        else:
+            logger.info("stock "+action.ib_ticker() + " not in authorized stock exchange")
+            return None 
+
+@connect_ib  
+def get_ratio_input_ib(
+        action:Action,
+        **kwargs):
+    '''
+    Return the daily change
+    
+    Arguments
+    ----------
+        action: stock for which the ratio must be retrieved
+    '''
+    if ib_global["connected"] and kwargs['client']:
+        contract=IBData.get_contract(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
+        if contract is not None:
+            bars = kwargs['client'].reqHistoricalData(
+                    contract,
+                    endDateTime='',
+                    durationStr="2 D", #"10 D","1 M"
+                    barSizeSetting='1 day', #"1 day", "1 min"
+                    whatToShow='TRADES',
+                    useRTH=True,
+                    formatDate=1)
+            if len(bars)!=0:
+                df=util.df(bars)
+                cours_ref=df.iloc[0]["close"] #closing price of the day before
+                cours_pres=IBData.get_last_price(contract)
+                return cours_pres, cours_ref
+    return 0, 0    
+
+@connect_ib  
+def place_ib(
+        buy,
+        action,
+        quantity: numbers.Number=0,
+        order_size: numbers.Number=0,
+        testing: bool=False,
+        **kwargs): 
+    """
+    Place an order
+    
+    Arguments
+    ----------
+    buy: should the order buy or sell the stock
+    action: stock to be checked
+    quantity: quantity, in number of stocks, of the stock to be ordered
+    order_size: size, in currency, of the stock to be ordered
+    """       
+    try:
+        if kwargs['client'] and ib_global["connected"]:
+            contract =IBData.get_tradable_contract(action,short=buy) #to check if it is enough
+            
+            if contract is None:
+                return "", Decimal(1.0), Decimal(0.0)
+            else:
+                kwargs['client'].qualifyContracts(contract)
+                
+                if quantity==0:
+                    last_price=IBData.get_last_price(action)
+                    if last_price!=0:
+                        quantity=math.floor(order_size/last_price)
+                    else:
+                        return "", Decimal(1.0), Decimal(0.0)
+                
+                if not testing:
+                    if buy:
+                        order = MarketOrder('BUY', quantity)
+                        txt="buying "
+                    else:
+                        order = MarketOrder('SELL', quantity)
+                        txt="selling "
+                    trade = kwargs['client'].placeOrder(contract, order)
+                    logger_trade.info(txt+"order sent to IB, action " + str(action.symbol)+ ", quantity: "+str(quantity))
+            
+                    max_time=20
+                    t=0
+                    
+                    while t<max_time:
+                        kwargs['client'].sleep(1.0)
+                        t+=1
+        
+                        if trade.orderStatus.status == 'Filled':
+                            fill = trade.fills[-1]
+                            logger_trade.info(f'{fill.time} - {fill.execution.side} {fill.contract.symbol} {fill.execution.shares} @ {fill.execution.avgPrice}')
+                            price=fill.execution.avgPrice     
+                            return Decimal(price), Decimal(quantity)
+                        
+                    logger_trade.info("order not filled, pending")
+                    return Decimal(1.0), Decimal(1.0)
+                else:
+                    return Decimal(1.0), Decimal(1.0)
+    except Exception as e:
+         logger.error(e, stack_info=True, exc_info=True)              
     
 class OrderPerformer():
     def __init__(

@@ -162,17 +162,21 @@ class TestIB(TestCase):
         m.Excluded.objects.create(name="all",strategy=self.strategy)
      
     def test_get_ratio(self):
+        _settings["USED_API"]["alerting"]="YF"
         t=ib.get_ratio(self.a)
         self.assertTrue(t!=0)
         
     def test_get_last_price(self):
+        _settings["USED_API"]["alerting"]="YF"
         ib.get_last_price(self.a4)       
         
     def test_cash_balance(self):
+        _settings["USED_API"]["orders"]="IB"
         self.assertTrue(ib.cash_balance()>=0)   
         self.assertTrue(ib.cash_balance(currency="USD")>=0)   
 
     def test_check_enough_cash(self):
+        _settings["USED_API"]["orders"]="IB"
         self.assertTrue(ib.check_enough_cash(1000,currency="USD"))        
 
     def test_entry_order_manual(self):
@@ -329,10 +333,9 @@ class TestIB(TestCase):
         present_ss=pd.DataFrame.from_records(m.StockStatus.objects.all().values(),index="action_id")
         print(present_ss)
         
-        
     def test_get_tradable_contract_ib(self):
-        c=ib.get_tradable_contract_ib(self.a2,False)
-        c2=ib.IBData.get_contract_ib("AI","SBF",False)
+        c=ib.get_tradable_contract(self.a2,False)
+        c2=ib.IBData.get_contract("AI","SBF",False)
         self.assertEqual(c,c2)
         
         from ib_insync import Stock
@@ -342,8 +345,6 @@ class TestIB(TestCase):
         #to see the contract details
         t=Stock("IBM","SMART", primaryExchange='NYSE')
         print(ib.IBData.client.reqContractDetails(t))
-        
-    
 
 if __name__ == '__main__':
     unittest.main() 

@@ -46,14 +46,6 @@ def retrieve_data_online(o,
         it_is_index: is it indexes that are provided
         
     """  
-    f_name_dic={
-        "IB":"retrieve_data_ib",
-        "CCXT":"retrieve_data_ccxt",
-        "MT5":"retrieve_data_mt5",
-        "TS":"retrieve_data_ts",
-        "YF":"retrieve_data_yf",
-        }
-    
     if actions is None or len(actions)==0:
         raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:
@@ -62,16 +54,20 @@ def retrieve_data_online(o,
             check_ib_permission([a.symbol for a in actions])
 
         used_api=_settings["USED_API"][used_api_key] #lighten the writting
-
-        if used_api in ["IB","CCXT","MT5","TS"]:
+        if used_api == "IB":
             try:
-                retrieve_data=getattr(sys.modules[__name__],f_name_dic[used_api])
-                cours, symbols, index_symbol=retrieve_data(actions,period,it_is_index=it_is_index)  
+                cours, symbols, index_symbol=retrieve_data_ib(used_api,actions,period,it_is_index=it_is_index)
+            except:
+                logger.info("IB retrieval of symbol failed, fallback on YF")
+                used_api="YF" #fallback            
+        elif used_api in ["CCXT","MT5","TS"]:
+            try:
+                cours, symbols, index_symbol=retrieve_data_notIB(used_api,actions,period,it_is_index=it_is_index)
             except:
                 logger.info("IB retrieval of symbol failed, fallback on YF")
                 used_api="YF" #fallback
         if used_api=="YF":
-            cours, symbols, index_symbol=retrieve_data_YF(actions,period,it_is_index=it_is_index)
+            cours, symbols, index_symbol=retrieve_data_notIB("YF",actions,period,it_is_index=it_is_index)
         _settings["USED_API"][used_api_key]=used_api #save potential change
 
         o.data=cours.select(symbols)
@@ -86,12 +82,6 @@ def retrieve_data_online(o,
             raise ValueError("Retrieve data failed and returned empty Dataframe, check the symbols")
 
         return symbols
-
-#retrieve_data_mt5()
-
-#retrieve_data_ccxt()
-
-#retrieve_data_ts()
 
 @connect_ib 
 def retrieve_data_ib(
@@ -162,8 +152,9 @@ def retrieve_data_ib(
             index_symbol_ib
     except Exception as e:
          logger.error(e, stack_info=True, exc_info=True)
-      
-def retrieve_data_YF(
+
+def retrieve_data_notIB(
+        used_api: str,
         actions: list,
         period: str,
         it_is_index: bool=False
@@ -182,6 +173,13 @@ def retrieve_data_YF(
     #add the index to the list of stocks downloaded. Useful to make calculation on the index to determine trends
     #by downloading at the same time, we are sure the signals are aligned
     try:
+        used_api_to_class={
+            "YF":"YFData",
+            "CCXT":"CCXTData",
+            "MT5":"MT5Data",
+            "TS":"TradeStationData"
+            }
+        f=getattr(vbt,used_api_to_class[used_api])
         symbols=[a.symbol for a in actions]
         if it_is_index:
             index_symbol=symbols[0]
@@ -194,17 +192,17 @@ def retrieve_data_YF(
         first_round=True
         #look for anomaly
         if len(all_symbols)>2:
-            res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop')
+            res=f.fetch(all_symbols, period=period,missing_index='drop')
             avg=np.average(
-                [len(vbt.YFData.fetch(all_symbols[0], period=period).get('Open')),
-                len(vbt.YFData.fetch(all_symbols[1], period=period).get('Open')),
-                len(vbt.YFData.fetch(all_symbols[-1], period=period).get('Open'))]
+                [len(f.fetch(all_symbols[0], period=period).get('Open')),
+                len(f.fetch(all_symbols[1], period=period).get('Open')),
+                len(f.fetch(all_symbols[-1], period=period).get('Open'))]
                 )
                         
             if len(res.get('Open'))<avg-10:
                 print("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
                 logger.info("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
-                res_nodrop=vbt.YFData.fetch(all_symbols, period=period)
+                res_nodrop=f.fetch(all_symbols, period=period)
                 nb_nan={}
                 for c in res.get('Open').columns:
                     nb_nan[c]=np.count_nonzero(np.isnan(res_nodrop.get('Open')[c]))
@@ -217,7 +215,7 @@ def retrieve_data_YF(
         #test if the symbols were downloaded
         while not ok and len(symbols)>=0:
             if not first_round:
-                res=vbt.YFData.fetch(all_symbols, period=period,missing_index='drop')
+                res=f.fetch(all_symbols, period=period,missing_index='drop')
             ok=True
             o=res.get('Open')
             
