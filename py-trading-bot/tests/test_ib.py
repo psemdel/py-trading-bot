@@ -177,6 +177,7 @@ class TestIB(TestCase):
 
     def test_entry_order_manual(self):
         _settings["PERFORM_ORDER"]=True
+        _settings["USED_API_DEFAULT"]["orders"]="IB"
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         self.strategy.perform_order=False
         self.e.perform_order=False
@@ -185,14 +186,14 @@ class TestIB(TestCase):
         
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.check_auto_manual()
-        self.assertEqual(op.api_used,"YF")
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
         
         self.strategy.perform_order=True
         self.strategy.save()
         
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.check_auto_manual()
-        self.assertEqual(op.api_used,"YF")
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
         
         self.strategy.perform_order=False
         self.e.perform_order=True
@@ -201,7 +202,7 @@ class TestIB(TestCase):
         
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.check_auto_manual()
-        self.assertEqual(op.api_used,"YF")
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
         
         self.strategy.perform_order=True
         self.e.perform_order=True
@@ -210,12 +211,12 @@ class TestIB(TestCase):
         
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.check_auto_manual()
-        self.assertEqual(op.api_used,"IB")
+        self.assertEqual(_settings["USED_API"]["orders"],"IB")
         
         _settings["PERFORM_ORDER"]=False
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.check_auto_manual()
-        self.assertEqual(op.api_used,"YF")
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
 
     def test_get_order(self):
         #Entry and buy

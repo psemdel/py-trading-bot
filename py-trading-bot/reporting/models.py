@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
-from orders.models import Action, Order, get_pf, get_candidates,\
+from orders.models import Action, get_pf, get_candidates,\
                           get_exchange_actions,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission, filter_intro_action
@@ -27,7 +27,7 @@ class ListOfActions(models.Model):
     entry=models.BooleanField(blank=False,default=False) #otherwise exit
     buy=models.BooleanField(blank=False,default=False)
     reverse=models.BooleanField(blank=False,default=False,null=True) 
-    api_used=models.CharField(max_length=100, blank=False, default="YF")
+    used_api=models.CharField(max_length=100, blank=False, default="YF")
     actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
     text=models.TextField(blank=True)
     
@@ -74,7 +74,7 @@ class Report(models.Model):
             self, 
             action: Action, 
             entry: bool, 
-            api_used: str, 
+            used_api: str, 
             buy: bool, 
             strategy: str,
             reverse: bool=None, 
@@ -99,7 +99,7 @@ class Report(models.Model):
             entry=entry,
             reverse=reverse,
             buy=buy,
-            api_used=api_used
+            used_api=used_api
             )
         ent_ex_symbols.actions.add(action)
         ent_ex_symbols.concat(txt)    
@@ -121,7 +121,6 @@ class Report(models.Model):
 
     def retard(
             self,
-            api_used: str, 
             exchange: str,
             ust,
             **kwargs):
@@ -131,14 +130,13 @@ class Report(models.Model):
            
         Arguments
        	----------
-           api_used: API to be used for the orders
            exchange: name of the stock exchange
            ust: underlying strategy 
        	""" 
         if _settings["RETARD_MACRO"]:
-            pr=presel.name_to_presel("PreselRetardMacro", ust.period,prd=True, api_used=api_used,input_ust=ust,exchange=exchange) 
+            pr=presel.name_to_presel("PreselRetardMacro", ust.period,prd=True, input_ust=ust,exchange=exchange) 
         else:
-            pr=presel.name_to_presel("PreselRetard", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange) 
+            pr=presel.name_to_presel("PreselRetard", ust.period,prd=True,input_ust=ust,exchange=exchange) 
         
         candidates, candidates_short=pr.get_candidates()
         
@@ -177,7 +175,7 @@ class Report(models.Model):
                     to_calculate=True
         
         if to_calculate:
-            wq=presel.WQ(ust.period, prd=True, api_used=ust.api_used,input_ust=ust,exchange=exchange)
+            wq=presel.WQ(ust.period, prd=True, input_ust=ust,exchange=exchange)
             
             for nb in range(102):
                 strategy="wq"+str(nb)
@@ -192,22 +190,22 @@ class Report(models.Model):
             logger.info("Presel wq done for "+exchange)  
             
 ### Preselected actions strategy    
-    def presel_sub(self,api_used,l,ust, exchange,**kwargs):
+    def presel_sub(self,l,ust, exchange,**kwargs):
         if len(l)!=0:
             #hist slow does not need code here
             if Strategy.objects.get(name="retard") in l:
-                self.retard(api_used,exchange,ust,**kwargs)
+                self.retard(exchange,ust,**kwargs)
             if Strategy.objects.get(name="retard_keep") in l:
-                self.retard(api_used,exchange,ust,keep=True,**kwargs)
+                self.retard(exchange,ust,keep=True,**kwargs)
             if Strategy.objects.get(name="divergence") in l:    
                 if _settings["DIVERGENCE_MACRO"]:
-                    pr=presel.name_to_presel("PreselDivergenceBlocked", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
+                    pr=presel.name_to_presel("PreselDivergenceBlocked", ust.period,prd=True,input_ust=ust,exchange=exchange)
                 else:
-                    pr=presel.name_to_presel("PreselDivergence", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
+                    pr=presel.name_to_presel("PreselDivergence", ust.period,prd=True,input_ust=ust,exchange=exchange)
                 candidates, _=pr.get_candidates()
                 self.ss_m.order_only_exit_substrat(self.candidates_to_YF(ust.symbols_to_YF,candidates), "divergence", False,**kwargs)
             if Strategy.objects.get(name="macd_vol") in l:
-                pr=presel.name_to_presel("PreselMacdVolMacro", ust.period,prd=True,api_used=api_used,input_ust=ust,exchange=exchange)
+                pr=presel.name_to_presel("PreselMacdVolMacro", ust.period,prd=True,input_ust=ust,exchange=exchange)
                 candidates, candidates_short=pr.get_candidates()
                 
                 if len(candidates)==0:
@@ -246,12 +244,12 @@ class Report(models.Model):
         if stock_ex.presel_at_sector_level:
             if 'sec' in kwargs:
                 sector=ActionSector.objects.get(name=kwargs.get("sec"))
-                self.presel_sub(ust.api_used,sector.strategies_in_use.all(),ust,exchange,**kwargs)
+                self.presel_sub(sector.strategies_in_use.all(),ust,exchange,**kwargs)
             else:    
                 for s in ActionSector.objects.all(): #try for each sector
-                    self.presel_sub(ust.api_used,s.strategies_in_use.all(),ust,exchange,sec=s,**kwargs)
+                    self.presel_sub(s.strategies_in_use.all(),ust,exchange,sec=s,**kwargs)
         else:
-            self.presel_sub(ust.api_used,stock_ex.strategies_in_use.all(),ust,exchange,**kwargs)
+            self.presel_sub(stock_ex.strategies_in_use.all(),ust,exchange,**kwargs)
   
     def populate_report(
             self, 
@@ -366,7 +364,6 @@ class Report(models.Model):
     #for a group of predefined actions, determine the signals    
     def perform_normal_strat(
             self,
-            api_used,
             actions, 
             exchange,
             it_is_index:bool=False, 
@@ -376,7 +373,6 @@ class Report(models.Model):
         
         Arguments
        	----------
-        api_used: API to be used for the orders
         actions: list of action 
         exchange: name of the stock exchange
         it_is_index: is it indexes that are provided
@@ -391,7 +387,6 @@ class Report(models.Model):
                 ust_name,
                 str(_settings["DAILY_REPORT_PERIOD"])+"y",
                 prd=True,
-                api_used=api_used,
                 actions=actions,
                 exchange=exchange,
                 it_is_index=it_is_index
@@ -583,13 +578,10 @@ class Report(models.Model):
             ##preprocessing
             self.it_is_index=it_is_index
             if self.it_is_index:
-                #symbols=kwargs.get("symbols",[])
-                api_used="YF"
-                if _settings["USED API_FOR_DATA"]["reporting"]:
-                    api_used=check_ib_permission(symbols)
+                check_ib_permission(symbols)
                 actions=[Action.objects.get(symbol=symbol) for symbol in symbols]
             else: #actions, exchange is provided
-                api_used, actions=get_exchange_actions(exchange,**kwargs)
+                actions=get_exchange_actions(exchange,**kwargs)
             
             ##handle the sectors
             if exchange is not None:
@@ -620,7 +612,7 @@ class Report(models.Model):
                 actions=filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
                 ##Perform a single strategy on predefined actions
                 #Uses afterward as source for the data to avoid loading them several times
-                ust_normal=self.perform_normal_strat(api_used,actions, exchange,it_is_index=it_is_index, **kwargs)
+                ust_normal=self.perform_normal_strat(actions, exchange,it_is_index=it_is_index, **kwargs)
                 ##Populate a report with different statistics
                 ust_kama=ic.VBTSTOCHKAMA.run(ust_normal.high,ust_normal.low,ust_normal.close)
                 ust_ma=ic.VBTMA.run(ust_normal.close)
@@ -633,7 +625,6 @@ class Report(models.Model):
                     ust_trend=strat.name_to_ust(
                         "StratKamaStochMatrendMacdbbMacro",
                         ust_normal.period,
-                        api_used=api_used,
                         input_ust=ust_normal,
                         prd=True
                         )    

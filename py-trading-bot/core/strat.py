@@ -332,7 +332,6 @@ class UnderlyingStrat():
                  suffix: str="",
                  actions: list=None,
                  symbols: list=None,
-                 api_used: str=None,
                  input_ust=None, #itself a strat
                  strat_arr_simple: list=None,
                  strat_arr_bull: list=None,
@@ -354,7 +353,6 @@ class UnderlyingStrat():
             suffix: suffix for files
             actions: list of actions
             symbols: list of YF tickers
-            api_used: which API should be used to download data
             input_ust: input underlying strategy with already all data downloaded, avoid downloading the same several times
             strat_arr_simple: array of the strategy combination to use, no trend
             strat_arr_bull: array of the strategy combination to use, trend bull
@@ -365,7 +363,7 @@ class UnderlyingStrat():
             self.suffix=suffix
             if self.suffix!="":
                 self.suffix="_" + self.suffix
-            for k in ["prd","period","symbol_index","api_used", "actions","symbols","exchange"]:
+            for k in ["prd","period","symbol_index", "actions","symbols","exchange"]:
                 if locals()[k] is None and input_ust is not None:
                     setattr(self,k, getattr(input_ust,k))
                 else:
@@ -408,20 +406,20 @@ class UnderlyingStrat():
                 else:
                     from orders.models import Action
                     from core.data_manager_online import retrieve_data_online
-                    if self.api_used is None:
-                        raise ValueError("api_used should not be none for Strat in production")
                     if self.actions is None:
                         if self.symbols is None:
                             raise ValueError("StratPRD, no symbols provided")
                         self.actions=[Action.objects.get(symbol=symbol) for symbol in self.symbols]
-                    self.api_used, self.symbols=retrieve_data_online(self,self.actions,period,self.api_used,it_is_index=it_is_index)  #the symbols as output are then the YF symbols
+                    self.symbols=retrieve_data_online(self,self.actions,period,it_is_index=it_is_index, used_api_key="reporting")  #the symbols as output are then the YF symbols
                     for s in self.symbols:
                         self.symbols_to_YF[s]=s
                     
             if input_ust is not None and self.prd: 
+                from trading_bot.settings import _settings #load only if in Django
+                
                 self.symbols=[]
                 for a in self.actions:
-                    if self.api_used=="IB":
+                    if _settings["USED_API"]["reporting"]=="IB":
                         s=a.ib_ticker()
                     else:
                         s=a.symbol

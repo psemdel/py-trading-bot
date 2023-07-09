@@ -49,7 +49,6 @@ class Presel():
             suffix: str="",
             actions: list=None,
             symbols: list=None,
-            api_used: str=None,
             input_ust=None,
             vol=None,
             macd_tot=None,
@@ -75,7 +74,6 @@ class Presel():
             suffix: suffix for files
             actions: list of actions
             symbols: list of YF tickers
-            api_used: which API should be used to download data
             input_st: input underlying strategy with already all data downloaded, avoid downloading the same several times
             vol: volatility signal
             macd_tot: macd signal
@@ -92,7 +90,7 @@ class Presel():
             self.suffix="_" + self.suffix
             
         for k in ["prd","symbol_index","period","vol","actions","symbols","macd_tot","macro_trend_ind","macro_trend_ind_mod",
-                  "macro_trend_select", "dur", "divergence", "grow","exchange","api_used"]:
+                  "macro_trend_select", "dur", "divergence", "grow","exchange"]:
             setattr(self,k,locals()[k])
 
         if input_ust is not None:
@@ -103,7 +101,6 @@ class Presel():
                     self.period,
                     symbol_index=symbol_index,
                     suffix=suffix,
-                    api_used=api_used,
                     )
             else:
                 self.ust=StratHold(
@@ -112,7 +109,6 @@ class Presel():
                     symbols=symbols,
                     prd=True,
                     suffix=suffix,
-                    api_used=api_used,
                    )
 
         for k, v in self.ust.__dict__.items():

@@ -128,11 +128,8 @@ class TestOrders(TestCase):
         self.assertEqual(m.exchange_to_index_symbol("XETRA"),["DAX","^GDAXI"])
 
     def test_get_exchange_actions(self):
-        use_IB, t=m.get_exchange_actions("Paris")
-        self.assertEqual(len(t),3)
-        
-        use_IB, t=m.get_exchange_actions("XETRA")
-        self.assertEqual(len(t),1)     
+        self.assertEqual(len(m.get_exchange_actions("Paris")),3)
+        self.assertEqual(len(m.get_exchange_actions("XETRA")),1)     
         
     def test_get_pf(self):
         ss1=m.StockStatus.objects.get(action=self.a)

@@ -80,15 +80,17 @@ def retrieve_data_offline(
        symbol_index: YF ticker of the index
        period: period in which we want to have the data
     '''
-    if symbol_index=="CAC40":
-        ind_sym="FCHI"
-    elif symbol_index=="DAX":
-        ind_sym="GDAXI"
-    elif symbol_index=="NASDAQ":
-        ind_sym="IXIC"
-    elif symbol_index=="Brent":
-        ind_sym="Brent"
-    else:
+    #just for the naming
+    symbol_to_index={
+       "CAC40":"FCHI",
+       "DAX":"GDAXI",
+       "NASDAQ":"IXIC",
+       "Brent":"Brent",
+       }
+    
+    if symbol_index in symbol_to_index:
+        ind_sym=symbol_to_index[symbol_index]
+    else: #default
         ind_sym="DJI"
         
     o.data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+symbol_index+'_' + period+'.h5'))

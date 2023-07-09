@@ -430,13 +430,13 @@ class MyScheduler():
        	----------
            report: report for which the calculation happened
         '''   
-        for api_used in ["YF", "IB"]:
+        for used_api in ["YF", "IB", "CCTX","MT5","TS"]:
             for entry in [False, True]:
                 for buy in [False, True]:
                     try:
-                        ent_ex_symbols=ListOfActions.objects.get(report=report,api_used=api_used,entry=entry,buy=buy)
+                        ent_ex_symbols=ListOfActions.objects.get(report=report,used_api=used_api,entry=entry,buy=buy)
                         for a in ent_ex_symbols.actions.all():
-                            self.send_entry_exit_msg(a.symbol,None, buy,api_used) 
+                            self.send_entry_exit_msg(a.symbol,None, buy,used_api) 
                         self.telegram_bot.send_message_to_all(ent_ex_symbols.text)
                     except:
                         pass
@@ -505,7 +505,7 @@ class MyScheduler():
                             symbol:str,
                             reverse: bool,
                             buy: bool, 
-                            api_used: str,
+                            used_api: str,
                             suffix: str=""
                             ):
         '''
@@ -519,7 +519,7 @@ class MyScheduler():
            auto: was the order automatic or not
            suffix: some text that can be chosen
         '''  
-        self.telegram_bot.send_message_to_all(send_entry_exit_txt(symbol, reverse, buy, api_used, suffix=suffix))
+        self.telegram_bot.send_message_to_all(send_entry_exit_txt(symbol, reverse, buy, used_api, suffix=suffix))
 
     def heartbeat_f(self):
         '''
@@ -552,7 +552,7 @@ def send_entry_exit_txt(
         symbol: str,
         reverse: bool,
         buy: bool, 
-        api_used: str,
+        used_api: str,
         suffix: str="",
         )-> str:
     '''
@@ -566,7 +566,7 @@ def send_entry_exit_txt(
        auto: was the order automatic or not
        suffix: some text that can be chosen
     '''  
-    if api_used=="YF":
+    if used_api!="YF":
         part1=""
         part2=""
     else:

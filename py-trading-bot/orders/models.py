@@ -1,6 +1,6 @@
 import numbers
 from django.db import models
-from django.db.models import Q, signals
+from django.db.models import Q
 
 from trading_bot.settings import _settings
 
@@ -28,28 +28,48 @@ This file contains the models for the orders
 
 The logic to perform them in the different platforms is in ib.py
 '''
+def check_if_index(action):
+    """
+    Check if a product is an index
+    
+    Arguments
+    ----------
+    action: stock to be checked
+    """   
+    if action.category==ActionCategory.objects.get(short="IND"):
+        return True
+    else:
+        return False
+
 def check_ib_permission(symbols: list):
     '''
-    Check if IB can be used
+    Populate USED_API from USED_API_DEFAULT
+    Check if IB can be used, otherwise YF is the fallback. For CCXT, MT5 and TS there is nothing to check.
+    
+    Needs to be performed for each set of symbols reported
 
     Arguments
     ----------
        symbols: list of YF tickers
     '''
-    api_used="IB"
-    for symbol in symbols:
-        if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
-            logger.info("symbol " + symbol + " has no permission for IB")
-            api_used="YF"
-            break
-        
-        a=Action.objects.get(symbol=symbol)      
-        if a.stock_ex.ib_auth==False:
-            logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
-            api_used="YF"
-            break
-    
-    return api_used
+    for k, v in _settings["USED_API_DEFAULT"].items():
+        if v in ["CCXT","MT5","TS"]:
+            _settings["USED_API"][k]=v
+        elif v=="IB":
+            _settings["USED_API"][k]="IB"
+            for symbol in symbols:
+                if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
+                    logger.info("symbol " + symbol + " has no permission for IB")
+                    _settings["USED_API"][k]="YF"
+                    break
+                
+                a=Action.objects.get(symbol=symbol)      
+                if a.stock_ex.ib_auth==False:
+                    logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
+                    _settings["USED_API"][k]="YF"
+                    break
+        elif v=="YF":
+            _settings["USED_API"][k]=v
     
 def get_exchange_actions(exchange:str,**kwargs):
     '''
@@ -82,11 +102,10 @@ def get_exchange_actions(exchange:str,**kwargs):
         c1 = Q(category=cat)
         actions=Action.objects.filter(c1 & c2 & c3)
 
-    api_used="YF"
-    if _settings["USED API_FOR_DATA"]["reporting"]=="IB":
-        api_used=check_ib_permission([a.symbol for a in actions])
+    if _settings["USED_API"]["reporting"]=="":
+        check_ib_permission([a.symbol for a in actions])
 
-    return api_used, actions
+    return actions
 
 def period_YF_to_ib(period: str): #see also split_freq_str in vbt
     '''

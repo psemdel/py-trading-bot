@@ -9,9 +9,11 @@ Created on Sat May 14 21:28:42 2022
 import vectorbtpro as vbt
 import numpy as np
 import pandas as pd
+import sys
 
-from orders.models import Action, period_YF_to_ib, exchange_to_index_symbol
+from orders.models import Action, period_YF_to_ib, exchange_to_index_symbol, check_ib_permission
 from orders.ib import connect_ib, IBData
+from trading_bot.settings import _settings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,38 +31,48 @@ The idea behind it, is to determine in some strategies the trend using the index
 def retrieve_data_online(o,
                   actions: list,
                   period: str,
-                  api_used: str="YF",
                   it_is_index: bool=False,
+                  used_api_key:str="reporting",
                   ) -> (bool, list):
     """
-    Retrieve the data using IB or YF
-
+    Retrieve the data using any API
 
     Arguments
     ----------
         o: object were to put the results
         actions: list of products to be downloaded
         period: time period for which data should be downloaded
-        api_used: which API should be used to download data
+        api_used_key:  key in _settings["USED API"] to be modified / checked
         it_is_index: is it indexes that are provided
         
     """  
-    #load only here, otherwise will cause problem if we want to perform backtest with Django off
-    
+    f_name_dic={
+        "IB":"retrieve_data_ib",
+        "CCXT":"retrieve_data_ccxt",
+        "MT5":"retrieve_data_mt5",
+        "TS":"retrieve_data_ts",
+        "YF":"retrieve_data_yf",
+        }
     
     if actions is None or len(actions)==0:
         raise ValueError("List of symbols empty, is there any stocks related to the requested stock exchange?")
     else:
         print("retrieve data")
+        if _settings["USED_API"][used_api_key]=="":
+            check_ib_permission([a.symbol for a in actions])
 
-        if api_used=="IB":
+        used_api=_settings["USED_API"][used_api_key] #lighten the writting
+
+        if used_api in ["IB","CCXT","MT5","TS"]:
             try:
-                cours, symbols, index_symbol=retrieve_data_ib(actions,period,it_is_index=it_is_index)
+                retrieve_data=getattr(sys.modules[__name__],f_name_dic[used_api])
+                cours, symbols, index_symbol=retrieve_data(actions,period,it_is_index=it_is_index)  
             except:
                 logger.info("IB retrieval of symbol failed, fallback on YF")
-                api_used="YF" #fallback
-        if api_used=="YF":
+                used_api="YF" #fallback
+        if used_api=="YF":
             cours, symbols, index_symbol=retrieve_data_YF(actions,period,it_is_index=it_is_index)
+        _settings["USED_API"][used_api_key]=used_api #save potential change
 
         o.data=cours.select(symbols)
         o.data_ind=cours.select(index_symbol)
@@ -73,7 +85,13 @@ def retrieve_data_online(o,
         if len(o.open_ind)==0 or len(o.open_ind)==0:
             raise ValueError("Retrieve data failed and returned empty Dataframe, check the symbols")
 
-        return api_used, symbols
+        return symbols
+
+#retrieve_data_mt5()
+
+#retrieve_data_ccxt()
+
+#retrieve_data_ts()
 
 @connect_ib 
 def retrieve_data_ib(

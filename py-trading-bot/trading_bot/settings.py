@@ -1,11 +1,8 @@
 ### Setting of the trading bot ###
 import os
+import vectorbtpro as vbt
 
 _settings={
-## IB configuration
-"IB_LOCALHOST":'127.0.0.1',
-"IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
-
 ## Preselection to be used for the different stock exchanges ##
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
@@ -16,7 +13,7 @@ _settings={
 "22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h   
 "NYSE_SECTOR_TO_SCAN":["it", "fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\ 
           #"fin","materials","healthcare"
-          
+     
           
 ## Configuration of Telegram ##
 "PF_CHECK":True,
@@ -35,12 +32,16 @@ _settings={
 "TIME_INTERVAL_UPDATE":60,
 
 ## Order settings ##
-"USED API_FOR_DATA":{
-    "orders": os.environ.get("USED API_FOR_ORDER_PERF","IB"), #"IB", "MT5" or "CCTX" (YF does not allow performing orders)
-    "alerting":os.environ.get("USED API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5" or "CCTX"
-    "reporting":os.environ.get("USED API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5" or "CCTX"
+"USED_API_DEFAULT":{
+    "orders": os.environ.get("USED_API_FOR_ORDER_PERF","IB"), #"IB", "MT5", "TS" or "CCXT" (YF does not allow performing orders)
+    "alerting":os.environ.get("USED_API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5", "TS" or "CCXT"
+    "reporting":os.environ.get("USED_API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5", "TS" or "CCXT"
     },
-    
+"USED_API":{
+    "orders": "", 
+    "alerting":"", 
+    "reporting":"", 
+    },
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
 "PERFORM_ORDER":True, #test or use IB to perform orders
@@ -78,9 +79,29 @@ _settings={
 "CALCULATE_TREND":True,   #trend calculation is time consuming
 
 #for some major events, that cannot be detected only with technical analysis
-"FORCE_MACRO_TO":"" #"bull"/"uncertain"/""
+"FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
+
+## IB configuration
+"IB_LOCALHOST":'127.0.0.1',
+"IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
 }
 
+### For other API ###
+## CCXT ##
+'''
+vbt.CCXTData.set_custom_settings(
+             exchanges=dict(
+                 binance=dict(
+                     exchange_config=dict(
+                         apiKey=os.environ.get("CCXT_KEY","YOUR_KEY"),
+                         secret=os.environ.get("CCXT_SECRET","YOUR_SECRET")
+                     )
+                 )
+             )
+        )
+''' 
+    
+    
 """
 Django settings for trading_bot project.
 
