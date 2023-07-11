@@ -8,7 +8,6 @@ Created on Sat May 14 22:36:16 2022
 import vectorbtpro as vbt
 import numpy as np
 import numbers
-import sys
 
 from core.common import save_vbt_both, remove_multi
 import core.indicators as ic
@@ -312,17 +311,6 @@ def strat_wrapper_macro(open_: np.array,
         print("line " + str(exc_tb.tb_lineno))
         logger.error(e, stack_info=True, exc_info=True) 
 
-def name_to_ust(
-        ust_name: str, 
-        period: str,
-        **kwargs):
-
-    UST=getattr(sys.modules[__name__],ust_name)
-    ust=UST(period,**kwargs)
-    ust.run()
-    
-    return ust
-
 class UnderlyingStrat(): 
     def __init__(self,
                  period: numbers.Number,
@@ -489,6 +477,9 @@ class UnderlyingStrat():
                  )
 
     def get_return(self):
+        '''
+        Give the return for a strategy
+        '''
         pf=vbt.Portfolio.from_signals(self.close, 
                                       entries =self.entries,
                                       exits =  self.exits,

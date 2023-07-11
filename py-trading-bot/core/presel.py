@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import sys
 
-from core import strat
+from core import strat, strat_legacy
 from core.strat import StratHold
 from core.macro import VBTMACROTREND, VBTMACROTRENDPRD
 import core.indicators as ic
@@ -30,6 +30,23 @@ I just select one, two,... actions and put all my orders on them
 
 Those strategies are home made (even though quite similar to classic one). For classic ones look at presel_classic
 """
+def name_to_ust(
+        ust_name: str, 
+        period: str,
+        **kwargs):
+
+    try:
+        UST=getattr(strat,ust_name)
+    except:
+        try:
+            UST=getattr(strat_legacy,ust_name)
+        except:
+            raise ValueError(ust_name + " underlying strategy not found")
+    ust=UST(period,**kwargs)
+    ust.run()
+    
+    return ust
+
 def name_to_presel(
         pr_name: str, 
         period: str,

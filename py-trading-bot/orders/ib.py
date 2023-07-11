@@ -41,7 +41,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
-from orders.models import (Action, StockStatus, Order, ActionCategory, Excluded, Strategy,
+from orders.models import (Action, StockStatus, Order, Excluded, Strategy,
                           action_to_etf, pf_retrieve_all_symbols, check_if_index, check_ib_permission)
 
 #Module to handle IB connection
@@ -482,7 +482,7 @@ class CCXTDataExt(CCXTData):
         currency: symbol of the currency to be checked
         '''
         # Get the account information from the CCXT API
-        account_info = self.exchange.fetch_balance()
+        account_info = self.exchange.fetchBalance()
     
         # If currency is not specified, return the account balance in the account's base currency
         if currency is None:

@@ -6,14 +6,10 @@ _settings={
 ## Preselection to be used for the different stock exchanges ##
 # possible values out-of-the-box:
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
-
-"ETF_IB_auth":False,   
-
 "17h_stock_exchanges":["Paris","XETRA","EUREX"], #exchange to scan at 17h  
 "22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h   
 "NYSE_SECTOR_TO_SCAN":["it", "fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\ 
           #"fin","materials","healthcare"
-     
           
 ## Configuration of Telegram ##
 "PF_CHECK":True,
@@ -81,9 +77,11 @@ _settings={
 #for some major events, that cannot be detected only with technical analysis
 "FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
 
-## IB configuration
+## API configurations
 "IB_LOCALHOST":'127.0.0.1',
 "IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
+
+"ETF_IB_auth":False, 
 
 "CCXT_EXCHANGE":"ace",
 "MT5_HOST":os.environ.get("MT5_HOST",0),

@@ -5,34 +5,32 @@
             <th>Symbol</th>
             <th>Name</th>
             <th>Stock exchange</th>
+            <th>Sector</th>
+            <th>Auto</th>
             <th>Strategy</th>
             <th>Direction</th>
-            <th>Sector</th>
         </tr>
     </thead>
-        {% for pf in pfs %}   
-            {% if pf.actions %}
-                {% for action in pf.actions.all %}
-                    <tr>
-                        <td>{{action.symbol}}</td>
-                        <td>{{action.name}}</td>
-                        <td>{{action.stock_ex.name}}</td>
-                        <td>{{pf.strategy.name}}</td>
-                        
-                        {% if pf.short %}
-                            <td>Short</td>
-                        {% else %}
-                            <td>Long</td>
-                        {% endif %}
-                        <td>{{pf.sector.name}}</td>
-                    </tr>
-                {% endfor %}
-            {% endif %}
+        {% for action in actions %}
+            <tr>
+                <td>{{action.symbol}}</td>
+                <td>{{action.name}}</td>
+                <td>{{action.stock_ex.name}}</td>
+                <td>{{action.sector}}</td>
+                <td>{{action__stockstatus.order_in_ib}}</td>
+                <td>{{action__stockstatus.strategy.name}}</td>
+                
+                {% if action__stockstatus.quantity < 0 %}
+                    <td>Short</td>
+                {% else %}
+                    <td>Long</td>
+                {% endif %}
+            </tr>
         {% endfor %}
 </table>   
 
 <h1>Manual order entry</h1> 
-<p>If you performed an order manually, insert it into the bot, with the form below. Stop loss is optional and makes sense only for opening (leave 0 otherwise).</p>
+<p>If you performed an order manually outside of IB, insert it into the bot with the form below. Stop loss is optional and makes sense only for opening (leave 0 otherwise). For short, give the position of present order in the case of reverse.</p>
 <form method="post">
 {% csrf_token %}
 {{form.as_table }}

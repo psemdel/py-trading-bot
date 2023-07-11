@@ -5,6 +5,7 @@ import math
 from trading_bot.settings import _settings
 
 from core import strat, presel
+from core.presel import name_to_ust
 from core import indicators as ic
 from core.common import intersection
 import warnings
@@ -17,6 +18,7 @@ from orders.models import Action, get_pf, get_candidates,\
                           StratCandidates, StockEx, Strategy, ActionSector,\
                           check_ib_permission, filter_intro_action
 from orders.ss_manager import StockStatusManager
+
       
 class ListOfActions(models.Model):
     """
@@ -383,7 +385,7 @@ class Report(models.Model):
             else:
                 ust_name=_settings["STRATEGY_NORMAL_STOCKS"]
                 
-            ust_normal=strat.name_to_ust(
+            ust_normal=name_to_ust(
                 ust_name,
                 str(_settings["DAILY_REPORT_PERIOD"])+"y",
                 prd=True,
@@ -430,7 +432,7 @@ class Report(models.Model):
         ust_normal: underlying strategy containing most of the needed information
         '''        
         if not self.it_is_index:
-            ust_keep=strat.name_to_ust(
+            ust_keep=name_to_ust(
                 _settings["STRATEGY_RETARD_KEEP"],
                 ust_normal.period,
                 input_ust=ust_normal,
@@ -493,7 +495,7 @@ class Report(models.Model):
                     slow_cands[s.name]=[]   
                      
             ##Change underlying strategy
-            ust_slow=strat.name_to_ust(
+            ust_slow=name_to_ust(
                 "StratKamaStochMatrendBbands",
                 ust_normal.period,
                 input_ust=ust_normal,
@@ -529,7 +531,7 @@ class Report(models.Model):
                 pf_div=get_pf("divergence",ust_normal.exchange,False)
                 self.concat("symbols in divergence: " +str(pf_div))
                 ##Change underlying strategy
-                ust_div=strat.name_to_ust(
+                ust_div=name_to_ust(
                     "StratDiv",
                     ust_normal.period,
                     input_ust=ust_normal,
@@ -622,7 +624,7 @@ class Report(models.Model):
                     ust_pattern=ic.VBTPATTERN.run(ust_normal.open,ust_normal.high,ust_normal.low,ust_normal.close,light=True)
                 ust_trend=None
                 if _settings["CALCULATE_TREND"]:
-                    ust_trend=strat.name_to_ust(
+                    ust_trend=name_to_ust(
                         "StratKamaStochMatrendMacdbbMacro",
                         ust_normal.period,
                         input_ust=ust_normal,

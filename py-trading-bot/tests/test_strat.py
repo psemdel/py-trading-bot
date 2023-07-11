@@ -81,6 +81,8 @@ class TestStrat(unittest.TestCase):
           
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),2.38)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.39)   
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.78)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.02)  
         
     def test_stratF(self):
         self.ust=strat.StratF(self.period, symbol_index=self.symbol_index)

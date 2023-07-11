@@ -389,18 +389,11 @@ class MyScheduler():
                             cours_pres=get_last_price(action)
                             if (not o.short and cours_pres<o.sl_threshold) or\
                             (o.short and cours_pres>o.sl_threshold):
-                                
-                                ###To be fixed!!!! ####
-                                print("sl exit")
-                                ex=True
-                                #ex, auto=exit_order(action.symbol,
-                                #           o.pf.strategy.name, 
-                                #           o.pf.stock_ex.name,
-                                #           o.short,
-                                #           auto,
-                                #           )
-                                if ex:
-                                    self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="stop loss") 
+
+                                r=Report.objects.create()
+                                r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
+                                r.ss_m.resolve()
+                                self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="Stop loss")
                         
                         if o.daily_sl_threshold is not None:
                             ratio=get_ratio(action)
@@ -408,17 +401,10 @@ class MyScheduler():
                             if (not o.short and ratio<-o.daily_sl_threshold*100) or\
                             (o.short and ratio>o.daily_sl_threshold*100):
     
-                                ###To be fixed!!!! ####
-                                print("sl exit")
-                                ex=True
-                                #ex, auto=exit_order(action.symbol,
-                                #           o.pf.strategy.name, 
-                                #           o.pf.stock_ex.name,
-                                #           o.short,
-                                #           auto,
-                                #           )
-                                if ex:
-                                    self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="daily stop loss")                        
+                                r=Report.objects.create()
+                                r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
+                                r.ss_m.resolve()
+                                self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="daily stop loss")                        
            
     def send_order(self,
                    report: Report
