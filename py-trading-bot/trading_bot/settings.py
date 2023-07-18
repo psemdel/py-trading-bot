@@ -8,14 +8,13 @@ _settings={
 # "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
 "17h_stock_exchanges":["Paris","XETRA","EUREX"], #exchange to scan at 17h  
 "22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h   
-"NYSE_SECTOR_TO_SCAN":["it", "fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\ 
-          #"fin","materials","healthcare"
           
 ## Configuration of Telegram ##
 "PF_CHECK":True,
 "INDEX_CHECK":True,
 "REPORT_17h":True, #for Paris and XETRA
 "REPORT_22h":True, #for Nasdaq and Nyse
+"INTRADAY":False,
 "HEARTBEAT":False, # to test telegram
 "HEARTBEAT_IB":False, # to test telegram
 "UPDATE_SLOW_STRAT":True, 
@@ -26,6 +25,7 @@ _settings={
 
 "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
 "TIME_INTERVAL_UPDATE":60,
+"TIME_INTERVAL_INTRADAY":15,
 
 ## Order settings ##
 "USED_API_DEFAULT":{

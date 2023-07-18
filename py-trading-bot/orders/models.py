@@ -315,6 +315,9 @@ def symbol_to_action(symbol)-> Action:
         return symbol #action in this case
 
 class Currency(models.Model):
+    '''
+    Currency in which the stock is traded
+    '''
     name=models.CharField(max_length=100, blank=False)
     symbol=models.CharField(max_length=100, blank=False,default="A")
     
@@ -325,18 +328,22 @@ class Currency(models.Model):
         return self.name
     
 class Fees(models.Model):
+    '''
+    Fees for the trades
+    '''
     name=models.CharField(max_length=100, blank=False, default="fee")
     fixed=models.DecimalField(max_digits=100, decimal_places=5)
     percent=models.DecimalField(max_digits=100, decimal_places=5)
     
     def __str__(self):
         return self.name  
- 
+
 class Strategy(models.Model):
     '''
     Strategy to be used for product to perform the orders
     '''
     name=models.CharField(max_length=100, blank=False)
+    class_name=models.CharField(max_length=100, blank=False, null=True)
     perform_order=models.BooleanField(blank=False,default=False)
     priority=models.IntegerField(null=False, blank=False, default=1000)
     order_size=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
@@ -351,6 +358,9 @@ class Strategy(models.Model):
         return self.name
     
 class StockEx(models.Model):
+    '''
+    Stock exchange
+    '''
     name=models.CharField(max_length=100, blank=False)
     fees=models.ForeignKey('Fees',on_delete=models.CASCADE)
     ib_ticker=models.CharField(max_length=15, blank=True,default="AAA")
@@ -359,7 +369,8 @@ class StockEx(models.Model):
     timezone=models.CharField(max_length=60,choices=all_tz, blank=False,default='Europe/Paris')
     perform_order=models.BooleanField(blank=False,default=False)
     ib_auth=models.BooleanField(blank=False,default=False)
-    strategies_in_use=models.ManyToManyField(Strategy,blank=True)   # Presel strategies in use, normal/sl/tsl depends on the selected candidates
+    strategies_in_use=models.ManyToManyField(Strategy,blank=True, related_name='strategies_in_use')   # Presel strategies in use, normal/sl/tsl depends on the selected candidates
+    strategies_in_use_intraday=models.ManyToManyField(Strategy,blank=True, related_name='strategies_in_use_intraday')  
     presel_at_sector_level=models.BooleanField(blank=False,default=False)
     main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=None)
     
@@ -479,7 +490,8 @@ class ActionSector(models.Model):
     GICS sectors    
     '''
     name=models.CharField(max_length=100, blank=False)
-    strategies_in_use=models.ManyToManyField(Strategy,blank=True)   
+    strategies_in_use=models.ManyToManyField(Strategy,blank=True,related_name="as_strategies_in_use")  
+    strategies_in_use_intraday=models.ManyToManyField(Strategy,blank=True,related_name="as_strategies_in_use_intraday") 
     
     class Meta:
         ordering = ["name"]

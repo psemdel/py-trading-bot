@@ -13,11 +13,11 @@ import numbers
 
 from orders.models import StockStatus, Strategy, Action
 from orders.ib import OrderPerformer
+from trading_bot.settings import _settings
 
 import logging
 from decimal import Decimal
 logger = logging.getLogger(__name__)
-logger_trade = logging.getLogger('trade')
 
 '''
 This file contains StockStatusManager, see description below
@@ -34,6 +34,7 @@ class StockStatusManager():
         Arguments
        	----------
            report: report associated with the stockstatus manager, useful to resolve
+           testing: should be true for testing and avoiding orders
         """
         self.present_ss= pd.DataFrame.from_records(StockStatus.objects.all().values(),index="action_id")
         comp= pd.DataFrame.from_records(Action.objects.all().values("symbol","etf_long_id","etf_short_id"),index="symbol")
@@ -161,7 +162,7 @@ class StockStatusManager():
                     )
                 out=op.sell_order()
                 if out:
-                    self.report.handle_listOfActions(op.action, op.entry, op.api_used, False, st.name, reverse=op.reverse)
+                    self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], False, st.name, reverse=op.reverse)
     
             buy_df=self.target_ss[self.target_ss["norm_delta_quantity"]>0].copy()
             buy_df.sort_values(by=["priority"],inplace=True)
@@ -177,7 +178,7 @@ class StockStatusManager():
                     )
                 out=op.buy_order()
                 if out:
-                    self.report.handle_listOfActions(op.action, op.entry, op.api_used, True, st.name, reverse=op.reverse)
+                    self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], True, st.name, reverse=op.reverse)
 
     def resolve(self):
         self.determine_target()
@@ -235,13 +236,33 @@ class StockStatusManager():
                 sold_symbols[s]=df.loc[s,"quantity"]
         
         #add candidates
-        for s in candidates:
-            if short:
-                self.target_ss_by_st.loc[s,strategy]=-1
-            else:
-                self.target_ss_by_st.loc[s,strategy]=1
+        self.cand_to_quantity_entry(candidates, strategy, short)
 
-        return sold_symbols #for keep  
+        return sold_symbols #for keep 
+    
+    def cand_to_quantity_entry(
+            self,
+            candidates: list,
+            strategy: str,
+            short:bool):
+        
+        '''
+        Part for the entry, used alone for only_exit_substrat
+        
+        Arguments
+        ----------
+            candidates: list of stocks that this strategy wants to "buy"
+            strategy: Strategy name involved in this decision
+            short: direction desired for those candidates
+        '''
+        if len(candidates)==0:
+            self.report.concat(strategy +" no candidates")     
+        else:
+            for s in candidates:
+                if short:
+                    self.target_ss_by_st.loc[s,strategy]=-1
+                else:
+                    self.target_ss_by_st.loc[s,strategy]=1
 
     def order_nosubstrat(self,
                          candidates: list, 
@@ -262,36 +283,21 @@ class StockStatusManager():
         short: direction of the desired order
         
     	"""        
-        if len(candidates)==0:
-            self.report.concat(strategy +" no candidates")
-        
-        self.clean_wrong_direction(strategy, short)
-        sold_symbols=self.cand_to_quantity(candidates, strategy, short)
-        
-        if kwargs.get("keep",False):
-            for s, v in sold_symbols.items():
-                self.add_target_quantity(s, "retard_keep", v)
-                
-    #YF symbol expected here
-    def order_only_exit_substrat(self,
-                                 candidates: list, 
-                                 strategy: str, 
-                                 short: bool,
-                                 **kwargs):
-        #to be checked if not redundant with cand_to_quantity
-        if short:
-            q=-1
-        else:
-            q=1
-        
-        if len(candidates)==0:
-            self.report.concat(strategy +" no candidates")        
-        else:
-            #buy without condition
-            for symbol in candidates:
-                self.add_target_quantity(symbol, strategy, q)
-                self.report.concat(strategy +" candidates " + symbol) 
-
+        try:
+            if len(candidates)==0:
+                self.report.concat(strategy +" no candidates")
+            
+            self.clean_wrong_direction(strategy, short)
+            sold_symbols=self.cand_to_quantity(candidates, strategy, short)
+            
+            if kwargs.get("keep",False):
+                for s, v in sold_symbols.items():
+                    self.add_target_quantity(s, "retard_keep", v)
+        except Exception as e:
+              import sys
+              _, e_, exc_tb = sys.exc_info()
+              print(e)
+              print("line " + str(exc_tb.tb_lineno))
 
     def ex_ent_to_target(self,
                          ent: bool,

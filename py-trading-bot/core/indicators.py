@@ -11,6 +11,8 @@ import talib
 from talib.abstract import *
 import numpy as np
 from numba import njit
+from scipy.signal import morlet
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -836,3 +838,27 @@ VBTSUM = vbt.IF(
       sum_ent, 
       takes_1d=True,  
  )      
+
+def wavelet_transform(close, window_size):
+    wavelet = morlet(window_size, 5)
+    out = np.convolve(close, wavelet, mode='same')
+    return out
+
+VBTMORLET = vbt.IF(
+      class_name='VBTMORLET',
+      short_name='vbt_morlet',
+      input_names=['close'],
+      param_names=['window_size'],
+      output_names=["out"]
+ ).with_apply_func(
+      wavelet_transform, 
+      takes_1d=True,  
+ )   
+
+
+
+
+
+    
+
+ 

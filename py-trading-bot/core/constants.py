@@ -106,8 +106,7 @@ CAC40_INTRO={
     "STLA.PA":"2021-01-18",
     "LR.PA":"2006-06-01", #from YF
     "WLN.PA":"2014-07-02",
-    "ACA.PA":"2002-01-01",
-    "ACA.PA":"2007-01-22", #for some inexplicable reason on YF
+    "ACA.PA":"2007-01-22", #for some inexplicable reason on YF #"ACA.PA":"2002-01-01",
     "SW.PA":"2000-03-01",
     }
 
@@ -126,7 +125,7 @@ DAX=[
     "CBK.DE",
     "CON.DE",
     "DB1.DE",
-    "DBK.DE", #DB
+    "DBK.DE", #=DB
     "DHER.DE",
     "DPW.DE",
     "DTE.DE", 

@@ -9,13 +9,14 @@ import vectorbtpro as vbt
 import numpy as np
 import numbers
 
-from core.common import save_vbt_both, remove_multi
+from core.common import save_vbt_both, remove_multi, intersection
 import core.indicators as ic
 from core.macro import VBTMACROFILTER, VBTMACROMODE, VBTMACROTREND, VBTMACROTRENDPRD, major_int
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
 from core.data_manager import retrieve_data_offline #don't load here retrieve_data_online, otherwise backtesting with Django off won't work
 import inspect
 import pandas as pd
+from trading_bot.settings import _settings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -326,6 +327,7 @@ class UnderlyingStrat():
                  strat_arr_bear: list=None,
                  strat_arr_uncertain: list=None,
                  exchange:str=None,
+                 st=None
                  ):
         """
         Strategies on one action, no preselection. For production and non production, to make the strats as child of the main one.
@@ -346,12 +348,14 @@ class UnderlyingStrat():
             strat_arr_bull: array of the strategy combination to use, trend bull
             strat_arr_bear: array of the strategy combination to use, trend bear
             strat_arr_uncertain: array of the strategy combination to use, trend uncertain
+            exchange: stock exchange, only for saving
+            st: strategy associated
         """
         try:
             self.suffix=suffix
             if self.suffix!="":
                 self.suffix="_" + self.suffix
-            for k in ["prd","period","symbol_index", "actions","symbols","exchange"]:
+            for k in ["prd","period","symbol_index", "actions","symbols","exchange","st"]:
                 if locals()[k] is None and input_ust is not None:
                     setattr(self,k, getattr(input_ust,k))
                 else:
@@ -403,8 +407,6 @@ class UnderlyingStrat():
                         self.symbols_to_YF[s]=s
                     
             if input_ust is not None and self.prd: 
-                from trading_bot.settings import _settings #load only if in Django
-                
                 self.symbols=[]
                 for a in self.actions:
                     if _settings["USED_API"]["reporting"]=="IB":
@@ -490,6 +492,31 @@ class UnderlyingStrat():
         #benchmark_return makes sense only for bull
         delta=pf.total_return().values[0]
         return delta
+    
+    def perform_StratCandidates(self, st_name, r):
+        from orders.models import Strategy, StratCandidates
+        st, _=Strategy.objects.get_or_create(name=st_name)
+        st_actions, _=StratCandidates.objects.get_or_create(strategy=st)  #.id
+        st_symbols=st_actions.retrieve()
+        
+        for symbol in intersection(self.symbols,st_symbols):
+            if np.isnan(self.vol[symbol].values[-1]):
+                self.concat("symbol " + symbol + " no data")
+            else:
+                symbol_complex_ent, symbol_complex_ex=r.display_last_decision(symbol,self, st_name)
+                
+                #list present status
+                r.ss_m.ex_ent_to_target(
+                    self.entries[symbol_complex_ent].values[-1],
+                    self.exits[symbol_complex_ex].values[-1],
+                    self.entries_short[symbol_complex_ex].values[-1],
+                    self.exits_short[symbol_complex_ent].values[-1],
+                    self.symbols_to_YF[symbol], 
+                    st_name
+                    )
+                
+    def perform(self, st_name, r): #default
+        self.perform_StratCandidates(st_name, r)        
 ###production functions        
     def get_last_decision(self, symbol_complex_ent: str, symbol_complex_ex: str):
         for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):
@@ -1080,4 +1107,56 @@ STRATWRAPPER = vbt.IF(
      trend_key="bbands",
      macro_trend_index=False,
      light=True
-)              
+)         
+
+class StratMorlet(UnderlyingStrat):
+    def __init__(
+            self,
+            period: numbers.Number,
+            positionSizingModel:str = 'percentage', # Choose the position sizing model ('percentage', 'fixed_ratio', 'secure_f', 'margin_based')
+            accountEquity: numbers.Number = 100000, # Account equity
+            riskPercentage: numbers.Number = 1.5, # Risk percentage per trade
+            stopLossPips: numbers.Number = 250, # Stop loss in pips
+            percentageVolatility: numbers.Number = 2.5, # Percentage volatility model
+            fixedRatio: numbers.Number = 0.02, # Fixed ratio model
+            secureF: numbers.Number = 0.01, # Secure (f) model
+            marginBasedSize: numbers.Number = 0.01, # Margin-based size mode
+            contractSize: numbers.Number = 5000,
+            **kwargs):
+        
+        super().__init__(period,**kwargs)
+        wavelet=ic.VBTMORLET(self.close)
+        price_diff=self.close.diff()
+        up=price_diff.clip(lower=0)
+        down=price_diff.clip(upper=0) * -1
+        #Compute ranks using the entire price data
+        up_norm=up.rank(pct=True)
+        down_norm = down.rank(pct=True)
+        #Calculate log returns
+        log_returns = np.log(self.close).diff()
+        
+        accountSize = accountEquity * riskPercentage / 100.0
+        
+        #Calculate position size
+        if positionSizingModel == 'percentage':
+            positionSize = accountSize * percentageVolatility / (stopLossPips * contractSize)
+        elif positionSizingModel == 'fixed_ratio':
+            positionSize = accountEquity * fixedRatio / (stopLossPips * contractSize)
+        elif positionSizingModel == 'secure_f':
+            positionSize = accountEquity * secureF / (stopLossPips * contractSize)
+        elif positionSizingModel == 'margin_based':
+            margin = accountEquity * marginBasedSize
+            positionSize = margin / stopLossPips
+
+        print("Position Size:", positionSize)
+        
+        #Define trading logic
+        position_size=np.where(up_norm > 0.95, positionSize, np.where(down_norm > 0.95, -positionSize, np.nan))
+        position_size=position_size.fillna(method='ffill')
+        
+        #Compute returns
+        returns= log_returns* position_size
+        
+        #Calculate equity curve
+        equity_curve = (returns + 1).cumprod() * accountEquity
+    

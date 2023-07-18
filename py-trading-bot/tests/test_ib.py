@@ -111,9 +111,9 @@ class TestIB(TestCase):
             sector=self.s,
             )
         self.a6=m.Action.objects.create(
-            symbol='PAYX',
+            symbol='KHC',
             #ib_ticker='AC',
-            name="Pay X",
+            name="KHC",
             stock_ex=self.e4,
             currency=c2,
             category=cat,
@@ -245,7 +245,7 @@ class TestIB(TestCase):
 
     def test_get_delta_size(self):
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
-        op.api_used="YF"
+        _settings["USED_API"]["orders"]="YF"
         op.get_order(True) #to create self.order
         op.get_delta_size()
         self.assertFalse(op.reverse)
@@ -255,20 +255,21 @@ class TestIB(TestCase):
 
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.reverse=False
-        
-        op.api_used="YF"
+
+        _settings["USED_API"]["orders"]="YF"
         op.entry_place(True)
         self.assertEqual(op.new_order.entering_price,1.0)
         self.assertEqual(op.ss.quantity,1.0)
         
-        #op.api_used="IB"
+        #op.used_api="IB"
         op.entry_place(True)
         self.assertEqual(op.new_order.entering_price,1.0)
         
         #if excluded no order
         op=ib.OrderPerformer("AI.PA",self.strategy.id,10000)
         op.excluded.append("AI.PA")
-        op.api_used="YF"
+        
+        _settings["USED_API"]["orders"]="YF"
         op.reverse=False
         op.entry_place(True)
         self.assertFalse("new_order" in op.__dir__())
@@ -278,7 +279,7 @@ class TestIB(TestCase):
     def test_entry_place2(self):        
         #If already in pf, no order
         op=ib.OrderPerformer("AI.PA",self.strategy.id,10000)
-        op.api_used="YF"
+        _settings["USED_API"]["orders"]="YF"
         op.reverse=False
         
         op.ss.quantity=1
@@ -299,7 +300,7 @@ class TestIB(TestCase):
     def test_buy_order(self):
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000,testing=True)
         
-        op.api_used="YF"
+        _settings["USED_API"]["orders"]="YF"
         self.assertTrue(op.buy_order_sub())
         self.assertEqual(op.ss.quantity,1)
         self.assertEqual(op.new_order.entering_price,1.0)
@@ -307,12 +308,12 @@ class TestIB(TestCase):
         self.assertTrue(op.executed)
 
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000000,testing=True)
-        op.api_used="IB"
+        _settings["USED_API"]["orders"]="IB"
         #expected not enough cash
         self.assertFalse(op.buy_order_sub())
         
         op=ib.OrderPerformer("AC.PA",self.strategy.id,1,testing=True)
-        op.api_used="IB"
+        _settings["USED_API"]["orders"]="IB"
         #expected enough cash
         self.assertTrue(op.buy_order_sub())
         self.assertEqual(op.new_order.entering_price,1.0)  
@@ -320,7 +321,7 @@ class TestIB(TestCase):
     def test_sell_order(self):
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000,testing=True)
         
-        op.api_used="YF"
+        _settings["USED_API"]["orders"]="YF"
         self.assertTrue(op.sell_order_sub())
         self.assertEqual(op.ss.quantity,-1)
         self.assertEqual(op.new_order.entering_price,1.0)
@@ -328,6 +329,7 @@ class TestIB(TestCase):
         self.assertTrue(op.executed)
     
     def test_actualize_ss(self):
+        _settings["USED_API"]["alerting"]="IB"
         ib.actualize_ss()
         
         present_ss=pd.DataFrame.from_records(m.StockStatus.objects.all().values(),index="action_id")

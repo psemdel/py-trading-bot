@@ -32,6 +32,8 @@ except ImportError:
     CCXTExchangeT = tp.Any
     
 ###TS???
+import socket
+import json
 
 import vectorbtpro as vbt
 import numpy as np
@@ -233,6 +235,7 @@ def place(
     action: stock to be checked
     quantity: quantity, in number of stocks, of the stock to be ordered
     order_size: size, in currency, of the stock to be ordered
+    testing: set to True to perform unittest on the function
     """       
     try:
         if _settings["USED_API"]["orders"]=="IB":
@@ -270,6 +273,8 @@ def place(
          logger.error(e, stack_info=True, exc_info=True)   
 
 ### Tradestation ###
+TS_API_ENDPOINT = "api.tradestation.com"
+
 class TradeStationData(RemoteData):
     def __init__(
             self, 
@@ -1002,6 +1007,7 @@ def place_ib(
     action: stock to be checked
     quantity: quantity, in number of stocks, of the stock to be ordered
     order_size: size, in currency, of the stock to be ordered
+    testing: set to True to perform unittest on the function
     """       
     try:
         if kwargs['client'] and ib_global["connected"]:
@@ -1157,7 +1163,7 @@ class OrderPerformer():
                 self.entry=True
                 buy_sell_txt={True:"buying ", False: "selling "}
                 #add reverse info
-                if self.api_used=="IB":
+                if _settings["USED_API"]["orders"]=="IB":
                     logger_trade.info("place "+  buy_sell_txt[buy] + "order symbol: "+self.symbol+" , strategy: " + self.st.name)
                     self.new_order.entering_price, _= place(buy,
                                             self.action,
@@ -1214,7 +1220,7 @@ class OrderPerformer():
         Calculate the difference between the desired final position (self.target_size)
         and the present position (self.order.quantity) for a stock (self.action)
         """
-        if self.api_used=="IB":
+        if _settings["USED_API"]["orders"]=="IB":
             #safer than looking in what we saved
             present_quantity, present_sign, _=retrieve_quantity(self.action) 
         else:
@@ -1264,7 +1270,7 @@ class OrderPerformer():
                     if self.reverse and self.symbol not in self.excluded.retrieve():
                         self.entry_place(False, order_size=self.delta_size,testing=self.testing)     
                         self.order.exiting_price=self.new_order.entering_price
-                    elif self.api_used=="IB":
+                    elif _settings["USED_API"]["orders"]=="IB":
                         if self.reverse:
                             logger.info(str(self.symbol) + " excluded, reverse order converted to close") 
                         
@@ -1302,7 +1308,7 @@ class OrderPerformer():
             self.get_order(True)
             self.get_delta_size()
             
-            if self.api_used=="IB":
+            if _settings["USED_API"]["orders"]=="IB":
                 enough_cash=check_enough_cash(self.delta_size,currency=self.action.currency.symbol)
             else:
                 enough_cash=True
@@ -1323,7 +1329,7 @@ class OrderPerformer():
                         if self.reverse and self.symbol not in self.excluded.retrieve():
                             self.entry_place(True, order_size=self.delta_size)
                             self.order.exiting_price=self.new_order.entering_price
-                        elif self.api_used=="IB" :
+                        elif _settings["USED_API"]["orders"]=="IB" :
                             if self.reverse:
                                 logger.info(str(self.symbol) + " excluded, reverse order converted to close") 
                                 

@@ -9,9 +9,8 @@ Created on Sun Mar 26 12:35:55 2023
 import vectorbtpro as vbt
 import numpy as np
 
-from core import strat
 from core.common import remove_multi
-from core.presel import Presel
+from core.presel import Presel, name_to_ust_or_presel
 from numba import njit
 
 import logging
@@ -133,7 +132,7 @@ class PreselClassic(Presel):
         self.size=self.new_alloc #remove_multi(self.new_alloc)* remove_multi(size_underlying)
 
     def apply_underlying_strat(self, strat_name):
-        self.ust=strat.name_to_ust(strat_name,self.period, symbol_index=self.symbol_index)
+        self.ust=name_to_ust_or_presel(strat_name,self.period, symbol_index=self.symbol_index)
         self.fill_allocations_underlying()
         
         #as function from_optimizer

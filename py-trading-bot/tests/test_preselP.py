@@ -11,8 +11,8 @@ import unittest
 from core import presel, strat
 from orders.models import (Fees, StockEx, Action, ActionSector,
                           ActionCategory, Strategy, Currency, Candidates, Excluded,
-                          get_exchange_actions)
-from orders.models import  get_candidates
+                          get_exchange_actions, get_candidates)
+from reporting.models import Report
 
 class TestbtP(TestCase):
     def setUp(self):
@@ -87,63 +87,74 @@ class TestbtP(TestCase):
         e.main_index=self.a5
         e.save()
         
+        self.report1=Report()
+        self.report1.save(testing=True)
+        
+        actions=get_exchange_actions("Paris")
+        self.ust=strat.StratDiv("1y",prd=True, actions=actions,exchange="Paris")
+        self.ust.run()
+        
   #hist slow does not need code here
     def test_actualize_hist_vol_slow(self):
-        api_used, actions=get_exchange_actions("Paris")
-        
-        self.pr=presel.PreselHistVolSlow("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
-
         strategy=Strategy.objects.create(name="hist_slow")
+        self.pr=presel.PreselHistVolSlow("1y",prd=True,input_ust=self.ust,st=strategy)
+
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.pr.actualize()
         #cand=get_candidates("hist_slow","Paris")
         
     def test_actualize_hist_vol_slow2(self):
-        api_used, actions=get_exchange_actions("Paris")
-        
-        self.ust=strat.StratDiv("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
-        self.ust.run()
-        
-        self.pr=presel.PreselHistVolSlow("1y",prd=True, input_ust=self.ust)
-        
         strategy=Strategy.objects.create(name="hist_slow")
+        self.pr=presel.PreselHistVolSlow("1y",prd=True, input_ust=self.ust,st=strategy)
+        
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.pr.actualize()
         #cand=get_candidates("hist_slow","Paris")
         
     def test_actualize_realmadrid(self):
-        api_used, actions=get_exchange_actions("Paris")
-        
-        self.pr=presel.PreselRealMadrid("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
-        
-        strategy=Strategy.objects.create(name="realmadrid")
+        strategy=Strategy.objects.create(name="realmadrid", class_name="PreselRealMadrid")
+        self.pr=presel.PreselRealMadrid("1y",prd=True,input_ust=self.ust,st=strategy)
         Excluded.objects.create(name="realmadrid", strategy=strategy)
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.pr.actualize()
         cand=get_candidates("realmadrid","Paris")
         self.assertEqual(len(cand.retrieve()),2)
-        
+
     def test_actualize_realmadrid2(self):
-        api_used, actions=get_exchange_actions("Paris")
-        
-        self.ust=strat.StratDiv("1y",prd=True, api_used=api_used,actions=actions,exchange="Paris")
-        self.ust.run()
-        
-        self.pr=presel.PreselRealMadrid("1y",prd=True, input_ust=self.ust)
-        
-        strategy=Strategy.objects.create(name="realmadrid")
+        strategy=Strategy.objects.create(name="realmadrid", class_name="PreselRealMadrid")
+        self.pr=presel.PreselRealMadrid("1y",prd=True, input_ust=self.ust,st=strategy)
         Excluded.objects.create(name="realmadrid", strategy=strategy)
         Candidates.objects.create(strategy=strategy,stock_ex=self.e)
         self.pr.actualize()
         cand=get_candidates("realmadrid","Paris")
-        self.assertEqual(len(cand.retrieve()),2)   
+        self.assertEqual(len(cand.retrieve()),2)  
         
-    def test_wq(self):
-        self.ust=strat.StratDiv("1y",prd=True, api_used="YF",actions=self.actions,exchange="Paris")
-        self.ust.run()
+    def test_realmadrid_perform(self):
+        strategy=Strategy.objects.create(name="realmadrid", class_name="PreselRealMadrid")
+        self.pr=presel.PreselRealMadrid("1y",prd=True, input_ust=self.ust, st=strategy)
+        Excluded.objects.create(name="realmadrid", strategy=strategy)
+        Candidates.objects.create(strategy=strategy,stock_ex=self.e)
+        self.pr.actualize()
+        
+        self.pr.perform(self.report1)
 
-        wq=presel.WQ("1y",input_ust=self.ust)
-        wq.call_wqa(7)
+    def test_wq(self):
+        st=Strategy.objects.create(name="wq54", class_name="PreselWQ54")
+        wq=presel.PreselWQ("1y",input_ust=self.ust,nb=54,st=st)
+        wq.perform(self.report1)
+        
+    def test_retard(self):
+        st=Strategy.objects.create(name="retard", class_name="PreselRetard")
+        
+        ust_or_pr=presel.name_to_ust_or_presel(
+            "PreselRetard",
+            self.ust.period,
+            input_ust=self.ust,
+            prd=True,
+            it_is_index=False,
+            st=st
+            )  
+        ust_or_pr.perform(self.report1)
  
 if __name__ == '__main__':
     unittest.main() 

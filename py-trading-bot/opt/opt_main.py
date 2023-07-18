@@ -2,7 +2,7 @@ import numbers
 from core import indicators as ic
 from core.macro import VBTMACROTREND, VBTMACROMODE, VBTMACROFILTER
 
-from core.data_manager import retrieve
+from core.data_manager import retrieve_data_offline 
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
@@ -117,7 +117,7 @@ class OptMain():
         self.total_len={}
 
         for ind in self.indexes:
-            retrieve(self,ind,period)
+            retrieve_data_offline(self,ind,period)
             if self.it_is_index:
                 self.suffix="_ind"
             else:

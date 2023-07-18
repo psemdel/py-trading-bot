@@ -30,7 +30,7 @@ from reporting.models import Report, Alert, ListOfActions
 from orders.ib import actualize_ss, get_last_price, get_ratio
 from orders.models import Action, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
-                          get_exchange_actions, action_to_short  
+                          get_exchange_actions, action_to_short, ActionSector 
                  
 from core import constants, presel
 
@@ -102,6 +102,7 @@ class MyScheduler():
         self.update_slow =_settings["UPDATE_SLOW_STRAT"]
         self.update_ss=True
         self.cleaning=True
+        self.intraday=_settings["INTRADAY"]
         
         tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
         tz_NY=ZoneInfo('US/Eastern') #does not seem to be at ease with multiple tz
@@ -128,7 +129,8 @@ class MyScheduler():
             self.do_weekday(time(10,00,tzinfo=tz_Paris), self.update_slow_strat) #performed away from the opening
         if self.update_ss:
             self.manager.every(_settings["TIME_INTERVAL_UPDATE"], 'minutes').do(actualize_ss)
-
+        if self.intraday:
+            self.manager.every(_settings["TIME_INTERVAL_INTRADAY"], 'minutes').do(self.daily_report,intraday=True)
         #the "background is created by celery"
         #OOTB vbt start_in_background does not seem to be compatible with django
         if not kwargs.get("test",False):
@@ -434,30 +436,29 @@ class MyScheduler():
         '''
         See daily report
         '''        
-        report1=Report()
-        report1.save()
+        report1=Report.objects.create()
         
-        st=report1.daily_report(exchange=exchange,**kwargs)
-        if st is None:
+        ust_hold=report1.daily_report(exchange=exchange,**kwargs)
+        if ust_hold is None:
             raise ValueError("The creation of the strategy failed, report creation interrupted")
-            
-        report1.presel(st,exchange,**kwargs)
-        report1.presel_wq(st,exchange,**kwargs)
+          
+        report1.perform(ust_hold,**kwargs)
         self.send_order(report1)
         
     def daily_report_index_sub(self,indexes: list):
         '''
         See daily report
         '''
-        report3=Report()
-        report3.save()    
+        report3=Report.objects.create()
 
-        report3.daily_report(symbols=indexes,it_is_index=True) # "BZ=F" issue
+        ust_hold=report3.daily_report(symbols=indexes,it_is_index=True) # "BZ=F" issue
+        report3.perform(ust_hold,it_is_index=True)
         self.send_order(report3)
         
     def daily_report(self, 
                      short_name: str=None,
                      key: str=None,
+                     intraday: bool=False,
                      **kwargs):
         '''
         Write report for an exchange and/or sector
@@ -465,28 +466,41 @@ class MyScheduler():
         Arguments
        	----------
            report: report for which the calculation happened
+           key: 17h or 22h, to determine the stockexchange to check
+           intraday: is it a report at the end of the day or during it
         '''  
         try:
             print("writting daily report "+short_name)
-            for exchange in _settings[key]:
-                if exchange=="NYSE":
-                    for s in _settings["NYSE_SECTOR_TO_SCAN"]:  
-                        print("starting report " + s)
-                        self.daily_report_sub("NYSE",sec=s)
-                else:
-                    self.daily_report_sub(exchange)
+            
+            if intraday:
+                a="strategies_in_use_intraday"
+                stock_exs=StockEx.objects.all()
+            else:
+                a="strategies_in_use"
+                stock_exs=[StockEx.objects.get(name=exchange) for exchange in _settings[key]]
 
-            indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
-            self.daily_report_index_sub(indexes)
+            for stock_ex in stock_exs:
+                if stock_ex.presel_at_sector_level:
+                    for sec in ActionSector.objects.all():
+                        strats=getattr(sec,a).all()
+                        if len(strats)!=0: #some strategy is activated for this sector
+                            print("starting report " + sec)
+                            self.daily_report_sub(stock_ex.name,sec=sec)
+                else:
+                    strats=getattr(stock_ex,a).all()
+                    if len(strats)!=0: 
+                        self.daily_report_sub(stock_ex.name)
+                
+            if not intraday:
+                indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
+                self.daily_report_index_sub(indexes)
             
             self.telegram_bot.send_message_to_all("Daily report "+short_name+" ready")
             
-        except ValueError as e:
-            logger.error(e, stack_info=True, exc_info=True)  
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass
-
+        
     def send_entry_exit_msg(self,
                             symbol:str,
                             reverse: bool,

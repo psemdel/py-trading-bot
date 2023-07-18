@@ -121,3 +121,17 @@ def remove_multi(df: pd.core.frame.DataFrame)-> pd.core.frame.DataFrame:
                 multi=multi.droplevel(ii)
             df=pd.DataFrame(data=df.values,index=df.index,columns=multi)
     return df
+
+def candidates_to_YF(
+                     symbols_to_YF: dict=None, 
+                     candidates: list=[]
+                     ) -> list:
+    """
+   	Convert a list of tickers to list of YF tickers
+       
+    Arguments
+   	----------
+       symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
+       candidates: list of product symbols, that can be either YF or IB tickers
+   	""" 
+    return [symbols_to_YF[c] for c in candidates]

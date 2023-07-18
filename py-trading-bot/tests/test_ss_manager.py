@@ -275,7 +275,7 @@ class TestSSManager(TestCase):
         
         ss1=m.StockStatus.objects.get(action=self.a) #need to be called again otherwise not actualized somehow
         self.assertEqual(ss1.quantity,1)
-        ent_ex_symbols=m2.ListOfActions.objects.get(report=self.r,api_used="YF",entry=True,buy=True)
+        ent_ex_symbols=m2.ListOfActions.objects.get(report=self.r,used_api="YF",entry=True,buy=True)
         self.assertTrue(np.equal(ent_ex_symbols.actions.all(),[self.a]).all())
     
         self.r=m2.Report.objects.create()
@@ -289,7 +289,7 @@ class TestSSManager(TestCase):
         
         ss1=m.StockStatus.objects.get(action=self.a2)
         self.assertEqual(ss1.quantity,-1)
-        ent_ex_symbols=m2.ListOfActions.objects.get(report=self.r,api_used="YF",entry=True,buy=False)
+        ent_ex_symbols=m2.ListOfActions.objects.get(report=self.r,used_api="YF",entry=True,buy=False)
         self.assertTrue(np.equal(ent_ex_symbols.actions.all(),[self.a2]).all())
         
         df=pd.DataFrame(data=[["AI.PA",0,self.strategy.id,True,10,1,2]],
@@ -382,20 +382,20 @@ class TestSSManager(TestCase):
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","retard_keep"],1)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","retard_keep"],0)         
 
-    def test_order_only_exit_substrat(self):
-        self.ss_m.order_only_exit_substrat([],"none", False)
+    def test_cand_to_quantity_entry(self):
+        self.ss_m.cand_to_quantity_entry([],"none", False)
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AC.PA","none"]))
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AI.PA","none"]))
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
 
         cands=["AC.PA"]
-        self.ss_m.order_only_exit_substrat(cands,"none", False)
+        self.ss_m.cand_to_quantity_entry(cands,"none", False)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],1)
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AI.PA","none"]))
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
 
         cands=["AI.PA"]
-        self.ss_m.order_only_exit_substrat(cands,"none", False)
+        self.ss_m.cand_to_quantity_entry(cands,"none", False)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],1)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","none"],1)
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
