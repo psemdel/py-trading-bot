@@ -276,20 +276,21 @@ class Report(models.Model):
     def display_last_decision(
             self,
             symbol: str,
-            ust_normal, 
+            target_order: int, 
             strategy: str):
         '''
         Display the present direction expected for a stock
-        Note: to be replaced with SS_manager        
+        
+        Arguments
+       	----------
+        symbol: YF ticker
+        target_order: which desired state (-1, 0, 1) is wanted   
+        strategy: name of the strategy
         '''
-        symbol_complex_ent_normal=ust_normal.symbols_simple_to_complex(symbol,"ent")
-        symbol_complex_ex_normal=ust_normal.symbols_simple_to_complex(symbol,"ex")
-        decision=ust_normal.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
-        if decision==1:
+        if target_order==1:
             self.concat(symbol + " present decision for "+str(strategy)+" strategy : sell")
-        elif decision==-1:
+        elif target_order==-1:
             self.concat(symbol + " present decision for "+str(strategy)+" strategy : buy")
-        return symbol_complex_ent_normal, symbol_complex_ex_normal
             
     def init_ust(
             self,

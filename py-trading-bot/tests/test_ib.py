@@ -177,7 +177,11 @@ class TestIB(TestCase):
 
     def test_check_enough_cash(self):
         _settings["USED_API"]["orders"]="IB"
-        self.assertTrue(ib.check_enough_cash(1000,currency="USD"))        
+        enough_cash, out_order_size, excess_money_engaged=ib.check_enough_cash(1000,self.strategy, self.a, currency="USD")
+
+        self.assertEqual(out_order_size,1000)
+        self.assertFalse(excess_money_engaged)
+        self.assertTrue(enough_cash)        
 
     def test_entry_order_manual(self):
         _settings["PERFORM_ORDER"]=True

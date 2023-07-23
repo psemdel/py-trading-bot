@@ -54,6 +54,7 @@ def name_to_ust_or_presel(
             else:
                 PR=getattr(sys.modules[__name__],ust_or_presel_name)
                 pr=PR(period,st=st,**kwargs)
+                
             pr.run()
             return pr
         elif ust_or_presel_name[:5]=="Strat":
@@ -344,21 +345,74 @@ class Presel():
         '''
         Main function for presel
         '''
-        self.underlying()
-        if self.prd and not self.calc_all:
-            ii=len(self.close)-1
-            self.presub(ii)
-            self.out=self.sub(ii,**kwargs)
-        else:
-            for ii in range(len(self.close.index)):
+        try:
+            self.underlying()
+            if self.prd and not self.calc_all:
+                ii=len(self.close)-1
                 self.presub(ii)
                 self.out=self.sub(ii,**kwargs)
-                self.calculate(ii,**kwargs)
-        #save_vbt_both(self.close, self.entries, self.exits, self.entries_short, self.exits_short, suffix="hist6")
-    
+            else:
+                for ii in range(len(self.close.index)):
+                    self.presub(ii)
+                    self.out=self.sub(ii,**kwargs)
+                    self.calculate(ii,**kwargs)
+            
+        except Exception as e:
+              import sys
+              _, e_, exc_tb = sys.exc_info()
+              print(e)
+              print("line " + str(exc_tb.tb_lineno))
+              
     def perform_cand_entry(self,r):
         candidates, _=self.get_candidates()
         r.ss_m.cand_to_quantity_entry(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.st.name, False)
+    
+  
+    def get_order(self,symbol: str, strategy:str):
+        from django.db.models import Q
+        from orders.models import Action, Strategy, Order
+        """
+        Search for an open order for an action
+        
+        Arguments
+        ----------
+        buy: should the order buy or sell the stock
+        """
+        action=Action.objects.get(symbol=symbol)
+        c1 = Q(action=action)
+        c2 = Q(active=True)
+        st=Strategy.objects.get(name=strategy)
+        c3 = Q(st)
+        orders=Order.objects.filter(c1 & c2 & c3)
+
+        if len(orders)>1:
+            print("several active orders have been found for: "+symbol+" , check the database")
+            
+        if len(orders)==0:
+            print("no order found for: "+symbol+" , check the database")
+        else:
+            return orders[0]
+        #entering_date
+        
+    def get_last_exit(self, entering_date, symbol_complex_ent: str, symbol_complex_ex: str, short:bool=False):
+        ii=len(self.entries[symbol_complex_ent].values)-1
+        
+        #look for an exit between the entry time and now
+        while entering_date<self.entries.index[ii] and ii>0:
+            if short:
+                if (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]) and not\
+                (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]):
+                    return 0
+            else:
+                if (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]) and not\
+                    (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]):
+                    return 0
+            ii-=1
+            
+        if short:
+            return -1
+        else:
+            return 1
     
     def perform_only_exit(self,r):
         from orders.models import get_pf
@@ -371,34 +425,21 @@ class Presel():
 
                     ##only_exit_substrat
                     if len(pf)>0:
-                        r.concat("symbols in "+self.st.name+" stragety: " +str(pf) + " direction: "+ str(short))
+                        r.concat("symbols in "+self.st.name+" strategy: " +str(pf) + " direction: "+ str(short))
                         for symbol in self.ust.symbols:
+                            o=self.get_order(symbol, self.st.name)
+                            symbol_complex_ex=self.ust.symbols_simple_to_complex(symbol,"ex")  
                             symbol_complex_ent=self.ust.symbols_simple_to_complex(symbol,"ent")  
                             
                             if self.ust.symbols_to_YF[symbol] in pf: 
-                                if short:
-                                    r.ss_m.ex_ent_to_target(
-                                         False,
-                                         False,
-                                         False,
-                                         self.ust.exits_short[symbol_complex_ent].values[-1],
-                                         self.ust.symbols_to_YF[symbol], 
-                                         self.st.name,
-                                         )  
-                                else:
-                                    r.ss_m.ex_ent_to_target(
-                                         False,
-                                         self.ust.exits[symbol_complex_ent].values[-1],
-                                         False,
-                                         False,
-                                         self.ust.symbols_to_YF[symbol], 
-                                         self.st.name,
-                                         )   
-       
+                                target_order=self.get_last_exit(o.entering_date, symbol_complex_ent, symbol_complex_ex, short)
+                                if target_order==0: #exit
+                                    r.ss_m.add_target_quantity(symbol,self.st.name, target_order)        
+
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass 
-
+        
 class PreselMacro(Presel):
     '''
     Parent class for preselection relying on trends
@@ -910,9 +951,10 @@ class PreselWQ(Presel):
         '''
         Function called at every step of the calculation, handle the filling of candidates array
         '''
-        ind_max=np.nanargmax(self.wb_out.iloc[ii].values)
-        self.candidates["long"][ii]=[self.wb_out.columns[ind_max]]
-    
+        if not np.isnan(self.wb_out.iloc[ii].values).all():
+            ind_max=np.nanargmax(self.wb_out.iloc[ii].values)
+            self.candidates["long"][ii]=[self.wb_out.columns[ind_max]]
+
     def underlying(self):
         pass
     

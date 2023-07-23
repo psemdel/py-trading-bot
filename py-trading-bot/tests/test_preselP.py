@@ -155,6 +155,19 @@ class TestbtP(TestCase):
             st=st
             )  
         ust_or_pr.perform(self.report1)
- 
+
+    def test_divergence(self):
+        st=Strategy.objects.create(name="divergence", class_name="PreselDivergence")
+        
+        ust_or_pr=presel.name_to_ust_or_presel(
+            "PreselDivergence",
+            self.ust.period,
+            input_ust=self.ust,
+            prd=True,
+            it_is_index=False,
+            st=st
+            )  
+        ust_or_pr.perform(self.report1)    
+
 if __name__ == '__main__':
     unittest.main() 

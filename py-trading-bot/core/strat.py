@@ -332,7 +332,9 @@ class UnderlyingStrat():
         """
         Strategies on one action, no preselection. For production and non production, to make the strats as child of the main one.
 
-        So it determines entries and exits for one action to optimize the return
+        So it determines entries and exits for one action to optimize the return.
+        
+        It is also used in the code as an object to save at one place attributes like close, open, exchange,...
 
         Arguments
         ----------
@@ -492,7 +494,7 @@ class UnderlyingStrat():
         #benchmark_return makes sense only for bull
         delta=pf.total_return().values[0]
         return delta
-    
+                
     def perform_StratCandidates(self, st_name, r):
         from orders.models import Strategy, StratCandidates
         st, _=Strategy.objects.get_or_create(name=st_name)
@@ -503,18 +505,13 @@ class UnderlyingStrat():
             if np.isnan(self.vol[symbol].values[-1]):
                 self.concat("symbol " + symbol + " no data")
             else:
-                symbol_complex_ent, symbol_complex_ex=r.display_last_decision(symbol,self, st_name)
+                symbol_complex_ent_normal=self.symbols_simple_to_complex(symbol,"ent")
+                symbol_complex_ex_normal=self.symbols_simple_to_complex(symbol,"ex")
+                target_order=self.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
+                r.display_last_decision(symbol,target_order, st_name)      
                 
-                #list present status
-                r.ss_m.ex_ent_to_target(
-                    self.entries[symbol_complex_ent].values[-1],
-                    self.exits[symbol_complex_ex].values[-1],
-                    self.entries_short[symbol_complex_ex].values[-1],
-                    self.exits_short[symbol_complex_ent].values[-1],
-                    self.symbols_to_YF[symbol], 
-                    st_name
-                    )
-                
+                r.ss_m.add_target_quantity(symbol, st_name, target_order)
+    
     def perform(self, st_name, r): #default
         self.perform_StratCandidates(st_name, r)        
 ###production functions        

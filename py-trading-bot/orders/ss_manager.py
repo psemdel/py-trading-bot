@@ -157,7 +157,7 @@ class StockStatusManager():
                 op= OrderPerformer(
                     symbol,
                     row["strategy_id"],
-                    row["norm_quantity"]*st.order_size,
+                    row["norm_quantity"]*st.target_order_size,
                     testing=testing
                     )
                 out=op.sell_order()
@@ -173,7 +173,7 @@ class StockStatusManager():
                 op= OrderPerformer(
                     symbol,
                     row["strategy_id"],
-                    row["norm_quantity"]*st.order_size,
+                    row["norm_quantity"]*st.target_order_size,
                     testing=testing
                     )
                 out=op.buy_order()

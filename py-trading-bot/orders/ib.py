@@ -44,7 +44,8 @@ logger = logging.getLogger(__name__)
 logger_trade = logging.getLogger('trade')
 
 from orders.models import (Action, StockStatus, Order, Excluded, Strategy,
-                          action_to_etf, pf_retrieve_all_symbols, check_if_index, check_ib_permission)
+                          action_to_etf, pf_retrieve_all_symbols, check_if_index, check_ib_permission,
+                          get_pf)
 
 #Module to handle IB connection
 ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
@@ -78,24 +79,67 @@ def retrieve_quantity(action: Action):
         tradeStationData=TradeStationData()
         return tradeStationData.retrieve_quantity(action.symbol)
 
-def check_enough_cash(order_size: numbers.Number,currency:str=None,**kwargs)-> bool:
+def check_enough_cash(
+        order_size: numbers.Number,
+        st:Strategy, 
+        action:Action, 
+        currency:str=None,
+        **kwargs
+        )-> (bool, numbers.Number, bool):
     """
-    Simple check, to determine if we have enough currency to perform an 
+    Simple check, to determine if we have enough currency to perform an order. Adjust the order is necessary. 
+    Also check that the maximum amount of money engaged is not too high.
+    
+    Note: a difficulty concerns how the platform handle the currency conversion. A convert to base currency function should be created to handle this.
     
     Arguments
     ----------
     order_size: Size of the order to be performed
+    st: strategy used for the trade
     """ 
-    t=cash_balance(currency=currency,**kwargs)
-    if t is not None and t>=order_size:
-        return True
-    else:
-        #fallback, if there is enough EUR, IB will convert
-        if cash_balance(currency="EUR",**kwargs)>=order_size:
-            return True
-        else:
-            return False
-   
+    t=cash_balance(**kwargs) #currency=currency,
+    money_engaged=get_money_engaged(st.name,action.stock_ex.name,False)
+    enough_cash=False
+    excess_money_engaged=False
+    out_order_size=0
+    if t is not None: 
+        if t>=order_size:
+            enough_cash=True
+            out_order_size=order_size
+        elif st.minimum_order_size is not None and t>=st.minimum_order_size:
+            enough_cash=True
+            out_order_size=t
+         
+        if st.maximum_money_engaged is not None and (money_engaged+out_order_size>=st.maximum_money_engaged):
+            excess_money_engaged=True
+            
+    return enough_cash, out_order_size, excess_money_engaged
+        
+def get_money_engaged(
+        strategy: str,
+        exchange:str,
+        short:bool,
+        ):
+    """
+    Determine the total amount of money engaged in a strategy
+    
+    Arguments
+    ----------
+        strategy: name of the strategy
+        exchange: name of the stock exchange
+        short: if the products are presently in a short direction
+    """ 
+    symbols=get_pf(strategy, exchange, short)
+    
+    total_money_engaged=0
+    for symbol in symbols:
+        action=Action.objects.get(symbol=symbol)
+        ss=StockStatus.objects.get(action=action)
+        last_price=get_last_price(action)    
+        total_money_engaged+=ss.quantity*last_price     
+        
+    return total_money_engaged
+    
 def cash_balance(currency:str="EUR",**kwargs) -> numbers.Number:
     """
     Return the cash balance for a certain currency
@@ -875,7 +919,7 @@ def get_last_price_ib(
 
 @connect_ib        
 def cash_balance_ib(
-        currency:str="EUR",
+        currency:str="BASE",
         **kwargs
         ) -> numbers.Number:
     """
@@ -1131,12 +1175,7 @@ class OrderPerformer():
         else: #Already and order
             self.new_order_bool=False
             self.order=orders[0]
-            '''
-            if (buy and self.order.short==True) or (sell and self.order.short==False):
-                entry=False
-            else:
-                entry=True -> means normally no new order is needed
-            '''
+
     def entry_place(
             self, 
             buy: bool,
@@ -1308,26 +1347,35 @@ class OrderPerformer():
             self.get_order(True)
             self.get_delta_size()
             
-            if _settings["USED_API"]["orders"]=="IB":
-                enough_cash=check_enough_cash(self.delta_size,currency=self.action.currency.symbol)
+            if _settings["USED_API"]["orders"]!="YF":
+                enough_cash, order_size, excess_money_engaged=check_enough_cash(
+                                                                self.delta_size,
+                                                                self.st,
+                                                                self.action, 
+                                                                currency=self.action.currency.symbol
+                                                                )
             else:
                 enough_cash=True
+                order_size=self.delta_size
+                excess_money_engaged=False                
                 
             if not enough_cash:
                 logger.info(str(self.symbol) + " order not executed, not enough cash available")
+            elif excess_money_engaged:
+                logger.info(str(self.symbol) + " order not executed, maximum money engaged for one strategy exceeded")
             else:
                 if self.new_order_bool: #we open a new long order
                     self.reverse=False
-                    self.entry_place(True, order_size=self.target_size)
+                    self.entry_place(True, order_size=order_size)
                     return self.executed
                 else: 
                     self.entry=False
                     #we close or reverse an old short order
                     #profit
-                    if self.delta_size>0:
+                    if order_size>0:
                         #if reverse but excluded then close without further conditions
                         if self.reverse and self.symbol not in self.excluded.retrieve():
-                            self.entry_place(True, order_size=self.delta_size)
+                            self.entry_place(True, order_size=order_size)
                             self.order.exiting_price=self.new_order.entering_price
                         elif _settings["USED_API"]["orders"]=="IB" :
                             if self.reverse:

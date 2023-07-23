@@ -346,7 +346,8 @@ class Strategy(models.Model):
     class_name=models.CharField(max_length=100, blank=False, null=True)
     perform_order=models.BooleanField(blank=False,default=False)
     priority=models.IntegerField(null=False, blank=False, default=1000)
-    order_size=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
+    target_order_size=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
+    minimum_order_size=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
     maximum_money_engaged=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
     sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as price
     daily_sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as pu

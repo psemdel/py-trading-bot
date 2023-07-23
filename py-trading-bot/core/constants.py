@@ -788,6 +788,7 @@ NYSE_INTRO={
 
 NYSE_DELIST={
     "CTXS":"2022-10-01",
+    "DRE":"2022-10-01",
     "FBHS":"2022-10-15",
     "FISV":"2023-05-01",
     "FRC":"2023-05-01",
@@ -828,7 +829,7 @@ UTILITIES=["AES","LNT","AEE","AEP","AWK","ATO","CNP","CMS","ED","CEG","D","DTE",
 FIN=["AFL","ALL","AXP","AIG","AMP","AON","AJG","AIZ","BAC","WRB","BRK-B","BLK","BK","BRO","COF","CBOE",
     "SCHW","CB","CINF","C","CFG","CME","CMA","DFS","RE","FDS","FITB","BEN","GL","GS","HIG","HBAN",
     "ICE","IVZ","JPM","KEY","LNC","L","MTB","MKTX","MMC","MET","MCO","MS","MSCI","NDAQ","NTRS","PNC",
-    "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SYF","TROW","TRV","TFC","USB","WFC","WTW", "SIVBQ"
+    "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SYF","TROW","TRV","TFC","USB","WFC","WTW", "SIVBQ",
     "ZION"]
 MATERIALS=["APD","ALB","AMCR","AVY","BALL","CE","CF","CTVA","DOW","DD","EMN","ECL","FMC","FCX","IP",
            "IFF","LIN","LYB","MLM","MOS","NEM","NUE","PKG","PPG","SEE","SHW","VMC","WRK"]

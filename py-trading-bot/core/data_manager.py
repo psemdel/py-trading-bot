@@ -122,11 +122,12 @@ def retrieve_data_live(
     symbols=stock_symbols+[symbol_index]
     
     cours=vbt.YFData.fetch(symbols, period=period,missing_index='drop')
-    data=cours.select(symbols)
-    data_ind=cours.select(symbol_index)
+    o.data=cours.select(symbols)
+    o.data_ind=cours.select(symbol_index)
+    
     for l in ["Close","Open","High","Low","Volume"]:
-        setattr(o,l.lower(),data.get(l))
-        setattr(o,l.lower()+"_ind",data_ind.get(l))
+        setattr(o,l.lower(),o.data.get(l))
+        setattr(o,l.lower()+"_ind",o.data_ind.get(l))
     
     print("number of days retrieved: " + str(np.shape(o.close)[0]))
     
