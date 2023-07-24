@@ -1,4 +1,4 @@
-0#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Sat Feb 12 14:09:14 2022
@@ -28,7 +28,7 @@ else:
 from reporting.models import Report, Alert, ListOfActions
 
 from orders.ib import actualize_ss, get_last_price, get_ratio
-from orders.models import Action, StockEx, Order, ActionCategory, Job,\
+from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
                           get_exchange_actions, action_to_short, ActionSector 
                  
@@ -88,6 +88,10 @@ class MyScheduler():
     def __init__(self, telegram_bot,**kwargs):
         '''
         The scheduler contains at the same time the job scheduling and the telegram bot
+        
+        Arguments
+       	----------
+           telegram_bot: instance of vbt TelegramBot
         '''
         self.manager = vbt.ScheduleManager()
         self.telegram_bot=telegram_bot
@@ -150,10 +154,15 @@ class MyScheduler():
     
     def do_weekday(self, 
                    strh: str, 
-                   f, #function
+                   f,
                    **kwargs):
         '''
         Schedule a job for the working days, as there is no trade the weekend
+        
+        Arguments
+       	----------
+           strh: time in the day when it should be performed
+           f: function to be performed
         '''
         self.manager.every('monday', strh).do(f, **kwargs)
         self.manager.every('tuesday', strh).do(f, **kwargs)
@@ -170,6 +179,10 @@ class MyScheduler():
     def check_stock_ex_open(self,action: Action)-> bool:
         '''
         Check if the stock exchange is open
+        
+        Arguments
+       	----------
+           action: product concerned
         '''
         tz=ZoneInfo(action.stock_ex.timezone)
         now=datetime.now(tz).time() #wil compare the time in the local time to opening_time, also in the local time
@@ -435,6 +448,10 @@ class MyScheduler():
     def daily_report_sub(self,exchange:str,**kwargs):
         '''
         See daily report
+        
+        Arguments
+       	----------
+           exchange: name of the stock exchange
         '''        
         report1=Report.objects.create()
         
@@ -448,6 +465,10 @@ class MyScheduler():
     def daily_report_index_sub(self,indexes: list):
         '''
         See daily report
+        
+        Arguments
+       	----------
+           indexes: list of index YF tickers
         '''
         report3=Report.objects.create()
 
@@ -598,10 +619,17 @@ def actualize_job(
         ):
     '''
     Perform a job with long intervals between two executions
+    
+    Arguments
+   	----------
+    strategy: name of the strategy which need an update
+    period_year: number of years to download in the past
+    exchange: name of the stock exchange
     ''' 
     use_IB, actions=get_exchange_actions(exchange)
+    st=Strategy.objects.get(name=strategy)
     pr=presel.name_to_presel(
-        constants.strategy_to_presel[strategy], 
+        st.class_name, 
         str(period_year)+"y",
         prd=True, 
         actions=actions,

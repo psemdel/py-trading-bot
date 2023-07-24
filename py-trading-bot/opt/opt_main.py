@@ -80,6 +80,8 @@ class OptMain():
             ):
         '''
         Optimisation main class
+        
+        Note: the split train/test can also be performed with @vbt.cv_split()
 
         Arguments
         ----------

@@ -132,6 +132,15 @@ class StockStatusManager():
         #start with index
         self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]=="IND"],True) #move order from index to etf
         self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]!="IND"],False)
+        
+    def display_target_ss_by_st(self,it_is_index:bool=False):
+        pd.set_option('display.max_columns', None)
+        pd.set_option('display.max_rows', None)
+        
+        if it_is_index:
+            return str(self.target_ss_by_st[self.target_ss_by_st["category_id"]=="IND"])
+        else:
+            return str(self.target_ss_by_st[self.target_ss_by_st["category_id"]!="IND"])
 
     def perform_orders(
             self,
@@ -283,21 +292,15 @@ class StockStatusManager():
         short: direction of the desired order
         
     	"""        
-        try:
-            if len(candidates)==0:
-                self.report.concat(strategy +" no candidates")
-            
-            self.clean_wrong_direction(strategy, short)
-            sold_symbols=self.cand_to_quantity(candidates, strategy, short)
-            
-            if kwargs.get("keep",False):
-                for s, v in sold_symbols.items():
-                    self.add_target_quantity(s, "retard_keep", v)
-        except Exception as e:
-              import sys
-              _, e_, exc_tb = sys.exc_info()
-              print(e)
-              print("line " + str(exc_tb.tb_lineno))
+        if len(candidates)==0:
+            self.report.concat(strategy +" no candidates")
+        
+        self.clean_wrong_direction(strategy, short)
+        sold_symbols=self.cand_to_quantity(candidates, strategy, short)
+        
+        if kwargs.get("keep",False):
+            for s, v in sold_symbols.items():
+                self.add_target_quantity(s, "retard_keep", v)
 
     def ex_ent_to_target(self,
                          ent: bool,

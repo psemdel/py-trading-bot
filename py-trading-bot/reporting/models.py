@@ -20,6 +20,16 @@ class ListOfActions(models.Model):
     """
     Temporary storage for the telegram to message the orders at the end of the reporting.
     Difficulty is that the telegram bot is async, so it is not possible to just make send_msg() in the order execution function
+  
+    Attributes
+   	----------
+         report: Report that generated this list.
+         entry: was the order an entry or an exit?
+         buy: was the order a buy or a sell?
+         reverse: did the order when from the short direction to long or the opposite, or was it the same direction?
+         used_api: API that was used for the trade. Important to determine which message to display in Telegram (manual or auto)
+         actions: stocks traded
+         text: free text to be displayed in the Telegram message    
     """
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     entry=models.BooleanField(blank=False,default=False) #otherwise exit
@@ -38,12 +48,23 @@ class Report(models.Model):
     """
     Periodically, a report is written. It performs calculation to decide if products need to be bought or sold.
     It also fill ActionReports which saves human readable indicators
+    
+    Note: a report can cover only one stock exchange.
+    
+    Attributes
+   	----------
+         date: Date when the report was generated
+         text: free text to be displayed in the Telegram message and in the report 
+         stock_ex: corresponding stock exchange
+         it_is_index: are the products covered by the report indexes?
+         sector: sector of the products covered by the report
     """
     date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #) default=timezone.now()
     text=models.TextField(blank=True)
     stock_ex=models.ForeignKey('orders.StockEx',on_delete=models.CASCADE,null=True)
     it_is_index=models.BooleanField(blank=False,default=False)
     sector=models.ForeignKey('orders.ActionSector',on_delete=models.CASCADE,blank=True,null=True)
+    target_ss_by_st=models.TextField(blank=True,null=True)
     
     def __str__(self):
         return str(self.date)
@@ -225,7 +246,6 @@ class Report(models.Model):
                         grow_past50_ma=ust_trend.grow_past(50, True)
                         grow_past20_raw=ust_trend.grow_past(20, False)
                         grow_past20_ma=ust_trend.grow_past(20, True)
-                        ar.date=ust_trend.date()
                         ar.vol=ust_trend.vol[symbol].values[-1]
 
                         symbol_complex_ent=ust_trend.symbols_simple_to_complex(symbol,"ent")
@@ -393,6 +413,8 @@ class Report(models.Model):
                         **kwargs)
 
                 self.ss_m.resolve()
+                self.target_ss_by_st=self.ss_m.display_target_ss_by_st(it_is_index=it_is_index)
+                self.save(testing=testing)
 
         except ValueError as e:
             logger.error(e, stack_info=True, exc_info=True)
@@ -409,16 +431,42 @@ class Report(models.Model):
 class ActionReport(models.Model):
     """
     Contain human readable indicators for one product and one report
+    
+    Attributes
+   	----------
+    report: Report related to this action report
+    action: product covered by this action report
+    vol: volativity
+    bbands_bandwidth: bandwidth of the Bollinger bands
+    trend: figure between -10 and 10. It is a fast trend evaluated with help of the bband and the MACD. 
+          It can change quickly. trend>0 means bear here, <0 bull. 
+    macro_trend: a slow trend evaluated by determining the extrema of a smoothed price curve.
+                 macro_trend>0 means bear, <0 bull, =0 means that it is unclear.
+    kama_dir: is the smoothed (kama) price increasing (then =-1) or decreasing (then =1)?           
+    three_mo_evol: price change over the past 3 months
+    three_mo_evol_sm: smoothed price change over the past 3 months
+    one_mo_evol: price change over the past month
+    one_mo_evol_sm: smoothed price change over the past month
+    
+    stoch: Stochastic Oscillator. figure between 0 and 100, 
+    pattern_ent: was one pattern of the BULL_PATTERNS (see constants.py) detected?
+    pattern_ex: was one pattern of the BEAR_PATTERNS (see constants.py) detected?
+    pattern_light_ent: was one pattern of the BULL_PATTERNS_LIGHT (see constants.py) detected?
+    pattern_light_ex: was one pattern of the BEAR_PATTERNS_LIGHT (see constants.py) detected?
+    kama_ent: indicates a minimum on the smoothed price (kama)
+    kama_ex: indicates a maximum on the smoothed price (kama)
+    stoch_ent: was an entry signal created by the Stochastic Oscillator. Typically if its value crosses 80.
+    stoch_ex: was an exit signal created by the Stochastic Oscillator. Typically if its value crosses 20.
+    ma_ent: was an entry signal created by the moving average strategy, when the fast window price becomes higher 
+           than the slow window price.
+    ma_ent: was an exit signal created by the moving average strategy, when the fast window price becomes lower 
+           than the slow window price.    
     """   
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     action=models.ForeignKey('orders.Action',on_delete=models.CASCADE, null=True,default=None)
-    
-    date=models.CharField(max_length=100, blank=True)
-  
-    last_decision=models.CharField(max_length=100, blank=True)
     #for Trend
     vol=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
-    bbands_bandwith=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
+    bbands_bandwidth=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
     trend=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
     macro_trend=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
     
@@ -451,8 +499,19 @@ class ActionReport(models.Model):
 
 class Alert(models.Model):
     """
-    Performance alert for one product
+    Performance alert for one product, if the price variation exceeds a certain threshold
     Related to the sending of a message in Telegram
+    
+    Attributes
+   	----------
+    active: indicate if the alert is active, so still present
+    opportunity: type of alert which is more for information and don't relate to a potential loss for stocks in our portfolio
+    opening: was the alert create at stock opening?
+    alarm: was the price variation very high, 5% by default?
+    short: does it concerns a stock in short direction?
+    trigger_date: when did the alert start?
+    recovery_date: when did the alert end?
+    action: product related to the alert    
     """  
     active=models.BooleanField(blank=False,default=True)
     opportunity=models.BooleanField(blank=False,default=False)

@@ -13,14 +13,14 @@ You can operate the bot in Docker and Kubernetes. Instruction were tested with L
     
 5. Go to the folder containing the Dockerfile. Introduce your Github token to be able to download vectorbtpro with https. If you use ssh, adapt the line corresponding to this download in the Dockerfile.
 
-    docker build . -t py-trading-bot --build-arg GH_TOKEN=<you Github Token>
+    docker build . -t py-trading-bot --build-arg GH_TOKEN=<your Github Token\>
 
 6. Change the password. Go in py-trading-bot/secret.yml and replace the items, especially the token for Telegram, with your values coded in base64, as it is the standard for secrets in Kubernetes.
 7. Run 
 
     py-trading-bot/kubernetes/sequence_start_first_time.sh 
     
-It is just some kubectl command in a sequence, you can also run them manually.
+It is just some kubectl command in a sequence, you can also run them manually. Note that you may have to adapt the "kubectl" commands into "minikube kubectl".
 
 8. Check that everything went well. All pods should be running.
 
@@ -125,6 +125,6 @@ you need then to adapt the file kubernetes/django.yml under "-env" with:
 So you can change the value by each deployment of the container without rebuilding the image.
 
 # Distribution
-Obviously don't distribute this image anywhere as it would contain vectorbtpro which requires a appropriate license.
+Obviously don't distribute this image anywhere as it would contain vectorbtpro which requires an appropriate license.
 
 

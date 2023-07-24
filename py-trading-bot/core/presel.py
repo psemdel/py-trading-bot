@@ -417,28 +417,23 @@ class Presel():
     def perform_only_exit(self,r):
         from orders.models import get_pf
  
-        try:
-            if not r.it_is_index and self.ust.exchange is not None: #index
-                #even if the strategy is not anymore used, we should be able to exit
-                for short in [True, False]:
-                    pf=get_pf(self.st.name,self.ust.exchange,short)
+        if not r.it_is_index and self.ust.exchange is not None: #index
+            #even if the strategy is not anymore used, we should be able to exit
+            for short in [True, False]:
+                pf=get_pf(self.st.name,self.ust.exchange,short)
 
-                    ##only_exit_substrat
-                    if len(pf)>0:
-                        r.concat("symbols in "+self.st.name+" strategy: " +str(pf) + " direction: "+ str(short))
-                        for symbol in self.ust.symbols:
-                            o=self.get_order(symbol, self.st.name)
-                            symbol_complex_ex=self.ust.symbols_simple_to_complex(symbol,"ex")  
-                            symbol_complex_ent=self.ust.symbols_simple_to_complex(symbol,"ent")  
-                            
-                            if self.ust.symbols_to_YF[symbol] in pf: 
-                                target_order=self.get_last_exit(o.entering_date, symbol_complex_ent, symbol_complex_ex, short)
-                                if target_order==0: #exit
-                                    r.ss_m.add_target_quantity(symbol,self.st.name, target_order)        
-
-        except Exception as e:
-            logger.error(e, stack_info=True, exc_info=True)
-            pass 
+                ##only_exit_substrat
+                if len(pf)>0:
+                    r.concat("symbols in "+self.st.name+" strategy: " +str(pf) + " direction: "+ str(short))
+                    for symbol in self.ust.symbols:
+                        o=self.get_order(symbol, self.st.name)
+                        symbol_complex_ex=self.ust.symbols_simple_to_complex(symbol,"ex")  
+                        symbol_complex_ent=self.ust.symbols_simple_to_complex(symbol,"ent")  
+                        
+                        if self.ust.symbols_to_YF[symbol] in pf: 
+                            target_order=self.get_last_exit(o.entering_date, symbol_complex_ent, symbol_complex_ex, short)
+                            if target_order==0: #exit
+                                r.ss_m.add_target_quantity(symbol,self.st.name, target_order)        
         
 class PreselMacro(Presel):
     '''
@@ -589,21 +584,14 @@ class PreselRetard(Presel):
             **kwargs
             ):
         
-        try:
-            v={}   
-            for symbol in self.close.columns.values:
-                v[symbol]=self.dur[symbol].values[ii]
-                if symbol in self.excluded: #if exclude take the next
-                    if v[symbol]==0: #trend change
-                        self.excluded.remove(symbol)
-       
-            self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=not short)
-
-        except Exception as e:
-              import sys
-              _, e_, exc_tb = sys.exc_info()
-              print(e)
-              print("line " + str(exc_tb.tb_lineno))
+        v={}   
+        for symbol in self.close.columns.values:
+            v[symbol]=self.dur[symbol].values[ii]
+            if symbol in self.excluded: #if exclude take the next
+                if v[symbol]==0: #trend change
+                    self.excluded.remove(symbol)
+   
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=not short)
                       
     def presub(self,ii:int):
         for key in ["long","short"]:
@@ -612,24 +600,18 @@ class PreselRetard(Presel):
                     self.excluded.append(s)
      
     def perform(self, r):
-        try:
-            candidates, candidates_short=self.get_candidates()
-            
-            if self.last_short:
-                direction="short"
-                candidates=candidates_short
-            else:
-                direction="long"
-    
-            r.concat("Retard, " + "direction " + direction + ", stockex: " + self.ust.exchange +\
-                        ", action duration: " +str(self.out))
-      
-            r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, "retard", self.last_short)
-        except Exception as e:
-              import sys
-              _, e_, exc_tb = sys.exc_info()
-              print(e)
-              print("line " + str(exc_tb.tb_lineno))
+        candidates, candidates_short=self.get_candidates()
+        
+        if self.last_short:
+            direction="short"
+            candidates=candidates_short
+        else:
+            direction="long"
+
+        r.concat("Retard, " + "direction " + direction + ", stockex: " + self.ust.exchange +\
+                    ", action duration: " +str(self.out))
+  
+        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, "retard", self.last_short)
               
 class PreselRetardMacro(PreselRetard):
     '''
@@ -967,24 +949,19 @@ class PreselWQ(Presel):
            ust: underlying strategy 
            exchange: name of the stock exchange
         '''
-        try:
-            from orders.models import Strategy, StockEx
-            stock_ex=StockEx.objects.get(name=self.ust.exchange)
-    
-            strategy="wq"+str(self.nb)
-            strats=Strategy.objects.filter(name=strategy) #normally there should be only one
-            if len(strats)>0 and strats[0] in stock_ex.strategies_in_use.all():
-                self.run()
-                candidates=self.candidates["long"][-1]
-                
-                r.ss_m.order_nosubstrat(
-                    candidates_to_YF(self.ust.symbols_to_YF,candidates), 
-                    self.ust.exchange, 
-                    strategy,
-                    False,
-                    )
-        except Exception as e:
-              import sys
-              _, e_, exc_tb = sys.exc_info()
-              print(e)
-              print("line " + str(exc_tb.tb_lineno))
+        from orders.models import Strategy, StockEx
+        stock_ex=StockEx.objects.get(name=self.ust.exchange)
+
+        strategy="wq"+str(self.nb)
+        strats=Strategy.objects.filter(name=strategy) #normally there should be only one
+        if len(strats)>0 and strats[0] in stock_ex.strategies_in_use.all():
+            self.run()
+            candidates=self.candidates["long"][-1]
+            
+            r.ss_m.order_nosubstrat(
+                candidates_to_YF(self.ust.symbols_to_YF,candidates), 
+                self.ust.exchange, 
+                strategy,
+                False,
+                )
+

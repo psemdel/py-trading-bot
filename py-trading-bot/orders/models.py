@@ -157,9 +157,25 @@ class Action(models.Model):
     '''
     Action means stock in French
     Index is like stock (but it had to be separated, as an index cannot be bought directly)
+    
+    Attributes
+   	----------
+    symbol: YF ticker, used as primary key
+    ib_ticker_explicit: IB ticker, if it is necessary to give it explicitely. For instance for symbol AAPL or MC.PA
+                        it will be deduced from the symbol, however for indexes it needs to be defined separately
+    name: name of the product
+    stock_ex: at which stock exchange is the product listed
+    currency: currency in which the product is listed by this exchange
+    category: is it a stock, an index, an etf...
+    sector: sector according to GICS classification of the product. Important for NYSE stocks, as otherwise they are too many
+    delisted: is the stock delisted?
+    etf_long: what is the ETF in the long direction associated with the product. Normally only for index
+    etf_short: what is the ETF in the short direction associated with the product. Normally only for index     
+    intro_date: when was the product introduced on the stock exchange
+    delisting_date: when was the product delisted from the stock exchange
     ''' 
     symbol=models.CharField(max_length=15, blank=False, primary_key=True)
-    ib_ticker_explicit=models.CharField(max_length=15, blank=True,default="AAA") #for index especially
+    ib_ticker_explicit=models.CharField(max_length=15, blank=True,default="AAA")
     name=models.CharField(max_length=100, blank=False)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE)
     currency=models.ForeignKey('Currency',on_delete=models.CASCADE)
@@ -222,13 +238,19 @@ def filter_intro_sub(
 class StockStatus(models.Model):
     '''
     Complement action, separated from action as Action contains the essence of the action, here it is some that the user can change
+    
+    Attributes
+   	----------
+    action: product associated with this status
+    quantity: quantity of this stock that we own. Can be positive or negative
+    order_in_ib: is the order manual (then we have no change to retrieve it using IB) or in IB?
     '''
     action = models.OneToOneField(
         Action,
         on_delete=models.CASCADE,
         primary_key=True,
     )
-    quantity=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True,default=0) #no need for short as quantity can be negative
+    quantity=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True,default=0) 
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
     order_in_ib=models.BooleanField(blank=False,default=True)
 
@@ -252,8 +274,8 @@ def filter_intro_action(
 
     Arguments
     ----------
-           input_actions: list of products to be tested
-           y_period: period of time in year where we need to check backward from now
+    input_actions: list of products to be tested
+    y_period: period of time in year where we need to check backward from now
     '''
     actions=[]
     for a in input_actions:
@@ -268,7 +290,7 @@ def exchange_to_index_symbol(exchange):
 
     Arguments
     ----------
-        exchange: name of the stock exchange
+    exchange: name of the stock exchange
     '''
     if type(exchange)==str:
         stock_ex=StockEx.objects.get(name=exchange)
@@ -291,8 +313,8 @@ def action_to_etf(
 
     Arguments
     ----------
-        action: product
-        short: if the products are presently in a short direction
+    action: product
+    short: if the products are presently in a short direction
     ''' 
     if action.category==ActionCategory.objects.get(short="IND"):
         if short:
@@ -307,7 +329,7 @@ def symbol_to_action(symbol)-> Action:
 
     Arguments
     ----------
-           symbol: YF ticker of the product for which the order was performed
+    symbol: YF ticker of the product for which the order was performed
     '''  
     if type(symbol)==str:
         return Action.objects.get(symbol=symbol)
@@ -330,6 +352,12 @@ class Currency(models.Model):
 class Fees(models.Model):
     '''
     Fees for the trades
+    
+    Attributes
+   	----------
+    name: name used to describe this fee
+    fixed: fixed fee to pay at each trade
+    percent: percent fee to pay at each trade
     '''
     name=models.CharField(max_length=100, blank=False, default="fee")
     fixed=models.DecimalField(max_digits=100, decimal_places=5)
@@ -341,6 +369,20 @@ class Fees(models.Model):
 class Strategy(models.Model):
     '''
     Strategy to be used for product to perform the orders
+    
+    Attributes
+   	----------
+    name: name of this strategy
+    class: name of the Class in strat.py or presel.py used to determine when to perform orders using this strategy
+    perform_order: boolean that determines if automatic orders in IB should be performed. If False, only manual trade is possible
+    priority: figure to rank the strategy by priority. Lower figure has higher priority
+    target_order_size: which order size in the base currency should be performed. For instance 1000, with base currency EUR, will perform
+                  order of 1000 euros
+    minimum_order_size: if the target_order_size cannot be reached (not enough money), what is minimum size of the trade which should
+                        lead to a trade execution
+    maximum_money_engaged: maximum total money that can be engaged in this strategy. To avoid having all the money invested in one strategy.
+    sl_threshold: stop loss threshold for orders performed with this strategy
+    daily_sl_threshold: daily stop loss threshold for orders performed with this strategy
     '''
     name=models.CharField(max_length=100, blank=False)
     class_name=models.CharField(max_length=100, blank=False, null=True)
@@ -361,6 +403,25 @@ class Strategy(models.Model):
 class StockEx(models.Model):
     '''
     Stock exchange
+    
+    Attributes
+   	----------
+    name: name of this stock exchange
+    fees: fees associated with this stock exchange
+    ib_ticker: ticker in IB
+    opening_time: opening time of this stock exchange in the timezone defined afterwards
+    closing_time: closing time of this stock exchange in the timezone defined afterwards
+    timezone: timezone of this stock exchange
+    perform_order: boolean that determines if automatic orders in IB should be performed. If False, only manual trade is possible
+    ib_auth: do you have enough permission in IB to perform trades in this stock exchange?
+    strategies_in_use: select the strategies you want to use for this stock exchange, before closing. 
+                       Overriden by those at sector level if presel_at_sector_level is true!
+    strategies_in_use_intraday: select the strategies you want to use for this stock exchange, during the day
+                                Overriden by those at sector level if presel_at_sector_level is true!
+    presel_at_sector_level: if true, the strategy will be performed at sector level. Is true only for NYSE, as there are too many stocks
+                            in the S&P 500. You may want to use the same strategy on 5 bundles of 100 stocks instead of 1 strategy for 
+                            500 stocks.
+    main_index: select the index related to this stock exchange    
     '''
     name=models.CharField(max_length=100, blank=False)
     fees=models.ForeignKey('Fees',on_delete=models.CASCADE)
@@ -382,6 +443,25 @@ class StockEx(models.Model):
         return self.name 
 
 class Order(models.Model):
+    '''
+    Order/trade
+    
+    Attributes
+   	----------
+    action: product associated that was traded
+    strategy: strategy that lead to this order
+    active: is this order still open?
+    short: is it an order with short direction?
+    entering_date: date when this order was opened
+    exiting_date: date when this order was closed
+    entering_price: price of this product at order opening
+    exiting_price: price of this product at order closing
+    sl_threshold: stop loss threshold 
+    daily_sl_threshold: daily stop loss threshold
+    profit: absolute profit realized with this order
+    profit_percent: relative profit realized with this order
+    quantity: quantity of the product involved in the order    
+    '''
     action=models.ForeignKey('Action',on_delete=models.CASCADE)
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True, null=True)
     active=models.BooleanField(blank=False,default=True)
@@ -407,7 +487,7 @@ def pf_retrieve_all(
     
     Arguments
    	----------
-       opening: test at stock exchange opening (need to compare with the day before then)
+    opening: test at stock exchange opening (need to compare with the day before then)
     """
     c0=~Q(stockstatus__quantity=0)
 
@@ -428,14 +508,15 @@ def pf_retrieve_all(
 
     return list(set(actions)) #unique
 
-def pf_retrieve_all_symbols(opening: str=None,
-    )-> list:
+def pf_retrieve_all_symbols(
+        opening: str=None
+        )-> list:
     """
     Retrieve all stocks symbols owned in long or short direction from the action status
     
     Arguments
     ----------
-       opening: test at stock exchange opening (need to compare with the day before then)
+    opening: test at stock exchange opening (need to compare with the day before then)
     """
     p=pf_retrieve_all(opening=opening)
     return [action.symbol for action in p]
@@ -450,9 +531,9 @@ def get_pf(
     
     Arguments
     ----------
-        strategy: name of the strategy
-        exchange: name of the stock exchange
-        short: if the products are presently in a short direction
+    strategy: name of the strategy
+    exchange: name of the stock exchange
+    short: if the products are presently in a short direction
     '''
     try:
         stockEx1=StockEx.objects.get(name=exchange)
@@ -479,6 +560,11 @@ def get_pf(
 class ActionCategory(models.Model):
     '''
     To distinguish between ETF, actions, indexes...
+    
+    Attributes
+   	----------
+    short: short key, to identify this category clearly
+    name: name of this category
     '''
     short=models.CharField(max_length=15, blank=False, default="AAA", primary_key=True)
     name=models.CharField(max_length=100, blank=False)
@@ -489,6 +575,12 @@ class ActionCategory(models.Model):
 class ActionSector(models.Model):
     '''
     GICS sectors    
+    
+    Attributes
+   	----------
+    name: name of this sector
+    strategies_in_use: select the strategies you want to use for this stock exchange, before closing. 
+    strategies_in_use_intraday: select the strategies you want to use for this stock exchange, during the day
     '''
     name=models.CharField(max_length=100, blank=False)
     strategies_in_use=models.ManyToManyField(Strategy,blank=True,related_name="as_strategies_in_use")  
@@ -504,6 +596,12 @@ class Candidates(models.Model):
     '''
     For strategy using two time frame, in the slow one (10 days) candidates are defined
     And on daily basis the other strategy decides which of the candidate is really bought or sold
+    
+    Attributes
+   	----------
+    actions: list of the products considered as candidate
+    strategy: strategy associated with this list of candidates
+    stock_ex: stock exchange where the candidates are listed (there can be only one)
     '''
     actions=models.ManyToManyField(Action,blank=True)    
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
@@ -525,7 +623,15 @@ class Candidates(models.Model):
     def __str__(self):
         return self.strategy.name + "_" + self.stock_ex.name
 
-def get_candidates(strategy, exchange):
+def get_candidates(strategy:str, exchange:str):
+    '''
+    Return the Candidates object corresponding to a strategy and a stock exchange
+    
+    Attributes
+   	----------
+    strategy: strategy name
+    exchange: stock exchange name
+    '''
     res, _ = Candidates.objects.get_or_create(
         stock_ex=StockEx.objects.get(name=exchange),
         strategy=Strategy.objects.get(name=strategy),
@@ -535,6 +641,12 @@ def get_candidates(strategy, exchange):
 class Excluded(models.Model):
     '''
     List of actions provisory excluded for a strategy as it risks to perform bad
+    
+    Attributes
+   	----------
+    name: name of this list. Normally same as the strategy, but there is a list "all" defined
+    actions: list of the products excluded
+    strategy: strategy for which those products are excluded
     ''' 
     name=models.CharField(max_length=100, blank=False)
     actions=models.ManyToManyField(Action,blank=True)   
@@ -568,6 +680,11 @@ class Excluded(models.Model):
 class StratCandidates(models.Model):
     '''
     Define a list of actions and indexes that can be traded using the defined strategy
+    
+    Attributes
+   	----------
+    actions: list of the products that can be traded
+    strategy: associated strategy
     '''
     actions=models.ManyToManyField(Action,blank=True)    
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
@@ -579,6 +696,17 @@ class StratCandidates(models.Model):
         return self.strategy.name   
     
 class Job(models.Model):
+    '''
+    Job, typically actualization job
+    
+    Attributes
+   	----------
+    strategy: associated strategy
+    stock_ex: associated stock exchange 
+    last_execution: date when the job was last executed
+    frequency_days: how often must the job be executed? In days
+    period_year: how far in the past should the script download prices.
+    '''
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
     stock_ex=models.ForeignKey('StockEx',on_delete=models.CASCADE,blank=True,null=True)
     

@@ -285,32 +285,25 @@ def strat_wrapper_macro(open_: np.array,
         dir_bear: direction to use during bear trend
         dir_uncertain: direction to use during uncertain trend
     """
-    try:
-        if prd:
-            t=VBTMACROTRENDPRD.run(close)
-        else:
-            t=VBTMACROTREND.run(close)
-        
-        #combine for the given array the signals and patterns
-        ent,ex=defi_i_fast( open_,
-                           high,
-                           low, 
-                           close,
-                           calc_arrs=[a_bull,a_bear, a_uncertain ],
-                           macro_trend=t.macro_trend)
-        #put both/long/short
-        t2=VBTMACROMODE.run(ent,ex, t.macro_trend,\
-                           dir_bull=dir_bull,
-                           dir_bear=dir_bear,
-                           dir_uncertain=dir_uncertain)
+    if prd:
+        t=VBTMACROTRENDPRD.run(close)
+    else:
+        t=VBTMACROTREND.run(close)
     
-        return t2.entries, t2.exits, t2.entries_short, t2.exits_short, t.macro_trend, t.min_ind, t.max_ind  
-    except Exception as e:
-        import sys
-        _, e_, exc_tb = sys.exc_info()
-        print(e)
-        print("line " + str(exc_tb.tb_lineno))
-        logger.error(e, stack_info=True, exc_info=True) 
+    #combine for the given array the signals and patterns
+    ent,ex=defi_i_fast( open_,
+                       high,
+                       low, 
+                       close,
+                       calc_arrs=[a_bull,a_bear, a_uncertain ],
+                       macro_trend=t.macro_trend)
+    #put both/long/short
+    t2=VBTMACROMODE.run(ent,ex, t.macro_trend,\
+                       dir_bull=dir_bull,
+                       dir_bear=dir_bear,
+                       dir_uncertain=dir_uncertain)
+
+    return t2.entries, t2.exits, t2.entries_short, t2.exits_short, t.macro_trend, t.min_ind, t.max_ind  
 
 class UnderlyingStrat(): 
     def __init__(self,
@@ -538,13 +531,7 @@ class UnderlyingStrat():
         for ii, e in enumerate(self.symbols_complex_yn):
             if e[-1]==symbol_simple: #9
                 return e     
-        
-    def date(self):
-        '''
-        Return the last index, which is a date
-        '''
-        return self.close.index[-1]     
-    
+ 
     def run_simple(self):
         '''
         Calculate the entries and exits for underlying strategy which don't depend on the trend
