@@ -1,4 +1,8 @@
-# Portfolio
+# Stock status
+
+The bot keeps track of the portfolio you own. For each stock, a stock status object is created automatically. It's attribute quantity saves how much stocks you have.
+
+
 
 In the bot, the concept of portfolio is used. You can look at the content of the portfolio by clicking on the button "Portfolio" on the starting page.
 

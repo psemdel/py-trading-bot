@@ -29,7 +29,7 @@ class Opt(OptStrat):
             ret=0
     
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            pf=vbt.Portfolio.from_signals(self.close_dic[ind]["learn"], self.ents[ind],self.exs[ind], #should be data
+            pf=vbt.Portfolio.from_signals(self.data_dic[ind]["learn"], self.ents[ind],self.exs[ind],
                                           short_entries=self.ents_short[ind],
                                           short_exits=self.exs_short[ind],
                                           freq="1d",fees=self.fees,tsl_stop=sl) #,stop_exit_price="close", should be data

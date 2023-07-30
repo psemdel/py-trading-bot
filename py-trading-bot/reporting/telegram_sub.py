@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Messaging using Python Telegram Bot."""
 

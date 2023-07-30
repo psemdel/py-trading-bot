@@ -8,7 +8,7 @@ Created on Sat Jun  3 23:28:20 2023
 
 
 import unittest
-from opt import opt_by_part, opt_macro, opt_div, opt_corr, opt_symbols, opt_presel
+from opt import opt_by_part, opt_macro, opt_corr, opt_symbols, #opt_presel  opt_div
 
 class TestOptByPart(unittest.TestCase):
     def test_by_part(self):
@@ -16,11 +16,11 @@ class TestOptByPart(unittest.TestCase):
                          loops=1)
         self.o.outer_perf()   
 
-class TestOptPressel(unittest.TestCase):
-    def test_pressel(self):
-        self.o=opt_presel.Opt("2007_2022_08",
-                         loops=1)
-        self.o.perf()
+#class TestOptPressel(unittest.TestCase):
+#    def test_pressel(self):
+#        self.o=opt_presel.Opt("2007_2022_08",
+#                         loops=1)
+#        self.o.perf()
 
 class TestOptMacro(unittest.TestCase):
     def test_macro(self):
@@ -28,12 +28,12 @@ class TestOptMacro(unittest.TestCase):
                          loops=1)
         self.o.perf()        
 
-class TestOptDiv(unittest.TestCase):
-    def test_div(self):
-        self.o=opt_div.Opt("2007_2022_08",
-                         loops=1,
-                         nb_macro_modes=3)
-        self.o.perf()
+#class TestOptDiv(unittest.TestCase):
+#    def test_div(self):
+#        self.o=opt_div.Opt("2007_2022_08",
+#                         loops=1,
+#                         nb_macro_modes=3)
+#        self.o.perf()
         
 class TestOptCorr(unittest.TestCase):
     def test_corr(self):

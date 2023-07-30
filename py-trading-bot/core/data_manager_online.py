@@ -9,7 +9,6 @@ Created on Sat May 14 21:28:42 2022
 import vectorbtpro as vbt
 import numpy as np
 import pandas as pd
-import sys
 
 from orders.models import Action, period_YF_to_ib, exchange_to_index_symbol, check_ib_permission
 from orders.ib import connect_ib, IBData
@@ -129,7 +128,7 @@ def retrieve_data_ib(
         
         #test if the symbols were downloaded
         while not ok and len(ib_symbols)>=0:
-            res=IBData.fetch(
+            data=IBData.fetch(
                 all_symbols, 
                 period=period,
                 missing_index='drop',
@@ -137,7 +136,7 @@ def retrieve_data_ib(
                 exchanges=exchanges,
                 it_is_indexes=it_is_indexes)
             ok=True
-            o=res.get('Open')
+            o=data.get('Open')
             for s in ib_symbols:
                 try:
                     o[s]
@@ -147,7 +146,7 @@ def retrieve_data_ib(
                     ib_symbols.remove(s)
                     all_symbols.remove(s)
 
-        return res,\
+        return data,\
             ib_symbols,\
             index_symbol_ib
     except Exception as e:
@@ -192,19 +191,19 @@ def retrieve_data_notIB(
         first_round=True
         #look for anomaly
         if len(all_symbols)>2:
-            res=f.fetch(all_symbols, period=period,missing_index='drop')
+            data=f.fetch(all_symbols, period=period,missing_index='drop')
             avg=np.average(
                 [len(f.fetch(all_symbols[0], period=period).get('Open')),
                 len(f.fetch(all_symbols[1], period=period).get('Open')),
                 len(f.fetch(all_symbols[-1], period=period).get('Open'))]
                 )
                         
-            if len(res.get('Open'))<avg-10:
+            if len(data.get('Open'))<avg-10:
                 print("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
                 logger.info("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
                 res_nodrop=f.fetch(all_symbols, period=period)
                 nb_nan={}
-                for c in res.get('Open').columns:
+                for c in data.get('Open').columns:
                     nb_nan[c]=np.count_nonzero(np.isnan(res_nodrop.get('Open')[c]))
 
                 nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
@@ -215,9 +214,9 @@ def retrieve_data_notIB(
         #test if the symbols were downloaded
         while not ok and len(symbols)>=0:
             if not first_round:
-                res=f.fetch(all_symbols, period=period,missing_index='drop')
+                data=f.fetch(all_symbols, period=period,missing_index='drop')
             ok=True
-            o=res.get('Open')
+            o=data.get('Open')
             
             for s in symbols:
                 try:
@@ -228,7 +227,7 @@ def retrieve_data_notIB(
                     symbols.remove(s)
                     all_symbols.remove(s)
 
-        return res,\
+        return data,\
                symbols,\
                index_symbol    
     except Exception as e:

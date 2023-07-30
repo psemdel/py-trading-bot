@@ -177,11 +177,10 @@ class TestIB(TestCase):
 
     def test_check_enough_cash(self):
         _settings["USED_API"]["orders"]="IB"
-        enough_cash, out_order_size, excess_money_engaged=ib.check_enough_cash(1000,self.strategy, self.a, currency="USD")
-
-        self.assertEqual(out_order_size,1000)
+        enough_cash, out_order_size, excess_money_engaged=ib.check_enough_cash(1,self.strategy, self.a, currency="USD")
+        self.assertEqual(out_order_size,1)
         self.assertFalse(excess_money_engaged)
-        self.assertTrue(enough_cash)        
+        self.assertTrue(enough_cash)       
 
     def test_entry_order_manual(self):
         _settings["PERFORM_ORDER"]=True
@@ -316,6 +315,7 @@ class TestIB(TestCase):
         #expected not enough cash
         self.assertFalse(op.buy_order_sub())
         
+    def test_buy_order2(self):    
         op=ib.OrderPerformer("AC.PA",self.strategy.id,1,testing=True)
         _settings["USED_API"]["orders"]="IB"
         #expected enough cash

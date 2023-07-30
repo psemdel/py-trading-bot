@@ -45,6 +45,8 @@ def name_to_ust_or_presel(
     ----------
         ust_or_presel_name: Name of the underlying strategy or preselection strategy to be called
         period: period of time in year for which we shall retrieve the data
+        it_is_index: is it indexes that are provided 
+        st: strategy associated
     '''
     try:
         if ust_or_presel_name[:6]=="Presel" and not it_is_index: #Presel for index makes no sense

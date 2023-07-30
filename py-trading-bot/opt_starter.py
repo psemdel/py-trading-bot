@@ -11,13 +11,13 @@ Created on Thu Jul 28 17:07:13 2022
 if False:
    #optimize the trend parameters
    from opt.opt_macro import Opt
-   o=Opt("2007_2022",loops=1)
+   o=Opt("2007_2022_08",loops=1)
    
 if False:
    #optimize the strategy without macro
    from opt.opt_strat import Opt
    
-   o=Opt("2007_2022",
+   o=Opt("2007_2022_08",
           loops=40,
           nb_macro_modes=1
           )
@@ -34,7 +34,7 @@ if False:
    a_uncertain= [1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1,
    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]
 
-   o=Opt("2007_2023",
+   o=Opt("2007_2022_08",
           loops=40,
           predefined=False,
           a_bull=a_bull,
@@ -42,69 +42,14 @@ if False:
           a_uncertain=a_uncertain,   
           #sl=0.005
           #it_is_index=True
-          macro_trend_bull="long", 
-          macro_trend_uncertain="both",
-          macro_trend_bear="both",
+          dir_bull="long", 
+          dir_uncertain="both",
+          dir_bear="both",
           #test_window_start=0
           )
    o.perf()
    #o.test_by_part()
-   
-if False:
-    #optimize bt
-    from opt.opt_presel import Opt
-   
-    #only for predefined
-    a_bull=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
-    0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
-    0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
-    a_bear=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
-    0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
-    0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
-    a_uncertain= [0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
-    0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
-    0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
-
-    o=Opt("2007_2022_08",
-           loops=40,
-          # predefined=True,
-           #a_bull=a_bull,
-          # a_bear=a_bear,
-         #  a_uncertain=a_uncertain,   
-           )
-    
-if False:
-    from opt.opt_div import Opt
-    
-    a_bull=[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-   0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1.,
-   1., 0., 1., 0., 0., 0., 0., 1., 0., 0.]
-  #  a_bear=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-  # 0., 0., 0., 0., 0., 
-  # 0., 1, 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
-  # 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-  #  a_uncertain= [0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-  # 0., 0., 0., 0., 0., 
-  #   0., 1, 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
-  # 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-    
-    o=Opt("2007_2023",
-           loops=40,
-           nb_macro_modes=3,
-           #predefined=True,
-           #a_bull=a_bull,
-           #a_bear=a_bear,
-           #a_uncertain=a_uncertain,   
-           )   
-
-if False:
-    from opt.opt_weighted import Opt
-    
-    o=Opt("2007_2023",
-           loops=40,
-           #nb_macro_modes=3,
-           )  
-    
+           
 if False:
     from opt.opt_sl import Opt
     
@@ -118,7 +63,7 @@ if False:
         1., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
         0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
     
-    o=Opt("2007_2023",
+    o=Opt("2007_2022_08",
            nb_macro_modes=3,
            predefined=True,
            a_bull=a_bull,
@@ -127,7 +72,7 @@ if False:
            #it_is_index=True
            )      
     
-#o.perf()  
+    o.perf()  
 
 if False:
     from opt.opt_by_part import Opt
@@ -142,7 +87,7 @@ if False:
         1., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
         0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
 
-    o=Opt("2007_2020",
+    o=Opt("2007_2022_08",
            nb_macro_modes=3,
            predefined=True,
            a_bull=a_bull,
@@ -169,7 +114,7 @@ if False:
       0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  1.,  0.,  0.,
       0.,  0.,  1.,  0.,  0.]
 
-    o=OptRecursive("2007_2023",
+    o=OptRecursive("2007_2022_08",
            nb_macro_modes=3,
            predefined=True,
            a_bull=a_bull,
@@ -181,7 +126,7 @@ if False:
     
     o.perf_recursion()    
   
-if False:
+if True:
     from opt.opt_corr import Opt
     
     a_bull=[ 0.,  0.,  0.,  1.,  1.,  1.,  1.,  0.,  0.,  0.,  1.,  1.,  0.,
@@ -199,7 +144,7 @@ if False:
 
     for indexes in ["CAC40","DAX","NASDAQ","IT"]:
 
-        o=Opt("2007_2023",
+        o=Opt("2007_2022_08",
                indexes=indexes,
                nb_macro_modes=3,
                predefined=True,
@@ -212,7 +157,7 @@ if False:
         
         o.outer_perf()      
   
-if True:
+if False:
     from opt.opt_symbols import Opt
     
     a_bull=[ 0.,  0.,  0.,  1.,  1.,  1.,  1.,  0.,  0.,  0.,  1.,  1.,  0.,
@@ -230,7 +175,7 @@ if True:
 
     indexes="CAC40"
     symbols=['AC', 'ATO', 'RNO']
-    o=Opt("2007_2023",
+    o=Opt("2007_2022_08",
            indexes,
            symbols,
            nb_macro_modes=3,

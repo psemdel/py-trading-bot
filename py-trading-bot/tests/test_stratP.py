@@ -110,12 +110,12 @@ class TestStratP(TestCase):
         self.assertFalse(res[(50,True,'AIR.PA')].values[-1]==0)        
         
     def test_call_strat(self):
-        self.st=getattr(strat, "StratKamaStochMatrendMacdbbMacro")("1y",prd=True, actions=self.actions)
-        self.st.run()
+        self.ust=getattr(strat, "StratKamaStochMatrendMacdbbMacro")("1y",prd=True, actions=self.actions)
+        self.ust.run()
         
-        pf=vbt.Portfolio.from_signals(self.st.close, self.st.entries,self.st.exits,
-                                      short_entries=self.st.entries_short,
-                                      short_exits  =self.st.exits_short)
+        pf=vbt.Portfolio.from_signals(self.ust.close, self.ust.entries,self.ust.exits,
+                                      short_entries=self.ust.entries_short,
+                                      short_exits  =self.ust.exits_short)
 
         self.assertTrue(pf.get_total_return()[pf.wrapper.columns[0]]!=0)
         self.assertTrue(pf.get_total_return()[pf.wrapper.columns[1]]!=0)

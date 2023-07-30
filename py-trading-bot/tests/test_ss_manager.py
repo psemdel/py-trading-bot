@@ -28,9 +28,9 @@ class TestSSManager(TestCase):
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
         cat3=m.ActionCategory.objects.create(name="ETF",short="ETF")
-        self.strategy=m.Strategy.objects.create(name="none",priority=10,order_size=1)
-        self.strategy2=m.Strategy.objects.create(name="strat2",priority=20,order_size=1)
-        self.strategy3=m.Strategy.objects.create(name="retard_keep",priority=30,order_size=1)
+        self.strategy=m.Strategy.objects.create(name="none",priority=10,target_order_size=1)
+        self.strategy2=m.Strategy.objects.create(name="strat2",priority=20,target_order_size=1)
+        self.strategy3=m.Strategy.objects.create(name="retard_keep",priority=30,target_order_size=1)
         
         self.s=m.ActionSector.objects.create(name="undefined")
         
@@ -291,7 +291,8 @@ class TestSSManager(TestCase):
         self.assertEqual(ss1.quantity,-1)
         ent_ex_symbols=m2.ListOfActions.objects.get(report=self.r,used_api="YF",entry=True,buy=False)
         self.assertTrue(np.equal(ent_ex_symbols.actions.all(),[self.a2]).all())
-        
+
+    def test_perform_orders2(self):  
         df=pd.DataFrame(data=[["AI.PA",0,self.strategy.id,True,10,1,2]],
                         columns=["symbol","quantity","strategy_id","order_in_ib","priority","norm_quantity","norm_delta_quantity"],
                         )

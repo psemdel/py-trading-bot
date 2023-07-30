@@ -19,7 +19,7 @@ class Opt(OptCorr):
             symbols:list,
             **kwargs): #all symbols should be from same index
         '''
-        Gather the symbols together depending on their correlation and optimize the strategy for the formed cluster
+        Gather the symbols together depending on their correlation and optimize the strategy for the formed clusters
         #The clusters are within one single index, as correlation calculation needs aligned data index.
         
         Arguments

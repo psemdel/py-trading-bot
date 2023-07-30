@@ -375,7 +375,7 @@ class Strategy(models.Model):
     name: name of this strategy
     class: name of the Class in strat.py or presel.py used to determine when to perform orders using this strategy
     perform_order: boolean that determines if automatic orders in IB should be performed. If False, only manual trade is possible
-    priority: figure to rank the strategy by priority. Lower figure has higher priority
+    priority: figure to rank the strategies by priority. Lower figure has higher priority
     target_order_size: which order size in the base currency should be performed. For instance 1000, with base currency EUR, will perform
                   order of 1000 euros
     minimum_order_size: if the target_order_size cannot be reached (not enough money), what is minimum size of the trade which should
@@ -480,7 +480,9 @@ class Order(models.Model):
         return self.action.name + " "+ str(self.entering_date)
 
 def pf_retrieve_all(
-        opening: str=None,
+        opening: bool=False,
+        s_ex: StockEx=None,
+        it_is_index:bool=False,
         )-> list:
     """
     Retrieve all stocks owned in long or short direction from the action status
@@ -488,23 +490,20 @@ def pf_retrieve_all(
     Arguments
    	----------
     opening: test at stock exchange opening (need to compare with the day before then)
+    s_ex: stock exchange from which the stocks need to be returned
     """
     c0=~Q(stockstatus__quantity=0)
-
-    if opening=="9h":
-        stockEx1=StockEx.objects.filter(name="Paris")
-        stockEx2=StockEx.objects.filter(name="XETRA")
-        c2 = Q(stock_ex=stockEx1[0])
-        c3 = Q(stock_ex=stockEx2[0])
-        actions=Action.objects.filter(c0&(c2|c3))#c1 &
-    elif opening=="15h":
-        stockEx1=StockEx.objects.filter(name="Nasdaq")
-        stockEx2=StockEx.objects.filter(name="NYSE")
-        c2 = Q(stock_ex=stockEx1[0])
-        c3 = Q(stock_ex=stockEx2[0])
-        actions=Action.objects.filter(c0&(c2|c3)) #c1 &
+    if it_is_index:
+        cat=ActionCategory.objects.get(short="IND")
+        c2=Q(category=cat)
     else:
-        actions=Action.objects.filter(c0) #filter(c1)
+        c2=~Q(pk__in=[])
+    
+    if opening and s_ex is not None:
+        c1 = Q(stock_ex=s_ex)
+        actions=Action.objects.filter(c0&c1&c2)
+    else:
+        actions=Action.objects.filter(c0&c2) #filter(c1)
 
     return list(set(actions)) #unique
 

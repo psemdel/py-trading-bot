@@ -37,7 +37,7 @@ from core import constants, presel
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
 
-from datetime import time, datetime, timedelta
+from datetime import time, datetime, timedelta, date
 '''
 This file contains the logic for:
  - Telegram bot
@@ -46,16 +46,6 @@ This file contains the logic for:
  - Send message after each order
 '''
 logging.basicConfig(level=logging.INFO)  
-
-from telegram import __version__ as TG_VER
-
-try:
-    from telegram import __version_info__
-except ImportError:
-    __version_info__ = (0, 0, 0, 0, 0)
-
-if __version_info__ >= (20, 0, 0, "alpha", 1):
-    raise RuntimeError(f"This example is not compatible with your current PTB version {TG_VER}")
 
 '''
 Start the bot in the background
@@ -97,61 +87,42 @@ class MyScheduler():
         self.telegram_bot=telegram_bot
         
         #Settings
-        self.pf_check=_settings["PF_CHECK"]
-        self.index_check=_settings["INDEX_CHECK"]
-        self.report_17h=_settings["REPORT_17h"]
-        self.report_22h=_settings["REPORT_22h"]
-        self.heartbeat=_settings["HEARTBEAT"] # to test if telegram is working ok
-        self.heartbeat_ib=_settings["HEARTBEAT_IB"]
-        self.update_slow =_settings["UPDATE_SLOW_STRAT"]
         self.update_ss=True
         self.cleaning=True
-        self.intraday=_settings["INTRADAY"]
         
-        tz_Paris=ZoneInfo('Europe/Paris') #Berlin is as Paris
-        tz_NY=ZoneInfo('US/Eastern') #does not seem to be at ease with multiple tz
-                        
-        if self.pf_check:
+        for s_ex in StockEx.objects.all():
+            start_check_time=self.shift_time(s_ex.opening_time,_settings["OPENING_CHECK_MINUTE_SHIFT"],s_ex.timezone) #perform the check 5 min after opening
+            if _settings["PF_CHECK"]:
+                self.do_weekday(start_check_time, self.check_pf, s_ex=s_ex, opening=True)
+            if _settings["INDEX_CHECK"]:
+                self.do_weekday(start_check_time, self.check_pf, it_is_index=True,s_ex=s_ex, opening=True)
+            if _settings["REPORT"]:
+                report_time=self.shift_time(s_ex.closing_time,-_settings["DAILY_REPORT_MINUTE_SHIFT"],s_ex.timezone) #write report 15 min before closing, so we have 15 min to calculate and pass the orders
+                self.do_weekday(report_time,self.daily_report,s_ex=s_ex) 
+            if _settings["INTRADAY"]:
+                self.manager.every(_settings["TIME_INTERVAL_INTRADAY"], 'minutes').do(self.daily_report,s_ex=s_ex,intraday=True)
+                
+        if _settings["PF_CHECK"]:
             self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf)
-            self.do_weekday(time(9,35,tzinfo=tz_Paris), self.check_pf, opening="9h")
-            self.do_weekday(time(9,35,tzinfo=tz_NY), self.check_pf, opening="15h")
-        if self.index_check:
-            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_index)
-            self.do_weekday(time(9,35,tzinfo=tz_Paris), self.check_index, opening="9h")
-            self.do_weekday(time(9,35,tzinfo=tz_NY), self.check_index, opening="15h")       
-        if self.report_17h: #round 15 min before closing
-            self.do_weekday(time(17,15,tzinfo=tz_Paris),self.daily_report,short_name="17h",key="17h_stock_exchanges")
-        if self.report_22h: #round 15 min before closing
-            self.do_weekday(time(15,45,tzinfo=tz_NY),self.daily_report,short_name="22h",key="22h_stock_exchanges")
-        if self.heartbeat:
+        if _settings["INDEX_CHECK"]:
+            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf,it_is_index=True)
+        if _settings["HEARTBEAT"]: # to test if telegram is working ok
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
-        if self.heartbeat_ib:
+        if _settings["HEARTBEAT_IB"]:
             self.manager.every(10, 'seconds').do(self.heartbeat_ib_f)
         if self.cleaning:
-            self.do_weekday(time(16,2,tzinfo=tz_NY),self.cleaning_f)
-        if self.update_slow:
-            self.do_weekday(time(10,00,tzinfo=tz_Paris), self.update_slow_strat) #performed away from the opening
+            self.do_weekday(time(16,2,tzinfo=ZoneInfo('US/Eastern')),self.cleaning_f) #after end of the day
+        if _settings["UPDATE_SLOW_STRAT"]:
+            self.do_weekday(time(10,00,tzinfo=ZoneInfo('Europe/Paris')), self.update_slow_strat) #performed away from the opening
         if self.update_ss:
             self.manager.every(_settings["TIME_INTERVAL_UPDATE"], 'minutes').do(actualize_ss)
-        if self.intraday:
-            self.manager.every(_settings["TIME_INTERVAL_INTRADAY"], 'minutes').do(self.daily_report,intraday=True)
+                
         #the "background is created by celery"
         #OOTB vbt start_in_background does not seem to be compatible with django
         if not kwargs.get("test",False):
             self.manager.start() 
-        self.telegram_bot.send_message_to_all( 
-                            "Scheduler started in background, settings:"
-                           +"\n pf " + str(self.pf_check) 
-                           +"\n index " + str(self.index_check)
-                           +"\n 17h " + str(self.report_17h)
-                           +"\n 22h " + str(self.report_22h)
-                           +"\n heartbeat " + str(self.heartbeat)
-                           +"\n heartbeat IB " + str(self.heartbeat_ib)
-                           +"\n cleaning " + str(self.cleaning)
-                           +"\n update stock status " + str(self.update_ss)
-                           )   
+        self.telegram_bot.send_message_to_all("Scheduler started in background")   
 
-    
     def do_weekday(self, 
                    strh: str, 
                    f,
@@ -175,8 +146,8 @@ class MyScheduler():
         Deactivate the alert at the end of the day
         '''
         cleaning_sub()
-    
-    def check_stock_ex_open(self,action: Action)-> bool:
+
+    def check_stock_ex_open_from_action(self,action: Action)-> bool:
         '''
         Check if the stock exchange is open
         
@@ -184,12 +155,24 @@ class MyScheduler():
        	----------
            action: product concerned
         '''
-        tz=ZoneInfo(action.stock_ex.timezone)
-        now=datetime.now(tz).time() #wil compare the time in the local time to opening_time, also in the local time
+        return self.check_stock_ex_open(action.stock_ex)
+
+    def check_stock_ex_open(self,s_ex: StockEx)-> bool:
+        '''
+        Check if the stock exchange is open
         
-        return (now >action.stock_ex.opening_time and\
-                    now <action.stock_ex.closing_time)
-    
+        Arguments
+       	----------
+           s_ex: stock exchange
+        '''
+        if s_ex is None:
+            return True
+        else:
+            tz=ZoneInfo(s_ex.timezone)
+            now=datetime.now(tz).time() #wil compare the time in the local time to opening_time, also in the local time
+            
+            return (now >s_ex.opening_time and now <s_ex.closing_time)
+            
     def check_change(self,
                      ratio: numbers.Number, 
                      action: Action,
@@ -215,7 +198,7 @@ class MyScheduler():
             alarming=False
             opportunity=False
 
-            if self.check_stock_ex_open(action):
+            if self.check_stock_ex_open_from_action(action):
                 if (short and ratio>_settings["ALERT_THRESHOLD"]) or (not short and ratio < -_settings["ALERT_THRESHOLD"]):
                     alerting=True
                     if (short and ratio>_settings["ALARM_THRESHOLD"]) or (not short and ratio<-_settings["ALARM_THRESHOLD"]):
@@ -283,7 +266,7 @@ class MyScheduler():
     def check_cours(self,
                     actions: list, 
                     both:bool=False,
-                    opening: str=None,
+                    opening: bool=False,
                     ):
         '''
         Preliminary steps for verification of the price variation
@@ -314,51 +297,18 @@ class MyScheduler():
                 short=action_to_short(action)
                 
                 self.check_change(ratio, action,short,opening=opening)
-                if both:
+                if both: #for index, we look also for opportunities. To be informed in case of great variation/events
                     self.check_change(ratio, action,not short,opening=opening)
 
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass           
-
-    def check_index(self,
-                    opening: str=None,
-                    ):
-        '''
-        Check price variation for indexes , so independently from their belonging or not 
-        
-        Arguments
-       	----------
-           opening: test at stock exchange opening (need to compare with the day before then)
-        '''
-        try:
-            print("check index")
-            cat=ActionCategory.objects.get(short="IND")
-            c3=Q(category=cat)
-            if opening=="9h":
-                c=None
-                for exchange in _settings["17h_stock_exchanges"]:
-                    c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
-                    c=c|c1
-                indexes = Action.objects.filter(c&c3)
-            elif opening=="15h":
-                c=None
-                for exchange in _settings["22h_stock_exchanges"]:
-                    c1 = Q(stock_ex=StockEx.objects.get(name=exchange))
-                    c=c|c1
-                indexes = Action.objects.filter(c&c3)
-            else:
-                indexes = Action.objects.filter(c3)
-
-            self.check_cours(indexes, False,both=True, opening=opening)
-            
-        except Exception as e:
-            logger.error(e, stack_info=True, exc_info=True)
-            pass        
-        
+     
     def check_pf(
             self,
-            opening: str=None,
+            opening: bool=False,
+            s_ex: StockEx=None,
+            it_is_index:bool=False
             ):
         '''
         Check price variation for portofolio, so products that we own
@@ -366,12 +316,13 @@ class MyScheduler():
         Arguments
        	----------
            opening: test at stock exchange opening (need to compare with the day before then)
+           s_ex: stock exchange from which the stocks need to be covered
         ''' 
         try:
-            actions=pf_retrieve_all(opening=opening)
+            actions=pf_retrieve_all(s_ex=s_ex,opening=opening)
             if len(actions)>0:
                 self.check_sl(actions)
-                self.check_cours(actions, False,opening=opening)
+                self.check_cours(actions, both=it_is_index, opening=opening)
                 
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
@@ -389,7 +340,7 @@ class MyScheduler():
            actions: list of action to be checked for price variation
         '''  
         for action in actions:
-            if self.check_stock_ex_open(action):
+            if self.check_stock_ex_open_from_action(action):
                 c1 = Q(action=action)
                 c2 = Q(active=True)
                 order=Order.objects.filter(c1 & c2)
@@ -445,7 +396,11 @@ class MyScheduler():
         if report.text:
              self.telegram_bot.send_message_to_all(report.text)       
     
-    def daily_report_sub(self,exchange:str,**kwargs):
+    def daily_report_sub(
+            self,
+            exchange:str,
+            it_is_index:bool=False,
+            **kwargs):
         '''
         See daily report
         
@@ -454,31 +409,11 @@ class MyScheduler():
            exchange: name of the stock exchange
         '''        
         report1=Report.objects.create()
-        
-        ust_hold=report1.daily_report(exchange=exchange,**kwargs)
-        if ust_hold is None:
-            raise ValueError("The creation of the strategy failed, report creation interrupted")
-          
-        report1.perform(ust_hold,**kwargs)
+        report1.daily_report(exchange=exchange,it_is_index=it_is_index,**kwargs)
         self.send_order(report1)
         
-    def daily_report_index_sub(self,indexes: list):
-        '''
-        See daily report
-        
-        Arguments
-       	----------
-           indexes: list of index YF tickers
-        '''
-        report3=Report.objects.create()
-
-        ust_hold=report3.daily_report(symbols=indexes,it_is_index=True) # "BZ=F" issue
-        report3.perform(ust_hold,it_is_index=True)
-        self.send_order(report3)
-        
     def daily_report(self, 
-                     short_name: str=None,
-                     key: str=None,
+                     s_ex: StockEx,
                      intraday: bool=False,
                      **kwargs):
         '''
@@ -486,37 +421,32 @@ class MyScheduler():
         
         Arguments
        	----------
-           report: report for which the calculation happened
-           key: 17h or 22h, to determine the stockexchange to check
+           s_ex: stock exchange from which the stocks need to be covered
            intraday: is it a report at the end of the day or during it
         '''  
         try:
-            print("writting daily report "+short_name)
-            
-            if intraday:
-                a="strategies_in_use_intraday"
-                stock_exs=StockEx.objects.all()
-            else:
-                a="strategies_in_use"
-                stock_exs=[StockEx.objects.get(name=exchange) for exchange in _settings[key]]
-
-            for stock_ex in stock_exs:
-                if stock_ex.presel_at_sector_level:
+            if self.check_stock_ex_open(s_ex):
+                print("writting daily report "+s_ex.name)
+                if intraday:
+                    a="strategies_in_use_intraday"
+                else:
+                    a="strategies_in_use"
+    
+                if s_ex.presel_at_sector_level:
                     for sec in ActionSector.objects.all():
                         strats=getattr(sec,a).all()
                         if len(strats)!=0: #some strategy is activated for this sector
                             print("starting report " + sec)
-                            self.daily_report_sub(stock_ex.name,sec=sec)
+                            self.daily_report_sub(s_ex.name,sec=sec)
                 else:
-                    strats=getattr(stock_ex,a).all()
+                    strats=getattr(s_ex,a).all()
                     if len(strats)!=0: 
-                        self.daily_report_sub(stock_ex.name)
+                        self.daily_report_sub(s_ex.name)
+                    
+                if not intraday:
+                    self.daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
                 
-            if not intraday:
-                indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
-                self.daily_report_index_sub(indexes)
-            
-            self.telegram_bot.send_message_to_all("Daily report "+short_name+" ready")
+                self.telegram_bot.send_message_to_all("Daily report "+s_ex.name+" ready")
             
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
@@ -565,9 +495,36 @@ class MyScheduler():
         
         for j in jobs:
             if today>(timedelta(days=j.frequency_days)+j.last_execution):
-                actualize_job(j.strategy.name, j.period_year, j.stock_ex.name)
+                actions=get_exchange_actions(j.stock_ex.name)
+                st=Strategy.objects.get(name=j.strategy.name)
+                pr=presel.name_to_presel(
+                    st.class_name, 
+                    str(j.period_year)+"y",
+                    prd=True, 
+                    actions=actions,
+                    exchange=j.stock_ex.name,
+                    st=st
+                    ) 
+                pr.actualize()   
                 j.last_execution=today
                 j.save()
+
+    def shift_time(
+            self, 
+            d: datetime, 
+            m: int,
+            tz: str
+            )->datetime:
+        '''
+        Shift the datetime from some minutes
+        
+        Arguments
+       	----------
+        d: original datetime
+        m: delta in minutes
+        tz: name of the timezone
+        '''
+        return (datetime.combine(date(1,1,1),d)+timedelta(minutes=m)).time().replace(tzinfo=ZoneInfo(tz))
        
 def send_entry_exit_txt(
         symbol: str,
@@ -612,28 +569,5 @@ def cleaning_sub():
         alert.active=False
         alert.save()
 
-def actualize_job(
-        strategy: str, 
-        period_year: numbers.Number, 
-        exchange:str
-        ):
-    '''
-    Perform a job with long intervals between two executions
-    
-    Arguments
-   	----------
-    strategy: name of the strategy which need an update
-    period_year: number of years to download in the past
-    exchange: name of the stock exchange
-    ''' 
-    use_IB, actions=get_exchange_actions(exchange)
-    st=Strategy.objects.get(name=strategy)
-    pr=presel.name_to_presel(
-        st.class_name, 
-        str(period_year)+"y",
-        prd=True, 
-        actions=actions,
-        use_IB=use_IB,
-        exchange=exchange) 
-    pr.actualize()    
+ 
     

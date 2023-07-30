@@ -3,9 +3,8 @@ from django.http import HttpResponse
 from reporting.telegram import start, send_entry_exit_txt, cleaning_sub
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, ListOfActions
-from orders.models import Action, exchange_to_index_symbol
+from orders.models import Action, StockStatus, exchange_to_index_symbol, ActionSector, StockEx
 from orders.ib import actualize_ss
-from trading_bot.settings import _settings
 
 from .filter import ReportFilter
 
@@ -47,24 +46,18 @@ def start_bot(request):
     return redirect('reporting:reports')
 
 #For testing purpose
-def daily_report_sub(exchange,**kwargs):
+def daily_report_sub(
+        exchange:str,
+        it_is_index:bool=False,
+        **kwargs):
     report1=Report.objects.create()
-
-    st=report1.daily_report(exchange=exchange,**kwargs)
-    if st is None:
-        raise ValueError("The creation of the strategy failed, report creation interrupted, <a href={% url 'reporting:reports' %}>Main page</a>")
-        
-    report1.presel(st,exchange,**kwargs)
-    report1.presel_wq(st,exchange,**kwargs)
+    report1.daily_report(exchange=exchange,it_is_index=it_is_index,**kwargs)
     send_order_test(report1)
-    
-def daily_report_index_sub(indexes):
-    report3=Report.objects.create()
 
-    report3.daily_report(symbols=indexes, it_is_index=True) # "BZ=F" issue
-    send_order_test(report3)
-
-def daily_report(request,**kwargs):
+def daily_report(
+        request,
+        exchange:str,
+        **kwargs):
     '''
     Write report for an exchange and/or sector
     Identical to the telegrambot function, but here without bot, so sync instead of async
@@ -73,33 +66,29 @@ def daily_report(request,**kwargs):
     Arguments
    	----------
        request: incoming http request
+       exchange: name of the stock exchange
     '''  
     try:
-        short_name=kwargs.get("short_name")
-        key=kwargs.get("key")
-        print("writting daily report "+short_name)
-        for exchange in _settings[key]:
-            if exchange=="NYSE":
-                for s in _settings["NYSE_SECTOR_TO_SCAN"]:  
-                    print("starting report " + s)
-                    daily_report_sub("NYSE",sec=s)
-            else:
-               daily_report_sub(exchange)
+        s_ex=StockEx.objects.get(name=exchange)
+        a="strategies_in_use"
+        print("writting daily report "+s_ex.name)
+        if s_ex.presel_at_sector_level:
+            for sec in ActionSector.objects.all():
+                strats=getattr(sec,a).all()
+                if len(strats)!=0: #some strategy is activated for this sector
+                    print("starting report " + sec)
+                    daily_report_sub(s_ex.name,sec=sec)
+        else:
+            strats=getattr(s_ex,a).all()
+            if len(strats)!=0: 
+                daily_report_sub(s_ex.name)
 
-        indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
-        daily_report_index_sub(indexes)
-        
+        daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
         return render(request, 'reporting/success_report.html')
 
     except Exception as e:
         print(e)
         pass
-
-def trigger_17h(request):
-    return daily_report(request,short_name="17h",key="17h_stock_exchanges")
-    
-def trigger_22h(request):
-    return daily_report(request,short_name="22h",key="22h_stock_exchanges")
 
 def send_order_test(report):
     '''
@@ -134,6 +123,14 @@ def cleaning(request):
 def actualize_ss_view(request):
     actualize_ss()
     return HttpResponse("Stock status actualized")
+
+def create_ss_sub():
+    for a in Action.objects.all():
+        ss, created=StockStatus.objects.get_or_create(action=a)
+
+def create_ss(request):
+    create_ss_sub()
+    return HttpResponse("Stock status created")
 
 def test_order(request):
     symbol=""

@@ -1,19 +1,12 @@
 ### Setting of the trading bot ###
 import os
-import vectorbtpro as vbt
 
 _settings={
-## Preselection to be used for the different stock exchanges ##
-# possible values out-of-the-box:
-# "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
-"17h_stock_exchanges":["Paris","XETRA","EUREX"], #exchange to scan at 17h  
-"22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h   
-          
+      
 ## Configuration of Telegram ##
 "PF_CHECK":True,
 "INDEX_CHECK":True,
-"REPORT_17h":True, #for Paris and XETRA
-"REPORT_22h":True, #for Nasdaq and Nyse
+"REPORT":True, #for Paris and XETRA
 "INTRADAY":False,
 "HEARTBEAT":False, # to test telegram
 "HEARTBEAT_IB":False, # to test telegram
@@ -21,11 +14,15 @@ _settings={
 
 "ALERT_THRESHOLD":3, #in %
 "ALARM_THRESHOLD":5, #in %
-"ALERT_HYST":1, #margin to avoid alert/recovery at high frequency
+"ALERT_HYST":1, #margin in % to avoid alert/recovery at high frequency, so if ALERT_THRESHOLD=3 and ALERT_HYST=1
+                #then the alert will be deactivated when the price variation is 2% (3-1)
 
 "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
 "TIME_INTERVAL_UPDATE":60,
 "TIME_INTERVAL_INTRADAY":15,
+
+"OPENING_CHECK_MINUTE_SHIFT":5,
+"DAILY_REPORT_MINUTE_SHIFT":15,
 
 ## Order settings ##
 "USED_API_DEFAULT":{
@@ -34,20 +31,14 @@ _settings={
     "reporting":os.environ.get("USED_API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5", "TS" or "CCXT"
     },
 "USED_API":{
-    "orders": "", 
-    "alerting":"", 
-    "reporting":"", 
+    "orders": "", #don't modify
+    "alerting":"",  #don't modify
+    "reporting":"",  #don't modify
     },
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
 "PERFORM_ORDER":True, #test or use IB to perform orders
 ## Configuration of the strategies ##
-"DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
-"RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
-
-"STRATEGY_NORMAL_STOCKS":"StratG",
-"STRATEGY_NORMAL_INDEX":"StratIndexB",
-"STRATEGY_RETARD_KEEP":"StratG",
 
 # Frequency is the number of days between successive candidates actualisation
 "DAILY_REPORT_PERIOD":3, #in year
@@ -76,6 +67,9 @@ _settings={
 
 #for some major events, that cannot be detected only with technical analysis
 "FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
+
+"STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
+          "PreselDivergenceBlocked","PreselWQ7","PreselWQ31","PreselWQ53","PreselWQ54"],
 
 ## API configurations
 "IB_LOCALHOST":'127.0.0.1',
@@ -198,7 +192,7 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb2023'),
+        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb'),
         'USER': DB_USER,
         'PASSWORD': DB_SECRET_KEY,
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
@@ -327,3 +321,5 @@ LOGGING = {
        }, 
     },
 }
+
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000000000

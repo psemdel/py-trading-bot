@@ -367,6 +367,9 @@ class Report(models.Model):
             else: #actions, exchange is provided
                 actions=get_exchange_actions(exchange,**kwargs)
 
+            if exchange is not None:
+                self.stock_ex=StockEx.objects.get(name=exchange)
+                
             if len(actions)==0:
                 print("No actions found for exchange: "+str(exchange))
                 logger.info("No actions found for exchange: "+str(exchange))

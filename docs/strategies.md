@@ -1,63 +1,275 @@
 # Strategies
+To decide when to perform orders and which stocks to trade, strategies need to defined. The bot offers different possibilities for their implementation. For their backtesting, refer to the [corresponding documentation](https://github.com/psemdel/py-trading-bot/blob/main/docs/backtesting.md).
 
-I am not a professional trader. The strategies included in the bot are more example, to show you how you could implement your own one. For transparency, some explications are brought here.
+## Object
+The bot is delivered with a dump containing some predefined strategies, but you surely wants to add more.
 
-# Strategy on one stock
+fter having started the bot click on "Admin panel" (http://localhost:8000/admin/). 
 
-Strategies on one stock are provided in core/strat.py. They buy and send one stock, let's say Apple, depending on some signal. The combination of signals is provided in the form of an array, 1 means the signal is used, 0 means that it is not used. The signals are well known one, and most of them provided out-of-the-box by vectorbt but you can modify them:
-* MA: Compare a smoothed price over a short time window (fast signal) with a smoothed signal over a longer time window (slow signal). If the fast signal cross the slow one and becomes higher, a buy signal is created. At the opposite, if they cross and the fast becomes lower than the slow one, a sell signal is created. [See also](https://www.investopedia.com/ask/answers/071414/whats-difference-between-moving-average-and-weighted-moving-average.asp)
-* RSI: It buys if the stock is "oversold", so when the price decreases quickly, and sell when it is overbought. The threshold can be defined, typically 80 and 20 or 70 and 30.
-* Stochastic RSI: variation of RSI. Same idea
-* KAMA: Kama is just an exponential smoothing of the price (PT1-filter for the German ;) ). Compare to the moving average smoothing, it has the advantage to give more weight to recent prices. My algorithm looks for the extrema of this function. It buys when a minimum is detected and sell when a maximum is detected. It indicates big changes, however it is not especially fast as the filter brings with it a delay.
-* Supertrend: [See](https://medium.datadriveninvestor.com/superfast-supertrend-6269a3af0c2a)
-* Bollinger band: [See](https://www.investopedia.com/trading/using-bollinger-bands-to-gauge-trends/). When the price reaches the bottom band, a buy signal is sent.
-* Patterns: there are many candlelight patterns. The ones selected, see core/constants, have higher prediction potential according to my statistics, but you can basically use any defined in Talib.
+- Click on "add" close to "Strategys"
 
-The combination defined in the bot results from optimisation algorithms without any a priori. The best combination for stocks is called "normal strategy" in the bot. As the index tends to behave differently, a strategy has been optimized for them also.
+Following inputs can be defined:
 
-The strategies on one stock are useful, but obviously do not help to select the stock to bet on.
+- name: name of this strategy
+- class: name of the Class in strat.py or presel.py used to determine when to perform orders using this strategy, the algorithm
+- perform_order: boolean that determines if automatic orders in IB should be performed. If False, only manual trade is possible
+- priority: figure to rank the strategies by priority. Lower figure has higher priority. Concretely, if the report calculated lead to the performance of 2 orders but you have money for only one, it will define which one to execute.
+- target_order_size: which order size in the base currency should be performed. For instance 1000, with base currency EUR, will perform order of 1000 euros
+- minimum_order_size: if the target_order_size cannot be reached (not enough money), what is minimum size of the trade which should lead to a trade execution
+- maximum_money_engaged: maximum total money that can be engaged in this strategy. To avoid having all the money invested in one strategy.
+- sl_threshold: stop loss threshold for orders performed with this strategy
+- daily_sl_threshold: daily stop loss threshold for orders performed with this strategy
 
-# "Macro" Trend
-Additionally, you can choose if you want to perform only long, only short or only both orders. The "macro" function, determine the general trend of the index related to the stock. So the dow jones for the NYSE. You can variate the type of orders depending on this trend. By default, it is long if the trend is bull, both for undetermined or bear trend. Theoretically, short would be better for bear, but a) bear tends to be more difficult to detect than bull, b) the rebound is badly exploited if you are in short.
+## Algorithm introduction
+Fundamentally the bot differentiate two types of strategies:
+- Strategies on one stock, called in the code "underlying strategy". Let's say you apply this strategy on Apple. It will decide when to buy and sell this stock depending on predefined signals, for instance the value of RSI. The stock involved will always be the same, here Apple. By default, you will always own this stock, in long or short direction.
+- Strategies on several stocks. Before deciding to buy or to sell, this kind of strategy will first determine which stocks to trade from a predefined group, stock exchange related. This selected stocks are called candidates. This step is later called preselection. Afterwards an underlying strategy can determine when to buy or sell those candidate stocks.
 
-The detection of the general trend is not easy. The present algorithm was optimized, but it cannot detect immediately a reversal.
+## Strategy on one stock
+Strategies on one stock are provided in core/strat.py and core/strat_legacy.py. Each underlying strategy is defined by a class.
 
-# Strategy on several stocks
-This kind of strategy tries to:
-a) Select the stock to buy/sell
-b) Determine when to buy/sell them
+The stocks that you want to trade with this kind of strategy must be selected in a "Strat candidates" object associated with the strategy, which can be create in the admin panel.
 
-They are saved in core/bt.py
+### Indicators from vbt
+The easiest kind of strategies use predefined indicator from vbt. For instance:
 
-The points a and b can be handled the same way, but an "underlying strategy" (see previous paragraph) can be used to handle b. The point a is defined as preselection. Let's take an example, you want to trade the stock with the highest volatility (function preselect_vol in core/bt.py). It filters the, let's say 4, stocks with the highest volatility (the candidates). When a buy signal, underlying strategy, is detected for one of those stock, it is bought. Then we wait for a sell signal from the underlying strategy, and determine again the candidates.
+```
+class StratRSI(UnderlyingStrat):  
+    '''
+    Very basic RSI strategy
+    '''
+    def run(self):      
+        t=vbt.RSI.run(self.close,wtype='simple')
+        self.entries=t.rsi_crossed_below(20)
+        self.exits=t.rsi_crossed_above(80)
+        t2=ic.VBTFALSE.run(self.close)
+        self.entries_short=t2.entries
+        self.exits_short=t2.entries
+```
 
-## Volatility
-See example
+Here an entry order will be performed when the RSI crosses below 20 and an exit when it crosses above 80. No short orders will be performed.
 
-## MACD + volatility
-Same as volatility, but the candidates must have a positive MACD.
+### Self-made indicators
+You can create your own indicator in core/indicator.py. This function comes directly from vbt, documentation can be found there. As example:
 
-## HIST + volatility
-Same as volatility, but the hysteresis parameter of the MACD must be positive for the candidates.
+```
+def ma(close: np.array)-> (np.array, np.array):    
+    fast_ma = vbt.MA.run(close, 5)
+    slow_ma = vbt.MA.run(close, 15)
+        
+    entries =  fast_ma.ma_crossed_above(slow_ma)
+    exits = fast_ma.ma_crossed_below(slow_ma)
+    
+    return entries, exits
+ 
+VBTMA = vbt.IF( #just to keep everything the same shape... but useless here
+     class_name='MA',
+     short_name='ma',
+     input_names=['close'],
+     output_names=['entries', 'exits']
+).with_apply_func(
+     ma, 
+     takes_1d=True,  
+     )
+```
 
-Note: the two last strategies turn to be highly chaotic. If you change your backtesting window from one day (let's say it begins the 05/01/2007 instead of the 4/01/2007), it will completely change the result.
+This indicator will create an entry when fast_ma crosses above slow_ma, and an exit when fast_ma crosses below slow_ma. 
 
-## Realmadrid
-I called this strategy so, as it bets on the winners. The candidates are the stocks which raised the most on a window of the past 400 trading days. 
+### Strategy array
+Simple strategies are easy to understand, but they can be quite limited. Combination of different indicators can provide better results, without much more complexity. The bot provides the possibility to optimise combination of signals for certain stocks (see the [documentation about optimization](https://github.com/psemdel/py-trading-bot/blob/main/docs/optimization.md). The combination is always using OR, so signal1 or signal2 or ... A combination is represented by an array, as following:
 
-## Retard
-This strategy first perform a KAMA on all prices. Then it determines the extrema and calculate the number of days in which the stock has been in a trend. So a figure of 30 means that the smoothed price of the stock has been decreasing for the past 30 days. -30 means, it rises since 30 days. The stock whose price is decreasing since the longest time is candidate. As a kind of stop loss, the stock cannot be retained more than 15 days. If it happens, it is sold and "excluded" from the strategy until the trend inverts. I called this strategy "retard" (delay) as the candidate stock is somehow delayed compared to the general trend and will at some point tries to reduce the difference to it.
+    index 0-21: entry
+    index 22-end: exit
+        
+    Index 0-6, same for entry and exit
+    0: moving average
+    1: stochastic oscillator
+    2: price smoothed with kama extrema (minimum -> entry, maximum -> exit)
+    3: supertrend
+    4: Bollinger bands (price crosses lower band -> entry, price crosses higher band -> exit)
+    5: RSI with threshold 20/80
+    6: RSI with threshold 30/70
+    
+    Index: 7-21, see BULL_PATTERNS in constants.py
+    Index: 29-end, see BEAR_PATTERNS in constants.py
+    
+For instance:
 
-If the macro trend (see above) is bear, the mechanism is inverted. It does not work as good however.
+    ```
+    class StratRSIeq(UnderlyingStrat):   
+        '''
+        Same a stratRSI but realized with a strategy array
+        '''
+        def __init__(self,
+                     period: numbers.Number,
+                     **kwargs):
+            a=[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+           0., 0., 0., 0., 0., 
+               0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 
+           0., 0., 0., 0., 0.]
+            super().__init__(period,strat_arr_simple=a,**kwargs )    
+    ``` 
 
-## Retard keep
-Variation of retard. Retard sells the stock, when it reverted it trends. So it means when the price is increasing, which is a bit too bad. Retard keep, keeps the stock until a signal of the underlying strategy comes (it is packed in the "normal strategy"). It requires however twice more capital than "retard", as the new candidate (price decreasing) is bought and the old candidate is kept. 
+Uses RSI with threshold 20/80 for the entries and exits. It is perfectly equivalent to StratRSI presented above.
 
-## Divergence
-It compare the smoothed price variation of one stock to the smoothed price variation of the index. If the stock price variation is significantly worse, it becomes candidate. It is a kind of RSI for multiple stocks. The stock is sold depending on the underlying strategy.
+### Trend dependent strategies
+In addition to various combination of signal, it may be interesting to variate on one side the strategy depending on the trend of the market, on the other side a variation of the direction depending on the trend may also be useful. So when the market is bear, you will want to short, whereas it can be risky when the market is bull.
 
-## WQ
-Implementation of the [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf). So professional alphas, some of them are very powerful. Check out also the number of trades they create, as you may pay more fee than a big trader bank ;). 
+The trend calculation is explained in the corresponding documentation. It sorts the trend in bull, bear and uncertain. One strategy can be assigned for each trend:
+    ```
+    class StratG(UnderlyingStrat):    
+        '''
+        Strategy optimized to have the best yield used alone on stocks
+    
+        In long/both/both, Optimized on 2007-2023, CAC40 7.58 (3.13 bench), DAX 2.31 (1.68), NASDAQ 19.88 (12.1), IT 15.69 (8.44)
+        '''
+        def __init__(self,
+                     period: numbers.Number,
+                     **kwargs):
+            a_bull=[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1.,
+                    1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                    0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
+            a_bear= [0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
+             1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
+             1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+            a_uncertain=  [0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 0.,
+             1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+             0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
+        
+            super().__init__(
+                period,
+                strat_arr_bull=a_bull,
+                strat_arr_bear=a_bear,
+                strat_arr_uncertain=a_uncertain,
+                **kwargs ) 
+    ```
+
+The strategy array a_bull is used for bull, a_bear for bear and a_uncertain for uncertain trends.
+
+Concerning the direction, by default the following is configured:
+
+    ```
+      dir_bull="long",
+      dir_bear="both",
+      dir_uncertain="both"
+    ```      
+
+Note: Theoretically, short would be better for bear, but:
+
+1. Bear tends to be more difficult to detect than bull, 
+2. The rebound is badly exploited if you are in short.
+
+To change this, just change the super().__init__ function presented above:
+
+    ```
+      super().__init__(
+                period,
+                strat_arr_bull=a_bull,
+                strat_arr_bear=a_bear,
+                strat_arr_uncertain=a_uncertain,
+                dir_bull="long",
+                dir_bear="short",
+                dir_uncertain="long",
+                **kwargs ) 
+    ```
+
+## Strategies on several stocks
+Strategies on several stocks, later preselection strategies, are provided in core/presel.py. Each preselection strategy is defined by a class. 
+
+Those strategies have two steps:
+
+1. Select the stock(s) to buy/sell
+2. Determine when to buy/sell them
+
+Many strategies on several stocks can be imagined. To cover all those possibilities, the algorithm requires a certain complexity. 
+
+### Underlying strategy
+The second step "Determine when to buy/sell them" use underlying strategy, as presented before. For instance: 
+
+    ```
+    def underlying(self):
+        self.underlying_creator("StratF")     
+    ```         
+
+This preselection strategy will use the StratF as underlying strategy.
+
+Additionnaly, the way the underlying strategy acts can be defined by:
+
+    ```
+    self.only_exit_ust=False
+    self.no_ust=False
+    ```
+    
+If no_ust is True, then the underlying strategy is completely ignored. If a stock is candidate, it is bought immediately. When it is not anymore in the candidates, it is sold.
+
+If only_exit_ust is True. If a stock is candidate, it is bought immediately. However, it is sold only when the underlying strategy decides so. It means that the entry definition of the underlying strategy plays no role at all.
+
+### Sorting
+To determine which stock(s) to buy/sell, a sorting function is often required. The first stock(s) of the output list are then the candidates. For instance:
+
+    ``` 
+    def sorting(self,ii: int,**kwargs):
+        v={}
+        for symbol in self.close.columns.values:
+            v[symbol]=self.vol[symbol].values[ii]
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+    ``` 
+    
+For the volatility preselection, the volatility (self.vol) serves to sort the stocks.
+
+### Supplementary criterium
+For certain strategy, the condition to become candidate is not only about the sorting. This supplementary condition can be defined in supplementary_criterium. For instance:
+
+    ``` 
+    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
+        return self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0
+    ``` 
+    
+The candidates here need to have a macd_tot.hist >0.
+
+### Maximum number of candidates
+The maximum number of candidates at the same time is defined by `self.max_candidates_nb`. When it is higher than 1, the underlying strategy will be decisive about which one of the candidates will be actually bought.
+
+### Influence of the trend
+The behavior of the strategy can variate depending on the market trend. For the calculation of trend, see [here](https://github.com/psemdel/py-trading-bot/blob/main/docs/trend_calculation.md).
+
+In the init function, the trend must then be calculated:
+
+    ```
+    PreselMacro.preliminary(self)
+    ```
+
+Two settings cover a different behavior:
+
+    ```
+    self.blocked=False     
+    self.blocked_im=False  
+    ```
+
+If self.blocked is True, when the trend becomes short, no more candidate is added, but the stocks presently owned are sold by exit signal.
+
+If self.blocked_im is True, when the trend becomes short, no more candidate is added, but the stocks presently owned are sold immediately.
+
+There are also preselection strategy, that revert completely their behavior when the trend becomes short, like PreselRetardMacro. Then the run method must be changed:
+
+    ```
+    def run(self,**kwargs):
+        self.last_short=PreselMacro.run(self,**kwargs)
+    ```
+    
+### Slow preselection
+Eventually, slow preselection strategies can be defined. The idea is that several candidates are selected at regular interval, let's say 14 days. The underlyng strategy will then determine which one to buy and sell. Methods like max_sharpe (defined in presel_classic.py) could be ranked in this categories. However, it does seem useful to schedule a job to run every year. For this case, you can run manually the portfolio optimization algorithm and put the candidates in "Strat candidates".
+
+To calculate portfolio optimization algorithm like max sharpe, OLMAR and similar, you can use the Jupyter notebook presel_classic.
+
+### Machine learning
+None of the strategies above use machine learning. An [optimization](https://github.com/psemdel/py-trading-bot/blob/main/docs/optimization.md) is proposed, but no machine learning out-of-box. However, the algorithm in strat.py require you only to define entries and exits to use the strategy in production. You can perfectly use a ML algorithm to determine the entries and exits.
+
+
+
+
+
+
 
 
 

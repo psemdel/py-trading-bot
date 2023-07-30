@@ -10,6 +10,7 @@ import vectorbtpro as vbt
 import math
 import os
 import numpy as np
+from pathlib import Path
 
 if __name__ != '__main__':
     from trading_bot.settings import BASE_DIR
@@ -18,13 +19,13 @@ if __name__ != '__main__':
 '''
 This file contains the logic to retrieve data.
 
-To save data, just run this script (see at the bottom). It will generate 2 files: actions.h5 and index.h5. In the first, all prices for the actions is listed, in 
-the second, the price of the main index (Nasdaq 100, Dow jones...) is listed. Their generation simulteneously ensures their alignment.
+To save data, just run this script (see at the bottom). It will generate 1 files: actions.h5. The main index (Nasdaq 100, Dow jones...) should be the last column by convention.
 The idea behind it, is to determine in some strategies the trend using the index, and adapting the strategy depending on this trend.
 '''
 
 ### Offline retrieval ###
 def save_data(
+        selector: str,
         symbol_index: str, 
         stock_symbols: list, 
         start_date: str, 
@@ -34,17 +35,16 @@ def save_data(
 
     Arguments
     ----------
+       selector: for the naming of the file
        symbol_index: YF ticker of the index
        stock_symbols: list of YF tickers to be downloaded for the stocks
        start_date: start date for the download
        end_date: end date for the download
     '''
     symbols=stock_symbols+[symbol_index]
-    
-    #Everything is downloaded together to use missing_index function
     data=vbt.YFData.fetch(symbols,start=start_date,end=end_date,\
                              timeframe='1d')
-    
+
     #knowing what we drop
     close=data.get("Close")
 
@@ -58,14 +58,9 @@ def save_data(
             
     #print(close.columns[7])            
     data=vbt.YFData.fetch(symbols,start=start_date,end=end_date,\
-                                 timeframe='1d',missing_index="drop")    
-    
-    #splitting index from the other actions
-    data_ind=data.select(index)
-    data_ind.to_hdf(file_path="index.h5")
-    
-    data_others=data.select(stock_symbols)
-    data_others.to_hdf(file_path="actions.h5")
+                                 timeframe='1d',missing_index="drop")   
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    data.to_hdf(file_path=os.path.join(BASE_DIR,'saved_cours/'+selector.upper()+'_period.h5'))
 
 def retrieve_data_offline(
              o, 
@@ -80,21 +75,12 @@ def retrieve_data_offline(
        symbol_index: YF ticker of the index
        period: period in which we want to have the data
     '''
-    #just for the naming
-    symbol_to_index={
-       "CAC40":"FCHI",
-       "DAX":"GDAXI",
-       "NASDAQ":"IXIC",
-       "Brent":"Brent",
-       }
     
-    if symbol_index in symbol_to_index:
-        ind_sym=symbol_to_index[symbol_index]
-    else: #default
-        ind_sym="DJI"
-        
-    o.data=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+symbol_index+'_' + period+'.h5'))
-    o.data_ind=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+ind_sym+'_' + period+'.h5'))
+    data_all=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+symbol_index+'_' + period+'.h5'))
+    cols=list(data_all.get("Open").columns)
+    
+    o.data=data_all.select(cols[:-1]) #all columns except last one
+    o.data_ind=data_all.select(cols[-1]) #only last column
     for l in ["Close","Open","High","Low","Volume"]:
         setattr(o,l.lower(),o.data.get(l))
         setattr(o,l.lower()+"_ind",o.data_ind.get(l))
@@ -138,7 +124,7 @@ def retrieve_data_live(
 
 if __name__ == '__main__':
     '''
-    Write a file actions.h5 with the content of "all_symbols" and a file index.h5 with the content of "index"
+    Write a file actions.h5
     
     You can download anything using
     
@@ -147,9 +133,9 @@ if __name__ == '__main__':
     '''
     import constants
     
-    selector="CAC40"
+    selector="it"
     start_date='2007-01-01'
-    end_date='2023-01-01'
+    end_date='2022-08-31'
     
     if selector=="CAC40":
         all_symbols=constants.CAC40
@@ -200,4 +186,4 @@ if __name__ == '__main__':
         else:
             new_list.append(s)
 
-    save_data(index,new_list, start_date, end_date)
+    save_data(selector,index,new_list, start_date, end_date)

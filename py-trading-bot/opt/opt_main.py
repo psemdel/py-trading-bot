@@ -139,25 +139,20 @@ class OptMain():
                 ", "+str(self.close.index[self.test_window_start]) +", "+\
                 "until index number: "+str(self.test_window_end) + ", "+str(self.close.index[self.test_window_end])
                 )
-            for d in ["close","open","low","high"]:
-                getattr(self,d+"_dic")[ind]["total"]=getattr(self,d+self.suffix) #ind already implicitely mentioned
+            
+            self.data_dic[ind]["total"]=getattr(self,"data"+self.suffix)
+            learn_range=[i for i in range(0,self.test_window_start)]+[i for i in range(self.test_window_end,self.total_len[ind])]
+            
+            if self.split_learn_train=="time": 
+                self.data_dic[ind]["test"]=getattr(self,"data"+self.suffix).iloc[self.test_window_start:self.test_window_end]
+                self.data_dic[ind]["learn"]=getattr(self,"data"+self.suffix).iloc[learn_range]
+            else: #symbol
+                self.data_dic[ind]["test"]=getattr(self,"data"+self.suffix).select(list(self.close.columns[self.test_window_start:self.test_window_end]))
+                self.data_dic[ind]["learn"]=getattr(self,"data"+self.suffix).select(list(self.close.columns[learn_range]))
                 
-                if self.split_learn_train=="time": 
-                    getattr(self,d+"_dic")[ind]["test"]=getattr(self,d+self.suffix).iloc[self.test_window_start:self.test_window_end]
-                    getattr(self,d+"_dic")[ind]["learn"]=pd.concat([getattr(self,d+self.suffix).iloc[0:self.test_window_start],
-                                                   getattr(self,d+self.suffix).iloc[self.test_window_end:]])
-                else: #symbol
-                    getattr(self,d+"_dic")[ind]["test"]=getattr(self,d+self.suffix).iloc[:,self.test_window_start:self.test_window_end]
-                    if self.test_window_start==0:
-                        getattr(self,d+"_dic")[ind]["learn"]=getattr(self,d+self.suffix).iloc[:,self.test_window_end:]
-                    elif self.test_window_end==np.shape(getattr(self,d+self.suffix))[1]:
-                        getattr(self,d+"_dic")[ind]["learn"]=getattr(self,d+self.suffix).iloc[:,0:self.test_window_start]
-                    else:
-                        getattr(self,d+"_dic")[ind]["learn"]= pd.concat([getattr(self,d+self.suffix).iloc[:,0:self.test_window_start],
-                                                    getattr(self,d+self.suffix).iloc[:,self.test_window_end:]])
-        #data to be solved    
-        #self.data.indexing_func(pd.DataFrame.iloc,index=getattr(self,d+"_dic")[ind]["learn"].index)                                      
-        #voir vbt
+            for d in ["Close","Open","Low","High"]:
+                for k in ["test","learn","total"]:
+                    getattr(self,d.lower()+"_dic")[ind][k]=self.data_dic[ind][k].get(d)
         self.out={}
         
         #init
@@ -643,7 +638,7 @@ class OptMain():
 
             for ind in self.indexes: #CAC, DAX, NASDAQ
                 stats[ind]={}
-                pf=vbt.Portfolio.from_signals(self.close_dic[ind][d],  #use data for tsl or sl!!!!
+                pf=vbt.Portfolio.from_signals(self.data_dic[ind][d],
                                               self.ents[ind],
                                               self.exs[ind],
                                               short_entries=self.ents_short[ind],
@@ -822,7 +817,7 @@ class OptMain():
             
             for ind in self.indexes: #CAC, DAX, NASDAQ
                 stats[(ii, ind)]={}
-                pf=vbt.Portfolio.from_signals(self.close_dic[ind]["part_"+str(ii)],  #use data for tsl or sl!!!!
+                pf=vbt.Portfolio.from_signals(self.data_dic[ind]["part_"+str(ii)],
                                               self.ents[ind],
                                               self.exs[ind],
                                               short_entries=self.ents_short[ind],

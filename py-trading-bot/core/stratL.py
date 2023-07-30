@@ -11,6 +11,7 @@ import numbers
 from core.strat import UnderlyingStrat
 from core import common, constants, strat, presel
 from core.data_manager import retrieve_data_live
+from trading_bot.settings import _settings
 
 class StratLIVE(UnderlyingStrat):
     def __init__(
@@ -106,7 +107,8 @@ def scan_presel_all(
         period,
         **kwargs):
     """
-    Allow you to evaluate how performed preselection strategies on past period finishing today, so in a close past
+    Allow you to evaluate how performed preselection strategies on past period finishing today, so in a close past.
+    The returned dictionary contains the returns for each strategies.
     
     Arguments
     ----------
@@ -127,8 +129,7 @@ def scan_presel_all(
        "FIN": {"symbols":constants.FIN, "index":"^DJI"},
        "MATERIALS": {"symbols":constants.MATERIALS, "index":"^DJI"},
     }
-    presel_l=["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
-              "PreselDivergenceBlocked","PreselWQ7","PreselWQ31","PreselWQ53","PreselWQ54"]
+    presel_l= _settings["STRATEGIES_TO_SCAN"]
     res={}
     
     for k, v in d.items():

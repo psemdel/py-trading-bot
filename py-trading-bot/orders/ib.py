@@ -114,7 +114,7 @@ def check_enough_cash(
             excess_money_engaged=True
             
     return enough_cash, out_order_size, excess_money_engaged
-        
+      
 def get_money_engaged(
         strategy: str,
         exchange:str,
@@ -135,11 +135,10 @@ def get_money_engaged(
     for symbol in symbols:
         action=Action.objects.get(symbol=symbol)
         ss=StockStatus.objects.get(action=action)
-        last_price=get_last_price(action)    
-        total_money_engaged+=ss.quantity*last_price     
+        total_money_engaged+=ss.quantity*Decimal(get_last_price(action)) 
         
     return total_money_engaged
-    
+
 def cash_balance(currency:str="EUR",**kwargs) -> numbers.Number:
     """
     Return the cash balance for a certain currency
@@ -1358,7 +1357,7 @@ class OrderPerformer():
                 enough_cash=True
                 order_size=self.delta_size
                 excess_money_engaged=False                
-                
+            
             if not enough_cash:
                 logger.info(str(self.symbol) + " order not executed, not enough cash available")
             elif excess_money_engaged:

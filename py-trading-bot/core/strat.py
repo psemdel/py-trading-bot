@@ -82,6 +82,22 @@ def defi_i_fast(
         ) -> (list, list):
     """
     Calculate the entries and exits for each strategy of the array separately
+    
+    Array explanation:
+        index 0-21: entry
+        index 22-end: exit
+        
+    Index 0-6, same for entry and exit
+    0: moving average
+    1: stochastic oscillator
+    2: price smoothed with kama extrema (minimum -> entry, maximum -> exit)
+    3: supertrend
+    4: Bollinger bands (price crosses lower band -> entry, price crosses higher band -> exit)
+    5: RSI with threshold 20/80
+    6: RSI with threshold 30/70
+    
+    Index: 7-21, see BULL_PATTERNS in constants.py
+    Index: 29-end, see BEAR_PATTERNS in constants.py
 
     Arguments
     ----------

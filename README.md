@@ -6,7 +6,7 @@ Features implemented:
 - Backstaging of complex strategies (including [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf)) using [vectorbtpro](https://vectorbt.pro/), on historical data but also on recent data.
 - Performing live automatically orders using the tested strategies and interactive brockers, thanks to ib_insync
 - Send Telegram messages when performing an order
-- Send Telegram alerts when the action price variation exceeds a certain threshold
+- Send Telegram alerts when the action price variation exceeds a certain threshold. Note: last version from IB mobile app has also this function.
 - Writting at regular interval reports on the market, using Django and Celery with Redis
 - Perform strategy optimization on data set
  

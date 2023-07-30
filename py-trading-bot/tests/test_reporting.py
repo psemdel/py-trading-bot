@@ -7,16 +7,13 @@ Created on Thu Jun 30 13:49:54 2022
 """
 
 import unittest
-import numpy as np
 from django.test import TestCase
 import reporting.models as m
-from reporting.models import Alert
 
 from orders.models import (Fees, StockEx, Action, ActionCategory, ActionSector, Strategy, 
                           Currency, StratCandidates, Excluded)
                           
 from trading_bot.settings import _settings                         
-import vectorbtpro as vbt
 
 #Test reporting, it looks for errors.
 class TestReporting(TestCase):
@@ -27,7 +24,7 @@ class TestReporting(TestCase):
         self.e=e
         e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
-        e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
+        e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True,presel_at_sector_level=True)
         e5=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         e6=StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=True)
         
@@ -361,11 +358,9 @@ class TestReporting(TestCase):
         self.ust=self.report1.daily_report(exchange="Nasdaq",testing=True)   
         
     def test_presel_NYSE(self):
-        for s in ["it","fin"]: 
-            report=m.Report()
-            report.daily_report(exchange="NYSE",sec=s,testing=True) 
-            
-            
+        #should perform the report at sector level
+        report=m.Report()
+        report.daily_report(exchange="NYSE",testing=True) 
                  
 if __name__ == '__main__':
     unittest.main() 

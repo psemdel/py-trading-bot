@@ -25,6 +25,8 @@ def major_int_sub(
     '''
     Determine when the trend is bull/bear or uncertain in order to improve the underlying strategy or
     to determine the ideal direction (long/short/both)
+    
+    The convention is -1=bull, 1=bear, 0=uncertain
     '''
 
     '''
