@@ -76,29 +76,19 @@ class Opt(OptMain):
             if (not self.check_tested_arrs()) and not "test" in dic:
                 return best_arrs_cand, best_ret_cand
             
-            self.defi_ent(dic)
-            self.defi_ex(dic)
-            self.macro_mode(dic)
-            
             if self.it_is_index:
                 ret_arr=[]
             else:
                 ret=0
+            
+            pf_dic=self.calculate_pf_sub(dic)
 
             for ind in self.indexes: #CAC, DAX, NASDAQ
-                pf=vbt.Portfolio.from_signals(self.close_dic[ind][dic],  #use data for tsl or sl!!!!
-                                              self.ents[ind],
-                                              self.exs[ind],
-                                              short_entries=self.ents_short[ind],
-                                              short_exits=self.exs_short[ind],
-                                              freq="1d",fees=self.fees,
-                                              tsl_stop=self.tsl,
-                                              sl_stop=self.sl,
-                                              ) #stop_exit_price="close"
+
                 if self.it_is_index:
-                    ret_arr.append(self.calculate_eq_ret(pf))
+                    ret_arr.append(self.calculate_eq_ret(pf_dic[ind]))
                 else:
-                    ret+=self.calculate_eq_ret(pf)
+                    ret+=self.calculate_eq_ret(pf_dic[ind])
     
             if self.it_is_index:
                 while np.std(ret_arr)>10:
@@ -107,10 +97,10 @@ class Opt(OptMain):
              
                 ret=np.mean(ret_arr)
     
-            trades =len(pf.get_trades().records_arr)
-            del pf
+            trades =len(pf_dic[ind].get_trades().records_arr)
+            del pf_dic
              
-            if (ret> best_arrs_ret and ret>best_ret_cand and trades>50) or "test" in dic:
+            if (ret> best_arrs_ret and ret>best_ret_cand and trades>50) or dic=="test":
                 return self.calc_arrs, ret
             
             return best_arrs_cand, best_ret_cand

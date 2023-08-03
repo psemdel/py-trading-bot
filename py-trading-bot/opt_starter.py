@@ -22,6 +22,32 @@ if False:
           nb_macro_modes=1
           )
    
+if True:
+    #optimize bt
+    from opt.opt_presel import Opt
+   
+    #only for predefined
+    a_bull=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
+    0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
+    0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
+    a_bear=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
+    0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
+    0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
+    a_uncertain= [0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
+    0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
+    0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
+
+    o=Opt(
+        "PreselDivergence",
+        "2007_2022_08",
+         loops=40,
+          # predefined=True,
+           #a_bull=a_bull,
+          # a_bear=a_bear,
+         #  a_uncertain=a_uncertain,   
+           )
+    o.perf()   
+    
 if False:
    #optimize the strategy with macro
    from opt.opt_strat import Opt
@@ -126,7 +152,7 @@ if False:
     
     o.perf_recursion()    
   
-if True:
+if False:
     from opt.opt_corr import Opt
     
     a_bull=[ 0.,  0.,  0.,  1.,  1.,  1.,  1.,  0.,  0.,  0.,  1.,  1.,  0.,

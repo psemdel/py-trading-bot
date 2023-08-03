@@ -400,6 +400,7 @@ class MyScheduler():
             self,
             exchange:str,
             it_is_index:bool=False,
+            sec:str=None,
             **kwargs):
         '''
         See daily report
@@ -407,9 +408,14 @@ class MyScheduler():
         Arguments
        	----------
            exchange: name of the stock exchange
-        '''        
-        report1=Report.objects.create()
-        report1.daily_report(exchange=exchange,it_is_index=it_is_index,**kwargs)
+           sec: sector of the stocks for which we write the report
+        '''  
+        if exchange is not None:
+            s_ex=StockEx.objects.get(name=exchange)
+            report1=Report.objects.create(stock_ex=s_ex)
+        else:
+            report1=Report.objects.create()
+        report1.daily_report(exchange=exchange,it_is_index=it_is_index,sec=sec,**kwargs)
         self.send_order(report1)
         
     def daily_report(self, 
@@ -497,7 +503,7 @@ class MyScheduler():
             if today>(timedelta(days=j.frequency_days)+j.last_execution):
                 actions=get_exchange_actions(j.stock_ex.name)
                 st=Strategy.objects.get(name=j.strategy.name)
-                pr=presel.name_to_presel(
+                pr=presel.name_to_ust_or_presel(
                     st.class_name, 
                     str(j.period_year)+"y",
                     prd=True, 

@@ -414,6 +414,7 @@ class OptMain():
                     self.exs[ind]=t.exits
                     self.ents_short[ind]=t.entries_short
                     self.exs_short[ind]=t.exits_short 
+                    
         except Exception as msg:      
             print(msg)
             print(self.macro_trend.__dir__())  
@@ -443,19 +444,18 @@ class OptMain():
                 self.tested_arrs.append(a)
             return True
         
-    def random(self):
+    def random(self)-> list:
         '''
         Generate a random strategy array
         ''' 
-        #choose randomly 0 and 1. All zeros is not accepted.
+        #choose randomly 0 and 1. All zeros is not accepted. 90% chance 0, 10% chance 1
         arr=np.random.choice(2,self.len_ent+self.len_ex, p=[0.9, 0.1]) 
         
         while np.sum(arr[0:self.len_ent] )==0 or np.sum(arr[self.len_ent:self.len_ent+self.len_ex])==0:#entries or exits must not be full 0
             arr=np.random.choice(2,self.len_ent+self.len_ex, p=[0.9, 0.1]) 
-
         return arr
     
-    def summarize_eq_ret(self,ret_arr:list):
+    def summarize_eq_ret(self,ret_arr:list)-> numbers.Number:
         '''
         Method to calculate a general score for a strategy from an array of returns
         
@@ -557,7 +557,9 @@ class OptMain():
                         self.best_arrs[self.best_arrs_index,:,:]= best_arrs_cand
                         self.best_arrs_ret[self.best_arrs_index]=best_ret_cand
                         self.best_arrs_index+=1
-                        
+                        log("Present best")
+                        log(best_arrs_cand)
+                        log(best_ret_cand)
                         #next step
                         self.arrs=best_arrs_cand
                         self.test(dic=dic,dic_test=dic_test,*kwargs)
@@ -605,6 +607,26 @@ class OptMain():
     def calculate_pf(self):
         print("calculate_pf not defined at OptMain, see child")
         pass
+    
+    def calculate_pf_sub(self,d):
+        pf_dic={}   
+        self.defi_ent(d)
+        self.defi_ex(d)
+        self.macro_mode(d)
+
+        for ind in self.indexes: #CAC, DAX, NASDAQ
+            self.tested_arrs=[] #reset after each loop
+            pf_dic[ind]=vbt.Portfolio.from_signals(self.data_dic[ind][d],
+                                          self.ents[ind],
+                                          self.exs[ind],
+                                          short_entries=self.ents_short[ind],
+                                          short_exits=self.exs_short[ind],
+                                          freq="1d",fees=self.fees,
+                                          tsl_stop=self.tsl,
+                                          sl_stop=self.sl,
+                                          ) #stop_exit_price="close"
+            
+        return pf_dic
 
     def test(
             self,
@@ -623,7 +645,6 @@ class OptMain():
         ''' 
         if verbose>0:
             log("Starting tests " + dic)
-        self.tested_arrs=[]
         ret_arr={}
         stats={}
         ret_pf_arr={}
@@ -632,25 +653,13 @@ class OptMain():
         for d in [dic, dic_test]:
             ret_arr[d]={}
             self.defi_i(d)
-            self.defi_ent(d)
-            self.defi_ex(d)
-            self.macro_mode(d)
-
+            
+            pf_dic=self.calculate_pf_sub(d)
             for ind in self.indexes: #CAC, DAX, NASDAQ
                 stats[ind]={}
-                pf=vbt.Portfolio.from_signals(self.data_dic[ind][d],
-                                              self.ents[ind],
-                                              self.exs[ind],
-                                              short_entries=self.ents_short[ind],
-                                              short_exits=self.exs_short[ind],
-                                              freq="1d",fees=self.fees,
-                                              tsl_stop=self.tsl,
-                                              sl_stop=self.sl,
-                                              ) #stop_exit_price="close"
-                self.tested_arrs=[]       
-
-                ret_arr[d][ind]= self.get_ret(pf)
-        _, ret_pf_arr[d]=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=d)
+                ret_arr[d][ind]= self.get_ret(pf_dic[ind])
+                
+            _, ret_pf_arr[d]=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=d)
         if verbose>0:
             log("Overall perf, "+d+": " + str(ret_pf_arr[d]),pr=True)
         return self.compare_learn_test(ret_arr,verbose=verbose)
@@ -855,6 +864,13 @@ class OptMain():
         pd.set_option('display.max_columns', None)     
         log(df)
         
+    def get_ret_sub(self,rb, rr):
+        if abs(rb)<0.1: #avoid division by zero
+            p=(rr)/ 0.1*np.sign(rb)   
+        else:
+            p=(rr- rb )/ abs(rb)
+        return p
+        
     def get_ret(self,pf)-> list:
         '''
         Calculate an equivalent score for each product in a portfolio  
@@ -862,21 +878,18 @@ class OptMain():
         Arguments
         ----------
            pf: vbt portfolio
-        '''    
-        if self.it_is_index:
+        '''   
+        arr=[]
+        if self.it_is_index or type(pf.total_market_return)!=pd.core.series.Series:
             rb=pf.total_market_return
-            rr=pf.get_total_return()           
+            rr=pf.get_total_return()  
+            arr.append(self.get_ret_sub(rb,rr))
         else:
             rb=pf.total_market_return.values
             rr=pf.get_total_return().values
-            
-        arr=[]
-        for ii in range(len(rb)):
-            if abs(rb[ii])<0.1: #avoid division by zero
-                p=(rr[ii])/ 0.1*np.sign(rb[ii])   
-            else:
-                p=(rr[ii]- rb[ii] )/ abs(rb[ii])
-            arr.append(p)
+            for ii in range(len(rb)):
+                arr.append(self.get_ret_sub(rb[ii],rr[ii]))
+        
         return arr            
     
     def calculate_eq_ret(self,pf)-> numbers.Number:

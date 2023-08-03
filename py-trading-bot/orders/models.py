@@ -41,7 +41,7 @@ def check_if_index(action):
     else:
         return False
 
-def check_ib_permission(symbols: list):
+def check_ib_permission(symbols: list, verbose: bool=True):
     '''
     Populate USED_API from USED_API_DEFAULT
     Check if IB can be used, otherwise YF is the fallback. For CCXT, MT5 and TS there is nothing to check.
@@ -59,25 +59,28 @@ def check_ib_permission(symbols: list):
             _settings["USED_API"][k]="IB"
             for symbol in symbols:
                 if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
-                    logger.info("symbol " + symbol + " has no permission for IB")
+                    if verbose:
+                        logger.info("symbol " + symbol + " has no permission for IB")
                     _settings["USED_API"][k]="YF"
                     break
                 
                 a=Action.objects.get(symbol=symbol)      
                 if a.stock_ex.ib_auth==False:
-                    logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB")
+                    if verbose:
+                        logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
                     _settings["USED_API"][k]="YF"
                     break
         elif v=="YF":
             _settings["USED_API"][k]=v
     
-def get_exchange_actions(exchange:str,**kwargs):
+def get_exchange_actions(exchange:str,sec: str=None):
     '''
     Get lists of actions for the reporting
 
     Arguments
     ----------
         exchange: name of the stock exchange
+        sec: name of the sector
     '''
     cat=ActionCategory.objects.get(short="ACT")
     
@@ -90,8 +93,8 @@ def get_exchange_actions(exchange:str,**kwargs):
     c2 = Q(stock_ex=stock_ex)
     c3 = Q(delisted=False) #to be removed
     
-    if stock_ex.presel_at_sector_level and kwargs.get("sec"):
-        action_sector, _=ActionSector.objects.get_or_create(name=kwargs.get("sec"))
+    if stock_ex.presel_at_sector_level and sec is not None:
+        action_sector, _=ActionSector.objects.get_or_create(name=sec)
         c4 = Q(sector=action_sector)
         actions=Action.objects.filter(c1 & c3 & c4) #c2 & no actual reason, but I use mix of Nasdaq and NYSE for sector
     else:
@@ -261,8 +264,7 @@ class StockStatus(models.Model):
         return self.action.name    
     
 def action_to_short(action):
-    a=Action.objects.get(action=action)
-    ss = StockStatus.objects.get(action=a)
+    ss = StockStatus.objects.get(action=action)
     return ss.quantity<0  
 
 def filter_intro_action(

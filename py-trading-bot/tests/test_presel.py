@@ -9,11 +9,83 @@ Created on Fri Jun 24 19:45:34 2022
 import unittest
 from core import presel
 import vectorbtpro as vbt
+from orders import models as m
+from core import strat
+from datetime import datetime
 
+import sys
+if sys.version_info.minor>=9:
+    from zoneinfo import ZoneInfo
+else:
+    from backports.zoneinfo import ZoneInfo
+    
 class TestBT(unittest.TestCase):
     def setUp(self):
         self.period="2007_2022_08"
         self.symbol_index="CAC40"
+        
+        f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
+        cat=m.ActionCategory.objects.create(name="actions",short="ACT")
+        
+        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
+        c=m.Currency.objects.create(name="euro")
+        
+        self.strategy=m.Strategy.objects.create(name="none",priority=10,target_order_size=1)
+        self.s=m.ActionSector.objects.create(name="undefined")
+        self.a=m.Action.objects.create(
+            symbol='AC.PA',
+            #ib_ticker='AC',
+            name="Accor",
+            stock_ex=self.e,
+            currency=c,
+            category=cat,
+            #strategy=strategy,
+            sector=self.s,
+            )
+        
+    def test_name_to_ust_or_presel(self):
+        pr=presel.name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index)
+        self.assertEqual( type(pr),presel.PreselWQ)
+        pr=presel.name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index,it_is_index=True)
+        self.assertEqual( pr,None)
+        pr=presel.name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index)
+        self.assertEqual( type(pr),presel.PreselDivergence)
+        pr=presel.name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index,it_is_index=True)
+        self.assertEqual( pr,None)        
+        pr=presel.name_to_ust_or_presel("abcd",self.period,symbol_index=self.symbol_index)
+        self.assertEqual( pr,None)  
+        pr=presel.name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index)
+        self.assertEqual( type(pr),strat.StratG)  
+        pr=presel.name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index,it_is_index=True) #gives some warnings
+        self.assertEqual( type(pr),strat.StratG)
+        
+    def test_get_order(self):
+        self.bti=presel.Presel(self.period,symbol_index=self.symbol_index)
+        self.assertEqual(self.bti.get_order("AC.PA","none"),None)
+        
+        o=m.Order.objects.create(action=self.a, strategy=self.strategy)
+        self.assertEqual( self.bti.get_order("AC.PA","none"),o)
+
+    def test_get_last_exit(self):
+        self.ust=strat.StratDiv(self.period, symbol_index=self.symbol_index)
+        self.ust.run()
+        
+        self.bti=presel.Presel(self.period,symbol_index=self.symbol_index,input_ust=self.ust)
+        #ust has an exit for AC in 2022-08-19, no exit short
+        d=datetime(2022,8,20,tzinfo=ZoneInfo('Europe/Paris'))
+        #since 2022-08-20, no exit
+        self.assertEqual(self.bti.get_last_exit(d,"AC","AC"),1)
+        self.assertEqual(self.bti.get_last_exit(d,"AC","AC",short=True),-1)
+        
+        d=datetime(2022,8,18,tzinfo=ZoneInfo('Europe/Paris'))
+        #since 2022-08-20, there was an exit
+        self.assertEqual(self.bti.get_last_exit(d,"AC","AC"),0)
+        self.assertEqual(self.bti.get_last_exit(d,"AC","AC",short=True),-1)
+        
+        d=datetime(2022,8,19,tzinfo=ZoneInfo('Europe/Paris'))
+        #since 2022-08-19, limit case, we should not exit the day we enter
+        self.assertEqual(self.bti.get_last_exit(d,"AC","AC"),1)
+        self.assertEqual(self.bti.get_last_exit(d,"AC","AC",short=True),-1)
         
     def test_preselect_vol(self):
         self.bti=presel.PreselVol(self.period,symbol_index=self.symbol_index)

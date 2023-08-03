@@ -105,6 +105,16 @@ class TestSSManager(TestCase):
             etf_long=etf1,
             etf_short=etf2,
             ) 
+        self.a6=m.Action.objects.create(
+            symbol='MC.PA',
+            #ib_ticker='AC',
+            name="Airbus",
+            stock_ex=self.e,
+            currency=c,
+            category=cat,
+            #strategy=strategy,
+            sector=self.s,
+            )
         
         ss1=m.StockStatus.objects.get(action=self.a)
         ss1.strategy=self.strategy
@@ -122,8 +132,12 @@ class TestSSManager(TestCase):
         ss4.strategy=self.strategy2
         ss4.save()
         
+        ss5=m.StockStatus.objects.get(action=self.a6)
+        ss5.strategy=None
+        ss5.save()
+        
         self.r=m2.Report.objects.create()
-        self.ss_m=ss_manager.StockStatusManager(self.r)
+        self.ss_m=ss_manager.StockStatusManager(self.r,"Paris")
             
     def test_init(self):
         self.assertEqual(len(m.StockStatus.objects.all()),7)    
@@ -156,9 +170,12 @@ class TestSSManager(TestCase):
         self.assertEqual(self.ss_m.target_ss.loc["AIR.PA","norm_quantity"],0)
         self.assertTrue(np.isnan(self.ss_m.target_ss.loc["AIR.PA","norm_delta_quantity"]))
         self.assertEqual(self.ss_m.target_ss.loc["AIR.PA","priority"],1000)
-        self.assertEqual(self.ss_m.target_ss.loc["JKHY","norm_quantity"],0)
+        self.assertEqual(self.ss_m.target_ss.loc["KER.PA","norm_quantity"],0)
+        
+        df=pd.DataFrame(data=[["MC.PA",1,np.nan],["AIR.PA",np.nan,np.nan]],columns=["index","none","strat2"])
+        df.set_index("index",inplace=True)
+        self.ss_m.determine_target_sub(df, False)
 
-    
     def test_determine_target_sub2(self):    
         '''
         If the priority is lower, we expect no change
@@ -170,7 +187,7 @@ class TestSSManager(TestCase):
         ss1.strategy=self.strategy
         ss1.save()
         r=m2.Report.objects.create()
-        self.ss_m=ss_manager.StockStatusManager(r)
+        self.ss_m=ss_manager.StockStatusManager(r,"Paris")
         #low priority 
         df=pd.DataFrame(data=[["AC.PA",np.nan,1],["AIR.PA",np.nan,1]],columns=["index","none","strat2"])
         df.set_index("index",inplace=True)
@@ -194,7 +211,7 @@ class TestSSManager(TestCase):
         ss1.strategy=self.strategy
         ss1.save()
         r=m2.Report.objects.create()
-        self.ss_m=ss_manager.StockStatusManager(r)
+        self.ss_m=ss_manager.StockStatusManager(r,"Paris")
         #low priority 
         df=pd.DataFrame(data=[["AC.PA",np.nan,1, 1],["AIR.PA",np.nan,1,np.nan]],columns=["index","none","strat2","strat3"])
         df.set_index("index",inplace=True)
@@ -218,7 +235,7 @@ class TestSSManager(TestCase):
         ss1.strategy=self.strategy
         ss1.save()
         r=m2.Report.objects.create()
-        self.ss_m=ss_manager.StockStatusManager(r)
+        self.ss_m=ss_manager.StockStatusManager(r,"Paris")
         #low priority 
         df=pd.DataFrame(data=[["AC.PA",np.nan,1, 1],["AIR.PA",np.nan,1,np.nan]],columns=["index","none","strat2","strat3"])
         df.set_index("index",inplace=True)
@@ -279,7 +296,7 @@ class TestSSManager(TestCase):
         self.assertTrue(np.equal(ent_ex_symbols.actions.all(),[self.a]).all())
     
         self.r=m2.Report.objects.create()
-        self.ss_m=ss_manager.StockStatusManager(self.r)
+        self.ss_m=ss_manager.StockStatusManager(self.r,"Paris")
         df=pd.DataFrame(data=[["AI.PA",0,self.strategy.id,True,10,-1,-1]],
                         columns=["symbol","quantity","strategy_id","order_in_ib","priority","norm_quantity","norm_delta_quantity"],
                         )
@@ -418,12 +435,27 @@ class TestSSManager(TestCase):
         self.ss_m.ex_ent_to_target(False,False,True,False,"AIR.PA","none")
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AIR.PA","none"],-1)
         
-        self.ss_m.ex_ent_to_target(False,False,False,True,"JKHY","none")
-        self.assertEqual(self.ss_m.target_ss_by_st.loc["JKHY","none"],0)        
+        self.ss_m.ex_ent_to_target(False,False,False,True,"KER.PA","none")
+        self.assertEqual(self.ss_m.target_ss_by_st.loc["KER.PA","none"],0)        
         
     def test_scan_removed_strat(self):
         self.ss_m.present_ss.loc["AC.PA","quantity"]=1
         #none is not listed in the strat for Paris
         self.ss_m.scan_removed_strat()
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],0)
-        self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))        
+        self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))     
+        
+    def test_display_target_ss_by_st(self):
+        df=pd.DataFrame(data=[["AC.PA","ACT",np.nan,1, 1],["AIR.PA","ACT",np.nan,1,np.nan],
+                              ["^FCHI","IND",np.nan,1, 1],["KER.PA","ACT",np.nan,np.nan,np.nan],],
+                        columns=["symbol","category_id","none","strat2","strat3"])
+        df.set_index("symbol",inplace=True)
+        self.ss_m.target_ss_by_st=df
+        
+        out=self.ss_m.display_target_ss_by_st()
+        expected="AC.PA\nstrat2 strat3 \n1.0    1.0    \r\n\nAIR.PA\nstrat2 \n1.0    \r\n\n"
+        self.assertEqual(out,expected)
+        
+        out=self.ss_m.display_target_ss_by_st(it_is_index=True)
+        expected="^FCHI\nstrat2 strat3 \n1.0    1.0    \r\n\n"
+        self.assertEqual(out,expected)

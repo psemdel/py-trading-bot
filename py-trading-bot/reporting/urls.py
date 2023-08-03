@@ -13,7 +13,6 @@ app_name = 'reporting'
 
 urlpatterns = [ 
     path('', views.reportsView, name="home"),
-    path('daily/', views.dailyView),
     path('alerts/', views.alertsView, name="alerts"),
     path('reports/', views.reportsView, name="reports"),
     path('reports/<int:pk>', views.reportView, name='rep'),

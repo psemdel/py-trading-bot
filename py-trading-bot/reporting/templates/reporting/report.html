@@ -102,8 +102,8 @@
 Entries if the fast signal becomes greater than the slow one and exits if it is the opposite.</p>
 
 <h1>Target quantity by strategy</h1>
-<p>1 means that we want to have the product in long, -1 the product in short, 0 no product. <br/>
+<p>1 means that we want to have the product in long, -1 the product in short, 0 no product. NaN means no decision is taken by this strategy<br/>
 The columns are the different strategies</p>
-<p>{{report.target_ss_by_st}}</p>
+<p>{{report.target_ss_by_st|linebreaks }}</p>
 
 <p><a href="{% url 'reporting:reports' %}">Main page</a></p>

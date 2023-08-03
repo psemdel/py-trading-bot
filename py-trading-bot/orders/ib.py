@@ -189,7 +189,7 @@ def get_last_price(
     action: stock to be checked
     """     
     try:
-        check_ib_permission([action.symbol]) 
+        check_ib_permission([action.symbol],verbose=False) #to populate USED_API
         cours_pres=0
         
         if _settings["USED_API"]["alerting"] =="CCXT":
@@ -230,7 +230,7 @@ def get_ratio(action):
         cours_pres=0
         cours_ref=0
         
-        check_ib_permission([action.symbol])
+        check_ib_permission([action.symbol],verbose=False) #to populate USED_API
         
         if _settings["USED_API"]["alerting"] =="CCXT":
             ccxtData=CCXTDataExt()
@@ -958,7 +958,9 @@ def actualize_ss_ib(**kwargs):
                         
             if action is not None: 
                 present_ss=StockStatus.objects.get(action=action)
-                present_ss.quantity=pos.position
+                if present_ss.quantity!=pos.position:
+                    logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position))
+                    present_ss.quantity=pos.position
                 present_ss.order_in_ib=True
                 present_ss.save()  
                 
@@ -1199,6 +1201,7 @@ class OrderPerformer():
                  self.symbol not in self.excluded.retrieve()):
                 self.new_order=Order(action=self.action, strategy=self.st, short=not buy)
                 self.entry=True
+                self.ss.strategy=self.st
                 buy_sell_txt={True:"buying ", False: "selling "}
                 #add reverse info
                 if _settings["USED_API"]["orders"]=="IB":
@@ -1213,6 +1216,7 @@ class OrderPerformer():
                     logger_trade.info("entering_price: "+ str(self.new_order.entering_price))
                     self.new_order.quantity, sign, short=retrieve_quantity(self.action)
                     self.ss.quantity=sign*self.new_order.quantity
+                    
                     self.new_order.short=short
             
                     if self.st.sl_threshold is not None and self.st.sl_threshold !=0:

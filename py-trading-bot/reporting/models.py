@@ -81,7 +81,10 @@ class Report(models.Model):
            testing: set to True to perform unittest on the function
         '''
         if "ss_m" not in self.__dir__():
-            self.ss_m=StockStatusManager(self,testing=testing)
+            if self.stock_ex is None:
+                self.ss_m=StockStatusManager(self,None,testing=testing)
+            else:
+                self.ss_m=StockStatusManager(self,self.stock_ex.name,testing=testing)
         super().save(*args, **kwargs)  
             
     def concat(self,text: str):
@@ -137,12 +140,12 @@ class Report(models.Model):
             ust, 
             exchange: str,
             it_is_index:bool=False,
+            sec:str=None
             ):
         '''
         Sub-function for perform_sub
         '''
         try:
-        
             for st in strats:
                 if st.class_name is None:
                     print("define class_name for strategy "+str(st.name))
@@ -155,7 +158,9 @@ class Report(models.Model):
                         it_is_index=it_is_index,
                         st=st
                         )  
-                    ust_or_pr.perform(self)
+                    if ust_or_pr is not None: #presel with it_is_index
+                        ust_or_pr.perform(self)
+                    
         except Exception as e:
               import sys
               _, e_, exc_tb = sys.exc_info()
@@ -190,25 +195,14 @@ class Report(models.Model):
             else:
                 a="strategies_in_use"
             
-            for stock_ex in stock_exs:
-                if stock_ex.presel_at_sector_level:
-                    if sec is not None:
-                        sector=ActionSector.objects.get(name=sec)
-                        strats=getattr(sector,a).all()
-                        self.perform_sub(strats,ust,ust.exchange,it_is_index=it_is_index)
-                    else:    
-                        for s in ActionSector.objects.all(): #try for each sector
-                            strats=getattr(s,a).all()
-                            self.perform_sub(strats,ust,ust.exchange,sec=s,it_is_index=it_is_index)
-                else:
-                    strats=getattr(stock_ex,a).all()
-                    self.perform_sub(strats,ust,ust.exchange,it_is_index=it_is_index)
+            for stock_ex in stock_exs: #sector is already in ust
+                strats=getattr(stock_ex,a).all()
+                self.perform_sub(strats,ust,ust.exchange,it_is_index=it_is_index)
         except Exception as e:
              import sys
              _, e_, exc_tb = sys.exc_info()
              print(e)
              print("line " + str(exc_tb.tb_lineno))
-        
         
     def populate_report(
             self, 
@@ -353,6 +347,7 @@ class Report(models.Model):
     	----------
         it_is_index: is it indexes that are provided
         exchange: name of the stock exchange
+        sec: sector of the stocks for which we write the report
         symbols: list of YF symbols
         sec: sector of the stocks for which we write the report
         intraday: is it a report at the end of the day or during it
@@ -365,7 +360,7 @@ class Report(models.Model):
                 check_ib_permission(symbols)
                 actions=[Action.objects.get(symbol=symbol) for symbol in symbols]
             else: #actions, exchange is provided
-                actions=get_exchange_actions(exchange,**kwargs)
+                actions=get_exchange_actions(exchange,sec=sec) #-> sec is considered here
 
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)

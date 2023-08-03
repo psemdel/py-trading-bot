@@ -5,11 +5,9 @@ To download more data, go in core/data_manager.py. At the bottom, you can select
 
 You can then use your data in the Jupyter notebooks like strat.ipynb:
 
-    ```
     period="2007_2022_08"
     symbol_index="CAC40"
     ust=strat.StratHold(period,symbol_index=symbol_index)    
-    ```
     
 This will load the stock file CAC40_2007_2022_08.
 

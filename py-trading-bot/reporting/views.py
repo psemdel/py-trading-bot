@@ -19,13 +19,6 @@ def reportView(request,pk):
 
     context={'report':report[0], 'ars':ars}
     return render(request, 'reporting/report.html', context)
-
-def dailyView(request):
-    report= Report.objects.latest('id')
-    actions=ActionReport.objects.filter(report=report.id)
-    indexes=ActionReport.objects.filter(report=report.id)
-    context={'report':report, 'actions':actions, 'indexes':indexes}
-    return render(request, 'reporting/report.html', context)
     
 def trendView(request,pk): 
     report= Report.objects.filter(id=pk)
@@ -50,7 +43,11 @@ def daily_report_sub(
         exchange:str,
         it_is_index:bool=False,
         **kwargs):
-    report1=Report.objects.create()
+    
+    if exchange is not None:
+        report1=Report.objects.create(stock_ex=StockEx.objects.get(name=exchange))
+    else:
+        report1=Report.objects.create()
     report1.daily_report(exchange=exchange,it_is_index=it_is_index,**kwargs)
     send_order_test(report1)
 

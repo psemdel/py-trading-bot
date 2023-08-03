@@ -49,16 +49,19 @@ def name_to_ust_or_presel(
         st: strategy associated
     '''
     try:
-        if ust_or_presel_name[:6]=="Presel" and not it_is_index: #Presel for index makes no sense
-            if ust_or_presel_name[6:8].lower()=="wq":
-                nb=int(ust_or_presel_name[8:])
-                pr=PreselWQ(period,nb=nb,st=st,**kwargs)
+        if ust_or_presel_name[:6]=="Presel":
+            if not it_is_index: #Presel for index makes no sense
+                if ust_or_presel_name[6:8].lower()=="wq":
+                    nb=int(ust_or_presel_name[8:])
+                    pr=PreselWQ(period,nb=nb,st=st,**kwargs)
+                else:
+                    PR=getattr(sys.modules[__name__],ust_or_presel_name)
+                    pr=PR(period,st=st,**kwargs)
+                    
+                pr.run()
+                return pr
             else:
-                PR=getattr(sys.modules[__name__],ust_or_presel_name)
-                pr=PR(period,st=st,**kwargs)
-                
-            pr.run()
-            return pr
+                return None
         elif ust_or_presel_name[:5]=="Strat":
             try:
                 UST=getattr(strat,ust_or_presel_name)
@@ -220,70 +223,77 @@ class Presel():
         #all presel strat are monodirectionel
         #So if the trends reverse, the opposite direction should be empty
         #clean at the same time the excluded
-        if short:
-            for symbol_simple in self.pf["long"]:
-                self.exits[symbol_simple].iloc[ii]=True
-                self.capital+=self.order_size
-                self.pf["long"].remove(symbol_simple)
-                self.hold_dur=0
-            for symbol_simple in self.pf["short"]:
-                if symbol_simple in self.excluded:
+        
+        try:
+            if short:
+                for symbol_simple in self.pf["long"]:
+                    self.exits[symbol_simple].iloc[ii]=True
+                    self.capital+=self.order_size
+                    self.pf["long"].remove(symbol_simple)
+                    self.hold_dur=0
+                for symbol_simple in self.pf["short"]:
+                    if symbol_simple in self.excluded:
+                        self.exits_short[symbol_simple].iloc[ii]=True
+                        self.capital+=self.order_size
+                        self.pf["short"].remove(symbol_simple)
+                        self.hold_dur=0
+            else:
+                for symbol_simple in self.pf["short"]:
                     self.exits_short[symbol_simple].iloc[ii]=True
                     self.capital+=self.order_size
                     self.pf["short"].remove(symbol_simple)
                     self.hold_dur=0
-        else:
-            for symbol_simple in self.pf["short"]:
-                self.exits_short[symbol_simple].iloc[ii]=True
-                self.capital+=self.order_size
-                self.pf["short"].remove(symbol_simple)
-                self.hold_dur=0
-            for symbol_simple in self.pf["long"]:
-                if symbol_simple in self.excluded:
-                    self.exits[symbol_simple].iloc[ii]=True  
+                for symbol_simple in self.pf["long"]:
+                    if symbol_simple in self.excluded:
+                        self.exits[symbol_simple].iloc[ii]=True  
+                        self.capital+=self.order_size
+                        self.pf["long"].remove(symbol_simple)
+                        self.hold_dur=0
+                        
+            #perform orders
+            #exit
+            for symbol_simple in self.pf[short_to_str[short]]:
+                symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
+    
+                if ((not self.no_ust and not short and self.ust.exits[symbol_complex].values[ii]) or  #not short and 
+                   (not self.no_ust and short and self.ust.exits_short[symbol_complex].values[ii]) or
+                    (self.no_ust and symbol_simple not in self.candidates[short_to_str[short]][ii])):
+       
+                    self.pf[short_to_str[short]].remove(symbol_simple)
                     self.capital+=self.order_size
-                    self.pf["long"].remove(symbol_simple)
-                    self.hold_dur=0
                     
-        #perform orders
-        #exit
-        for symbol_simple in self.pf[short_to_str[short]]:
-            symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
-
-            if ((not self.no_ust and not short and self.ust.exits[symbol_complex].values[ii]) or  #not short and 
-               (not self.no_ust and short and self.ust.exits_short[symbol_complex].values[ii]) or
-                (self.no_ust and symbol_simple not in self.candidates[short_to_str[short]][ii])):
-   
-                self.pf[short_to_str[short]].remove(symbol_simple)
-                self.capital+=self.order_size
-                
-                if short:
-                    self.exits_short[symbol_simple].iloc[ii]=True 
+                    if short:
+                        self.exits_short[symbol_simple].iloc[ii]=True 
+                    else:
+                        self.exits[symbol_simple].iloc[ii]=True
+    
+                    self.hold_dur=0 
                 else:
-                    self.exits[symbol_simple].iloc[ii]=True
-
-                self.hold_dur=0 
-            else:
-                self.hold_dur+=1
-
-        #entry
-        for symbol_simple in self.candidates[short_to_str[short]][ii]:
-            symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
-
-            if (self.capital>=self.order_size and
-                ((self.no_ust or self.only_exit_ust) or
-                (not short and self.ust.entries[symbol_complex].values[ii]) or
-                (short and self.ust.entries_short[symbol_complex].values[ii])) and
-                symbol_simple not in self.excluded):
-
-                self.pf[short_to_str[short]].append(symbol_simple)
-                self.capital-=self.order_size
-                
-                if short:
-                    self.entries_short[symbol_simple].iloc[ii]=True
-                else:
-                    self.entries[symbol_simple].iloc[ii]=True
-                            
+                    self.hold_dur+=1
+    
+            #entry
+            for symbol_simple in self.candidates[short_to_str[short]][ii]:
+                symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
+    
+                if (self.capital>=self.order_size and
+                    ((self.no_ust or self.only_exit_ust) or
+                    (not short and self.ust.entries[symbol_complex].values[ii]) or
+                    (short and self.ust.entries_short[symbol_complex].values[ii])) and
+                    symbol_simple not in self.excluded):
+    
+                    self.pf[short_to_str[short]].append(symbol_simple)
+                    self.capital-=self.order_size
+                    
+                    if short:
+                        self.entries_short[symbol_simple].iloc[ii]=True
+                    else:
+                        self.entries[symbol_simple].iloc[ii]=True
+        
+        except Exception as e:
+              _, e_, exc_tb = sys.exc_info()
+              print(e)
+              print("line " + str(exc_tb.tb_lineno))     
+                     
     def presub(self,ii:int):
         '''
         Used in run to add a function there if needed
@@ -343,12 +353,13 @@ class Presel():
 
         return self.sorted #for display
     
-    def run(self,**kwargs):
+    def run(self,skip_underlying:bool=False,**kwargs):
         '''
         Main function for presel
         '''
         try:
-            self.underlying()
+            if not skip_underlying:
+                self.underlying()
             if self.prd and not self.calc_all:
                 ii=len(self.close)-1
                 self.presub(ii)
@@ -357,7 +368,12 @@ class Presel():
                 for ii in range(len(self.close.index)):
                     self.presub(ii)
                     self.out=self.sub(ii,**kwargs)
-                    self.calculate(ii,**kwargs)
+                    t=self.calculate(ii,**kwargs)
+                    if t=="abc":
+                        print("len close")
+                        print(len(self.close.index))
+                        print(len(self.ust.close.index))
+                        return
             
         except Exception as e:
               import sys
@@ -383,8 +399,9 @@ class Presel():
         action=Action.objects.get(symbol=symbol)
         c1 = Q(action=action)
         c2 = Q(active=True)
+
         st=Strategy.objects.get(name=strategy)
-        c3 = Q(st)
+        c3 = Q(strategy=st)
         orders=Order.objects.filter(c1 & c2 & c3)
 
         if len(orders)>1:
@@ -394,20 +411,29 @@ class Presel():
             print("no order found for: "+symbol+" , check the database")
         else:
             return orders[0]
-        #entering_date
-        
+
     def get_last_exit(self, entering_date, symbol_complex_ent: str, symbol_complex_ex: str, short:bool=False):
-        ii=len(self.entries[symbol_complex_ent].values)-1
+        """
+        Search for an exit between the entry time and now. Return the desired quantity
+        
+        Arguments
+        ----------
+        entering_date: datetime when the order was performed by the preselection strategy
+        symbol_complex_ent: symbol in self.ust.entries and self.ust.exits_short
+        symbol_complex_ex: symbol in self.ust.exits and self.ust.entries_short
+        short: was the preselection strategy in short direction?        
+        """
+        ii=len(self.ust.entries[symbol_complex_ent].values)-1
         
         #look for an exit between the entry time and now
-        while entering_date<self.entries.index[ii] and ii>0:
+        while entering_date<self.ust.entries.index[ii] and ii>0:
             if short:
-                if (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]) and not\
-                (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]):
+                if (self.ust.entries[symbol_complex_ent].values[ii] or self.ust.exits_short[symbol_complex_ent].values[ii]) and not\
+                (self.ust.exits[symbol_complex_ex].values[ii] or self.ust.entries_short[symbol_complex_ex].values[ii]):
                     return 0
             else:
-                if (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]) and not\
-                    (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]):
+                if (self.ust.exits[symbol_complex_ex].values[ii] or self.ust.entries_short[symbol_complex_ex].values[ii]) and not\
+                    (self.ust.entries[symbol_complex_ent].values[ii] or self.ust.exits_short[symbol_complex_ent].values[ii]):
                     return 0
             ii-=1
             
@@ -415,10 +441,10 @@ class Presel():
             return -1
         else:
             return 1
-    
+              
     def perform_only_exit(self,r):
         from orders.models import get_pf
- 
+        
         if not r.it_is_index and self.ust.exchange is not None: #index
             #even if the strategy is not anymore used, we should be able to exit
             for short in [True, False]:
@@ -428,15 +454,14 @@ class Presel():
                 if len(pf)>0:
                     r.concat("symbols in "+self.st.name+" strategy: " +str(pf) + " direction: "+ str(short))
                     for symbol in self.ust.symbols:
-                        o=self.get_order(symbol, self.st.name)
-                        symbol_complex_ex=self.ust.symbols_simple_to_complex(symbol,"ex")  
-                        symbol_complex_ent=self.ust.symbols_simple_to_complex(symbol,"ent")  
-                        
                         if self.ust.symbols_to_YF[symbol] in pf: 
+                            o=self.get_order(symbol, self.st.name)
+                            symbol_complex_ex=self.ust.symbols_simple_to_complex(symbol,"ex")  
+                            symbol_complex_ent=self.ust.symbols_simple_to_complex(symbol,"ent")  
                             target_order=self.get_last_exit(o.entering_date, symbol_complex_ent, symbol_complex_ex, short)
                             if target_order==0: #exit
-                                r.ss_m.add_target_quantity(symbol,self.st.name, target_order)        
-        
+                                r.ss_m.add_target_quantity(symbol,self.st.name, target_order)     
+
 class PreselMacro(Presel):
     '''
     Parent class for preselection relying on trends
@@ -578,6 +603,7 @@ class PreselRetard(Presel):
         self.no_ust=True
         self.calc_all=True
         self.last_short=False
+        self.strategy="retard"
 
     def sorting(
             self,
@@ -610,20 +636,23 @@ class PreselRetard(Presel):
         else:
             direction="long"
 
-        r.concat("Retard, " + "direction " + direction + ", stockex: " + self.ust.exchange +\
+        r.concat(self.strategy.capitalize()+", " + "direction " + direction + ", stockex: " + self.ust.exchange +\
                     ", action duration: " +str(self.out))
   
-        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, "retard", self.last_short)
+        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.strategy, self.last_short)
               
 class PreselRetardMacro(PreselRetard):
     '''
     Like retard, but the long/short is decided in function of the macro trend
     '''
     def __init__(self,period: str,**kwargs):
+        print("retard macro called")
+
         super().__init__(period,**kwargs)
         if self.macro_trend_select is None:
             self.macro_trend_select="ind_mod"
         PreselMacro.preliminary(self)
+        self.strategy="retard_macro"
     
     def run(self,**kwargs):
         self.last_short=PreselMacro.run(self,**kwargs)
@@ -632,6 +661,10 @@ class PreselRetardKeep(Presel):
     '''
     Only the "keep" part of the strategy, so inheritence from PreselRetard
     '''
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        self.strategy="retard_keep"
+        
     def underlying(self):
         self.underlying_creator("StratG")    
     

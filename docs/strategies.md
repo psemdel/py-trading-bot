@@ -95,7 +95,6 @@ Simple strategies are easy to understand, but they can be quite limited. Combina
     
 For instance:
 
-    ```
     class StratRSIeq(UnderlyingStrat):   
         '''
         Same a stratRSI but realized with a strategy array
@@ -108,7 +107,6 @@ For instance:
                0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 
            0., 0., 0., 0., 0.]
             super().__init__(period,strat_arr_simple=a,**kwargs )    
-    ``` 
 
 Uses RSI with threshold 20/80 for the entries and exits. It is perfectly equivalent to StratRSI presented above.
 
@@ -116,7 +114,7 @@ Uses RSI with threshold 20/80 for the entries and exits. It is perfectly equival
 In addition to various combination of signal, it may be interesting to variate on one side the strategy depending on the trend of the market, on the other side a variation of the direction depending on the trend may also be useful. So when the market is bear, you will want to short, whereas it can be risky when the market is bull.
 
 The trend calculation is explained in the corresponding documentation. It sorts the trend in bull, bear and uncertain. One strategy can be assigned for each trend:
-    ```
+
     class StratG(UnderlyingStrat):    
         '''
         Strategy optimized to have the best yield used alone on stocks
@@ -142,17 +140,15 @@ The trend calculation is explained in the corresponding documentation. It sorts 
                 strat_arr_bear=a_bear,
                 strat_arr_uncertain=a_uncertain,
                 **kwargs ) 
-    ```
 
 The strategy array a_bull is used for bull, a_bear for bear and a_uncertain for uncertain trends.
 
 Concerning the direction, by default the following is configured:
 
-    ```
-      dir_bull="long",
-      dir_bear="both",
-      dir_uncertain="both"
-    ```      
+    dir_bull="long",
+    dir_bear="both",
+    dir_uncertain="both"
+    
 
 Note: Theoretically, short would be better for bear, but:
 
@@ -161,8 +157,8 @@ Note: Theoretically, short would be better for bear, but:
 
 To change this, just change the super().__init__ function presented above:
 
-    ```
-      super().__init__(
+
+    super().__init__(
                 period,
                 strat_arr_bull=a_bull,
                 strat_arr_bear=a_bear,
@@ -171,7 +167,6 @@ To change this, just change the super().__init__ function presented above:
                 dir_bear="short",
                 dir_uncertain="long",
                 **kwargs ) 
-    ```
 
 ## Strategies on several stocks
 Strategies on several stocks, later preselection strategies, are provided in core/presel.py. Each preselection strategy is defined by a class. 
@@ -186,19 +181,15 @@ Many strategies on several stocks can be imagined. To cover all those possibilit
 ### Underlying strategy
 The second step "Determine when to buy/sell them" use underlying strategy, as presented before. For instance: 
 
-    ```
     def underlying(self):
         self.underlying_creator("StratF")     
-    ```         
 
 This preselection strategy will use the StratF as underlying strategy.
 
 Additionnaly, the way the underlying strategy acts can be defined by:
 
-    ```
     self.only_exit_ust=False
     self.no_ust=False
-    ```
     
 If no_ust is True, then the underlying strategy is completely ignored. If a stock is candidate, it is bought immediately. When it is not anymore in the candidates, it is sold.
 
@@ -207,23 +198,19 @@ If only_exit_ust is True. If a stock is candidate, it is bought immediately. How
 ### Sorting
 To determine which stock(s) to buy/sell, a sorting function is often required. The first stock(s) of the output list are then the candidates. For instance:
 
-    ``` 
     def sorting(self,ii: int,**kwargs):
         v={}
         for symbol in self.close.columns.values:
             v[symbol]=self.vol[symbol].values[ii]
         self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-    ``` 
     
 For the volatility preselection, the volatility (self.vol) serves to sort the stocks.
 
 ### Supplementary criterium
 For certain strategy, the condition to become candidate is not only about the sorting. This supplementary condition can be defined in supplementary_criterium. For instance:
 
-    ``` 
     def supplementary_criterium(self,symbol_simple, ii,v, short=False):
         return self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0
-    ``` 
     
 The candidates here need to have a macd_tot.hist >0.
 
@@ -235,16 +222,12 @@ The behavior of the strategy can variate depending on the market trend. For the 
 
 In the init function, the trend must then be calculated:
 
-    ```
     PreselMacro.preliminary(self)
-    ```
 
 Two settings cover a different behavior:
 
-    ```
     self.blocked=False     
     self.blocked_im=False  
-    ```
 
 If self.blocked is True, when the trend becomes short, no more candidate is added, but the stocks presently owned are sold by exit signal.
 
@@ -252,10 +235,8 @@ If self.blocked_im is True, when the trend becomes short, no more candidate is a
 
 There are also preselection strategy, that revert completely their behavior when the trend becomes short, like PreselRetardMacro. Then the run method must be changed:
 
-    ```
     def run(self,**kwargs):
         self.last_short=PreselMacro.run(self,**kwargs)
-    ```
     
 ### Slow preselection
 Eventually, slow preselection strategies can be defined. The idea is that several candidates are selected at regular interval, let's say 14 days. The underlyng strategy will then determine which one to buy and sell. Methods like max_sharpe (defined in presel_classic.py) could be ranked in this categories. However, it does seem useful to schedule a job to run every year. For this case, you can run manually the portfolio optimization algorithm and put the candidates in "Strat candidates".
