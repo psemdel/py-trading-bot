@@ -6,7 +6,7 @@ Created on Fri Jun 24 19:45:34 2022
 @author: maxime
 """
 
-import unittest
+from django.test import TestCase
 from core import presel
 import vectorbtpro as vbt
 from orders import models as m
@@ -19,7 +19,7 @@ if sys.version_info.minor>=9:
 else:
     from backports.zoneinfo import ZoneInfo
     
-class TestBT(unittest.TestCase):
+class TestBT(TestCase):
     def setUp(self):
         self.period="2007_2022_08"
         self.symbol_index="CAC40"
@@ -311,6 +311,3 @@ class TestBT(unittest.TestCase):
                               )
 
         self.assertEqual(round(pf.get_total_return(),2),2.81)  
-           
-if __name__ == '__main__':
-    unittest.main()        

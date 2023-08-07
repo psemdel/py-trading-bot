@@ -6,7 +6,6 @@ Created on Thu Jun 30 13:49:54 2022
 @author: maxime
 """
 
-import unittest
 from django.test import TestCase
 import reporting.models as m
 
@@ -362,5 +361,3 @@ class TestReporting(TestCase):
         report=m.Report()
         report.daily_report(exchange="NYSE",testing=True) 
                  
-if __name__ == '__main__':
-    unittest.main() 

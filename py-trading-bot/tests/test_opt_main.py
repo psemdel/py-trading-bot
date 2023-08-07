@@ -6,14 +6,15 @@ Created on Sat Jun  3 23:03:23 2023
 @author: maxime
 """
 
-import unittest
+from django.test import TestCase
 from opt import opt_main
 from opt import opt_strat 
 import numpy as np
+from core import strat
 
 import vectorbtpro as vbt
 
-class TestOptMain(unittest.TestCase):
+class TestOptMain(TestCase):
     @classmethod
     def setUpClass(self):  
         self.a_bull=[
@@ -144,3 +145,37 @@ class TestOptMain(unittest.TestCase):
         
     def test_random(self):
         self.assertEqual(np.shape(self.o.random())[0],44)
+     
+    def test_get_ret_sub(self):
+        #the idea is to have p1>p2 is rr1>rr2
+        self.assertEqual(round(self.o.get_ret_sub(1,1),2),0)
+        self.assertEqual(round(self.o.get_ret_sub(1,1.1),2),0.1)
+        self.assertEqual(round(self.o.get_ret_sub(0.5,1),2),1)
+        
+        self.assertEqual(round(self.o.get_ret_sub(0,1),2),10)
+        self.assertEqual(round(self.o.get_ret_sub(0.01,1),2),10)
+        self.assertEqual(round(self.o.get_ret_sub(0.001,1),2),10)
+        
+        #also if rb is negative
+        self.assertEqual(round(self.o.get_ret_sub(-0.2,0),2),1)
+        self.assertEqual(round(self.o.get_ret_sub(-0.2,0.2),2),2)
+        self.assertEqual(round(self.o.get_ret_sub(-0.2,0.4),2),3)
+        
+        self.assertEqual(round(self.o.get_ret_sub(-0.01,0.4),2),4)
+        self.assertEqual(round(self.o.get_ret_sub(-0.001,1),2),10)
+        
+        #both negative
+        self.assertEqual(round(self.o.get_ret_sub(-0.2,-0.2),2),0)
+        self.assertEqual(round(self.o.get_ret_sub(-0.2,-0.4),2),-1)
+        self.assertEqual(round(self.o.get_ret_sub(0.01,-0.4),2),-4)
+        
+    def test_get_ret(self):
+        self.ust=strat.StratF("2007_2022_08", symbol_index="CAC40")
+        self.ust.run()
+        
+        pf=vbt.Portfolio.from_signals(self.ust.close, self.ust.entries,self.ust.exits,
+                                      short_entries=self.ust.entries_short,
+                                      short_exits  =self.ust.exits_short)
+        t=self.o.get_ret(pf)
+        self.assertEqual(len(t),39)
+        self.assertEqual(round(t['VIV'],2),-0.97)

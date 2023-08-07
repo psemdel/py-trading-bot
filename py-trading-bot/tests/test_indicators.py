@@ -5,13 +5,13 @@ Created on Thu Jun 23 17:03:49 2022
 
 @author: maxime
 """
-import unittest
+from django.test import TestCase
 import core.indicators as ic
 from core import strat
 import math
 import vectorbtpro as vbt
 
-class TestIndicator(unittest.TestCase):
+class TestIndicator(TestCase):
     @classmethod
     def setUpClass(self):  
         self.ust=strat.StratDiv("2007_2009", symbol_index="CAC40")
@@ -280,6 +280,3 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(round(t.out['AC'].values[-1],3),0.007)
         self.assertEqual(round(t.out['AI'].values[-1],3),0.001)
         self.assertEqual(round(t.out['SLB'].values[-1],3),-0.007)
-        
-if __name__ == '__main__':
-    unittest.main()

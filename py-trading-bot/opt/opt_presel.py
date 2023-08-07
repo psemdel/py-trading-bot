@@ -128,49 +128,5 @@ class Opt(OptMain):
             return self.calc_arrs, ret
 
         return best_arrs_cand, best_ret_cand
-
-    def test(
-            self,
-            dic:str="learn",
-            dic_test:str="test",
-            verbose:int=1,
-            ):
-        '''
-        Compare the performance of learn and test, try to avoid overfitting
-        
-        Arguments
-        ----------
-           dic: key word to access learn data
-           dic_test: key word to access test data
-           verbose: how much verbose is needed
-        ''' 
-        try:
-            print("test in opt presel")
-            if verbose>0:
-                log("Starting tests " + dic)
-            self.tested_arrs=[]
-            ret_arr={}
-            stats={}
-            ret_pf_arr={}
-            
-            #recalculate the returns
-            for d in [dic, dic_test]:
-                ret_arr[d]={}
-                self.defi_i(d)
-                pf_dic=self.calculate_pf_sub(d)
-    
-                for ind in self.indexes: #CAC, DAX, NASDAQ
-                    stats[ind]={}
-                    self.tested_arrs=[]       
-                    ret_arr[d][ind]= self.get_ret(pf_dic[ind])
-                    
-                    _, ret_pf_arr[d]=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=d,verbose=True)
-            if verbose>0:
-                log("Overall perf, "+d+": " + str(ret_pf_arr[d]),pr=True)
-            return self.compare_learn_test(ret_arr,verbose=verbose)
-        
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)        
+     
+           

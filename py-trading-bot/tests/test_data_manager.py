@@ -5,12 +5,11 @@ Created on Thu Jun 23 17:03:49 2022
 
 @author: maxime
 """
-
-import unittest
+from django.test import TestCase
 from core.data_manager import retrieve_data_offline 
 import numpy as np
 
-class TestIndicator(unittest.TestCase):
+class TestIndicator(TestCase):
     def test_retrieve(self):
         retrieve_data_offline(self,"CAC40","2007_2009")
             
@@ -51,6 +50,3 @@ class TestIndicator(unittest.TestCase):
         self.assertEqual(np.shape(self.close)[1],23)   
         self.assertEqual(np.shape(self.volume)[1],23)
         self.assertEqual(len(np.shape(self.close_ind)),1)    
-
-if __name__ == '__main__':
-    unittest.main()

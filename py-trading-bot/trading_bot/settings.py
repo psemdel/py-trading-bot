@@ -9,7 +9,7 @@ _settings={
 "REPORT":True, #for Paris and XETRA
 "INTRADAY":False,
 "HEARTBEAT":False, # to test telegram
-"HEARTBEAT_IB":False, # to test telegram
+"HEARTBEAT_IB":False, # to test telegram, note ["USED_API_DEFAULT"]["alerting] must be set to IB otherwise, it makes no sense.
 "UPDATE_SLOW_STRAT":True, 
 
 "ALERT_THRESHOLD":3, #in %
@@ -76,6 +76,7 @@ _settings={
 "IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
 
 "ETF_IB_auth":False, 
+"IB_BASE_CURRENCY":"EUR",
 
 "CCXT_EXCHANGE":"ace",
 "MT5_HOST":os.environ.get("MT5_HOST",0),
@@ -322,4 +323,4 @@ LOGGING = {
     },
 }
 
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000000000
+

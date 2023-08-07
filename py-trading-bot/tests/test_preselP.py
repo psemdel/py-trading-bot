@@ -7,7 +7,6 @@ Created on Sun Jun 26 21:38:23 2022
 """
 
 from django.test import TestCase
-import unittest
 from core import presel, strat
 from orders.models import (Fees, StockEx, Action, ActionSector,
                           ActionCategory, Strategy, Currency, Candidates, Excluded,
@@ -168,6 +167,3 @@ class TestbtP(TestCase):
             st=st
             )  
         ust_or_pr.perform(self.report1)    
-
-if __name__ == '__main__':
-    unittest.main() 

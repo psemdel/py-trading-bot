@@ -7,7 +7,6 @@ Created on Sun Jun 26 21:39:46 2022
 """
 
 
-import unittest
 from core import strat
 import vectorbtpro as vbt
 import numpy as np
@@ -120,6 +119,3 @@ class TestStratP(TestCase):
         self.assertTrue(pf.get_total_return()[pf.wrapper.columns[0]]!=0)
         self.assertTrue(pf.get_total_return()[pf.wrapper.columns[1]]!=0)
         self.assertTrue(pf.get_total_return()[pf.wrapper.columns[2]]!=0)
-
-if __name__ == '__main__':
-    unittest.main()           

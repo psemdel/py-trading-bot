@@ -5,12 +5,11 @@ Created on Sun Jun 25 12:09:04 2023
 
 @author: maxime
 """
-
-import unittest
+from django.test import TestCase
 from core import strat, macro
 import vectorbtpro as vbt
 
-class TestMacro(unittest.TestCase):
+class TestMacro(TestCase):
     @classmethod
     def setUpClass(self):  
         self.period="2007_2022_08"

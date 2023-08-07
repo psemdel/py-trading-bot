@@ -6,8 +6,6 @@ Created on Tue Jun 28 21:22:48 2022
 @author: maxime
 """
 
-import unittest
-import os
 from django.test import TestCase
 import reporting.telegram as tel
 from reporting.models import Alert
@@ -113,6 +111,3 @@ class TestTelegram(TestCase):
         self.sched.check_cours([self.a],both=True)
         self.sched.check_cours([self.a],opening=True)
         self.sched.check_cours([self.a],both=True,opening=True)
-            
-if __name__ == '__main__':
-    unittest.main() 

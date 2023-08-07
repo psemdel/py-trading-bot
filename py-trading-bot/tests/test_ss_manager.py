@@ -5,9 +5,6 @@ Created on Mon Jun 12 21:59:42 2023
 
 @author: maxime
 """
-
-import unittest
-import os
 import numpy as np
 from django.test import TestCase
 from orders import ss_manager

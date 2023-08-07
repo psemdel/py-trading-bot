@@ -143,7 +143,7 @@ When starting the bot, the message appearing will relate to Django, Redis, Teleg
      AAPL: 100%|##########| 1/1 [00:00<00:00,  8.02it/s]
      AAPL: 100%|##########| 1/1 [00:00<00:00,  8.01it/s]
      
-If everything goes well, your Telegram should display a message "I'm back online".
+If everything goes well, your Telegram should display a message "I'm back online". If not, type "/start" in Telegram, it will add your chat_id to the list.
 
 Note the admin panel from Django that allows creating finance products.
 

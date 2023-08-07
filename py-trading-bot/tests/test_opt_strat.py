@@ -6,10 +6,10 @@ Created on Tue Jan 31 17:40:09 2023
 @author: maxime
 """
 
-import unittest
+from django.test import TestCase
 from opt import opt_strat 
 
-class TestOptStrat(unittest.TestCase):
+class TestOptStrat(TestCase):
     @classmethod
     def setUpClass(self):  
         self.a_bull=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,

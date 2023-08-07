@@ -14,7 +14,6 @@ Created on Tue Jun 28 20:20:29 2022
 @author: maxime
 """
 
-import unittest
 import os
 import numpy as np
 from django.test import TestCase
@@ -352,6 +351,12 @@ class TestIB(TestCase):
         t=Stock("IBM","SMART", primaryExchange='NYSE')
         print(ib.IBData.client.reqContractDetails(t))
 
-if __name__ == '__main__':
-    unittest.main() 
-
+    def test_convert_to_base(self):
+        _settings["USED_API"]["orders"]="IB"
+        
+        self.assertEqual(ib.IBData.convert_to_base("EUR",1),1)
+        self.assertTrue(ib.IBData.convert_to_base("USD",1)<1) #EUR normally has more value than USD
+        self.assertTrue(ib.IBData.convert_to_base("GBP",1)>1) #GBP normally has more value than EUR
+        self.assertEqual(ib.IBData.convert_to_base("EUR",1,inverse=True),1)
+        self.assertTrue(ib.IBData.convert_to_base("USD",1,inverse=True)>1) #EUR normally has more value than USD
+        self.assertTrue(ib.IBData.convert_to_base("GBP",1,inverse=True)<1) #GBP normally has more value than EUR

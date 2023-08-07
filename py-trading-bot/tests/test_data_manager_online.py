@@ -13,8 +13,6 @@ Created on Tue Jun 28 20:20:29 2022
 
 @author: maxime
 """
-
-import unittest
 import os
 import numpy as np
 from django.test import TestCase
@@ -181,7 +179,4 @@ class TestDatamanagerOnline(TestCase):
         self.assertEqual(np.shape(self.high)[1],3)
         self.assertTrue(np.shape(self.high)[0]>200)
 
-
-if __name__ == '__main__':
-    unittest.main() 
 

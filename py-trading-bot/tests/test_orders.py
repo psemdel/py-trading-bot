@@ -5,8 +5,6 @@ Created on Tue Jun 28 20:20:29 2022
 
 @author: maxime
 """
-
-import unittest
 import numpy as np
 from django.test import TestCase
 from orders import models as m
@@ -199,6 +197,3 @@ class TestOrders(TestCase):
     def test_symbol_to_action(self):
         self.assertEqual(self.a, m.symbol_to_action('AI.PA'))
         self.assertEqual(self.a, m.symbol_to_action(self.a))
-       
-if __name__ == '__main__':
-    unittest.main() 

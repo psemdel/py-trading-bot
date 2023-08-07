@@ -549,7 +549,6 @@ class OptMain():
                 
                 #start variations
                 calc=True
-                
                 while calc:
                     print("next calc")
                     best_arrs_cand, best_ret_cand=self.variate(best_ret_cand,dic=dic)
@@ -653,12 +652,12 @@ class OptMain():
         for d in [dic, dic_test]:
             ret_arr[d]={}
             self.defi_i(d)
-            
             pf_dic=self.calculate_pf_sub(d)
+            
             for ind in self.indexes: #CAC, DAX, NASDAQ
                 stats[ind]={}
-                ret_arr[d][ind]= self.get_ret(pf_dic[ind])
-                
+                ret_arr[d][ind]= self.get_ret(pf_dic[ind],ind)
+
             _, ret_pf_arr[d]=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=d)
         if verbose>0:
             log("Overall perf, "+d+": " + str(ret_pf_arr[d]),pr=True)
@@ -682,17 +681,19 @@ class OptMain():
         
         for ind in self.indexes:
             total_len+=len(ret_arr[test_key][ind])
-            for ii in range(len(ret_arr[test_key][ind])):
-                delta=ret_arr[test_key][ind][ii]-ret_arr[learn_key][ind][ii]
-                t=str(self.close_dic[ind][test_key].columns[ii]) + " delta: "+str(delta)
-                if delta>0 or ret_arr[test_key][ind][ii]>0: #test better than learning set or at least better than the benchmark
+           
+            for k in ret_arr[test_key][ind]:
+                delta=ret_arr[test_key][ind][k]-ret_arr[learn_key][ind][k]
+
+                t=str(k) + " delta: "+str(delta)
+                if delta>0 or ret_arr[test_key][ind][k]>0: #test better than learning set or at least better than the benchmark
                     if verbose>1:
                         log(t+" OK",pr=True)
                     confidence+=1
                 else:
                     if verbose>1:
-                        log(t+" failed, learning ratio: " +  str(ret_arr[learn_key][ind][ii]) +\
-                          " test ratio: " +  str(ret_arr[test_key][ind][ii]),pr=True) 
+                        log(t+" failed, learning ratio: " +  str(ret_arr[learn_key][ind][k]) +\
+                          " test ratio: " +  str(ret_arr[test_key][ind][k]),pr=True) 
         
         if total_len!=0:
             confidence_ratio=100*round(confidence/total_len,2)
@@ -836,7 +837,7 @@ class OptMain():
                                               sl_stop=self.sl,
                                               ) 
 
-                ret_arr[ind]= self.get_ret(pf)
+                ret_arr[ind]= self.get_ret(pf,ind)
                 stats[(ii, ind)]["mean"]=np.mean(ret_arr[ind])
                 stats[(ii, ind)]["min"]=np.min(ret_arr[ind])
                 stats[(ii, ind)]["argmin"]=np.argmin(ret_arr[ind])
@@ -865,13 +866,23 @@ class OptMain():
         log(df)
         
     def get_ret_sub(self,rb, rr):
+        '''
+        Should measure the surperformance
+        rr-rb (close to alpha calculation) is not used as it would give too much weight to products or index with high rb (Nasdaq for instance compared to CAC40)
+        the idea is to have p1>p2 is rr1>rr2
+        
+        Arguments
+        ----------
+            rb: benchmark return
+            rr: portfolio’s realized return
+        '''
         if abs(rb)<0.1: #avoid division by zero
-            p=(rr)/ 0.1*np.sign(rb)   
+            p=(rr)/ 0.1
         else:
             p=(rr- rb )/ abs(rb)
         return p
         
-    def get_ret(self,pf)-> list:
+    def get_ret(self,pf,ind)-> list:
         '''
         Calculate an equivalent score for each product in a portfolio  
         
@@ -879,18 +890,20 @@ class OptMain():
         ----------
            pf: vbt portfolio
         '''   
-        arr=[]
+        out={}
         if self.it_is_index or type(pf.total_market_return)!=pd.core.series.Series:
             rb=pf.total_market_return
             rr=pf.get_total_return()  
-            arr.append(self.get_ret_sub(rb,rr))
+            out[ind]=self.get_ret_sub(rb,rr) #seems a bit silly to repeat ind twice as key in a row, but makes compare_learn_test simpler
         else:
             rb=pf.total_market_return.values
             rr=pf.get_total_return().values
-            for ii in range(len(rb)):
-                arr.append(self.get_ret_sub(rb[ii],rr[ii]))
+            for ii, s in enumerate(pf.total_market_return.index):
+                if type(s)==tuple:
+                    s=s[-1]
+                out[s]=self.get_ret_sub(rb[ii],rr[ii])
         
-        return arr            
+        return out           
     
     def calculate_eq_ret(self,pf)-> numbers.Number:
         '''

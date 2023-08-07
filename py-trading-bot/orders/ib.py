@@ -11,7 +11,7 @@ from vectorbtpro.data.custom import RemoteData, CCXTData
 from vectorbtpro import _typing as tp
 import warnings
 import math
-from ib_insync import MarketOrder, util
+from ib_insync import MarketOrder, util, Forex
 from core.indicators import rel_dif
 from django.db.models import Q
 from django.utils import timezone
@@ -55,6 +55,8 @@ ib_global={"connected":False, "client":None}
 This file contains the interfaces to IB, YF, MT5, TS and CCXT. For instance to perform orders or retrieve data.
 
 Aditionnally the class OrderPerformer handles the Django part of the order performance.
+
+Note 05/08/2023: only IB and YF are working presently. If no complement it brought to MT5, TS and CCXT it will be deleted again.
 '''
 ###General functions that will route to the used API
 def retrieve_quantity(action: Action):
@@ -79,6 +81,31 @@ def retrieve_quantity(action: Action):
         tradeStationData=TradeStationData()
         return tradeStationData.retrieve_quantity(action.symbol)
 
+def convert_to_base(
+        currency: str,
+        quantity: numbers.Number):
+    """
+    Convert the amount in the base currency
+
+    Arguments
+    ----------
+        currency: origin currency of the amount to be converted
+        quantity: amount to be converted
+    """   
+    if _settings["USED_API"]["orders"]=="IB":
+        return convert_to_base_ib(currency, quantity)
+    elif _settings["USED_API"]["orders"]=="CCXT":
+        ccxtData=CCXTDataExt()
+        return ccxtData.convert_to_base(currency, quantity)
+    elif _settings["USED_API"]["orders"]=="MT5":
+        mt5Data=Mt5Data()
+        return mt5Data.convert_to_base(currency, quantity)
+    elif _settings["USED_API"]["orders"] =="TS":        
+        tradeStationData=TradeStationData()
+        return tradeStationData.convert_to_base(currency, quantity)
+    
+    #no implementatation for YF yet, normally ticket in the form EUR=X, JPX=X
+
 def check_enough_cash(
         order_size: numbers.Number,
         st:Strategy, 
@@ -90,27 +117,33 @@ def check_enough_cash(
     Simple check, to determine if we have enough currency to perform an order. Adjust the order is necessary. 
     Also check that the maximum amount of money engaged is not too high.
     
-    Note: a difficulty concerns how the platform handle the currency conversion. A convert to base currency function should be created to handle this.
+    In IB, BASE is amount of cash you have in your base currency after conversion of the others currencies in your account.
+    
+    out_order_size is in the custom currency
     
     Arguments
     ----------
     order_size: Size of the order to be performed
     st: strategy used for the trade
     """ 
-    t=cash_balance(**kwargs) #currency=currency,
+    base_order_size=convert_to_base(currency,order_size)
+    base_cash=cash_balance(None) #for IB "BASE" is the one that allows determining if you 
     money_engaged=get_money_engaged(st.name,action.stock_ex.name,False)
     enough_cash=False
     excess_money_engaged=False
     out_order_size=0
-    if t is not None: 
-        if t>=order_size:
+    base_out_order_size=0
+    if base_cash is not None: 
+        if base_cash>=base_order_size:
             enough_cash=True
             out_order_size=order_size
-        elif st.minimum_order_size is not None and t>=st.minimum_order_size:
+            base_out_order_size=convert_to_base(currency,out_order_size)
+        elif st.minimum_order_size is not None and base_cash>=st.minimum_order_size:
             enough_cash=True
-            out_order_size=t
-         
-        if st.maximum_money_engaged is not None and (money_engaged+out_order_size>=st.maximum_money_engaged):
+            out_order_size=convert_to_base(currency,base_cash,inverse=True)
+            base_out_order_size=base_cash
+        
+        if st.maximum_money_engaged is not None and (money_engaged+base_out_order_size>=st.maximum_money_engaged):
             excess_money_engaged=True
             
     return enough_cash, out_order_size, excess_money_engaged
@@ -119,9 +152,11 @@ def get_money_engaged(
         strategy: str,
         exchange:str,
         short:bool,
-        ):
+        )-> Decimal:
     """
     Determine the total amount of money engaged in a strategy
+    
+    total_money_engaged in base currency
     
     Arguments
     ----------
@@ -135,14 +170,16 @@ def get_money_engaged(
     for symbol in symbols:
         action=Action.objects.get(symbol=symbol)
         ss=StockStatus.objects.get(action=action)
-        total_money_engaged+=ss.quantity*Decimal(get_last_price(action)) 
+        price_base=convert_to_base(action.currency,Decimal(get_last_price(action)))
+        total_money_engaged+=ss.quantity*price_base
         
     return total_money_engaged
 
-def cash_balance(currency:str="EUR",**kwargs) -> numbers.Number:
+def cash_balance(currency:str,**kwargs) -> numbers.Number:
     """
     Return the cash balance for a certain currency
     
+    Default currency may depend on the platform, BASE is probably only available on IB  
     Note: assuming check permission already took place
     
     Arguments
@@ -150,6 +187,8 @@ def cash_balance(currency:str="EUR",**kwargs) -> numbers.Number:
     currency: symbol of the currency to be checked
     """ 
     if _settings["USED_API"]["orders"]=="IB":
+        if currency is None:
+            currency="BASE"
         return cash_balance_ib(currency)
     elif _settings["USED_API"]["orders"]=="CCXT":
         ccxtData=CCXTDataExt()
@@ -176,7 +215,7 @@ def actualize_ss():
     elif _settings["USED_API"]["alerting"] =="TS": 
         tradeStationData=TradeStationData()
         tradeStationData.actualize_ss()
-            
+
 #for SL check
 def get_last_price(
         action:Action,
@@ -897,6 +936,39 @@ class IBData(RemoteData):
             return Stock(symbol_ib,"SMART", primaryExchange=exchange_ib)
         else:
             return Stock(symbol_ib,exchange_ib)
+        
+    @classmethod 
+    def convert_to_base(
+            cls, 
+            currency: str,
+            quantity: numbers.Number,
+            inverse: bool=False
+            ):    
+        """
+        Convert the amount in the base currency
+
+        Arguments
+        ----------
+            currency: origin currency of the amount to be converted
+            quantity: amount to be converted
+            inverse: convert in the other way
+        """     
+        if currency==_settings["IB_BASE_CURRENCY"]:
+            return quantity
+        
+        contract=Forex(currency+_settings["IB_BASE_CURRENCY"])
+        price=cls.get_last_price_sub(contract)
+        if np.isnan(price):
+            logger.info("Currency conversion from "+currency+" to BASE, failed.")
+            return quantity
+        
+        if inverse:
+            if price==0:
+                logger.info("Currency conversion equal to 0 for "+currency+", failed.")
+                return 0
+            return quantity/price
+        else:                        
+            return quantity*price
 
 #Following functions should be part of IBData
 @connect_ib
@@ -934,6 +1006,20 @@ def cash_balance_ib(
                 return float(v.value)
     else:
         return 0
+    
+@connect_ib
+def convert_to_base_ib(
+        currency: str,
+        quantity: numbers.Number):
+    """
+    Convert the amount in the base currency
+
+    Arguments
+    ----------
+        currency: origin currency of the amount to be converted
+        quantity: amount to be converted
+    """     
+    return IBData.convert_to_base(currency, quantity)
 
 @connect_ib
 def actualize_ss_ib(**kwargs):

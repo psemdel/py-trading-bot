@@ -7,7 +7,6 @@ Created on Sun Mar 26 23:30:05 2023
 """
 
 from django.test import TestCase
-import unittest
 from core import presel_classic, strat
 import vectorbtpro as vbt
 import numpy as np
@@ -114,6 +113,3 @@ class TestPreselClassic(TestCase):
             len(np.unique(np.concatenate((pf_test2.trades.records["entry_idx"],pf_test3.trades.records["entry_idx"])))),
             len(np.unique(pf_test.trades.records["entry_idx"]))
             )
-    
-if __name__ == '__main__':
-    unittest.main()          

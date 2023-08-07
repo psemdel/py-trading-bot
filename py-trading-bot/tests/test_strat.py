@@ -7,7 +7,7 @@ Created on Fri Jun 24 19:45:34 2022
 """
 
 import unittest
-from core import strat, macro
+from core import strat
 import vectorbtpro as vbt
 
 class TestStrat(unittest.TestCase):
