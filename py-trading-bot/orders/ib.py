@@ -11,13 +11,15 @@ from vectorbtpro.data.custom import RemoteData, CCXTData
 from vectorbtpro import _typing as tp
 import warnings
 import math
-from ib_insync import MarketOrder, util, Forex
+from ib_insync import MarketOrder, util, Forex, Option
 from core.indicators import rel_dif
 from django.db.models import Q
 from django.utils import timezone
 import numbers
 from decimal import Decimal
 import requests
+
+from datetime import datetime, timedelta
 
 try:
     import MetaTrader5 as mt5
@@ -170,8 +172,12 @@ def get_money_engaged(
     for symbol in symbols:
         action=Action.objects.get(symbol=symbol)
         ss=StockStatus.objects.get(action=action)
-        price_base=convert_to_base(action.currency,Decimal(get_last_price(action)))
-        total_money_engaged+=ss.quantity*price_base
+        price=get_last_price(action)
+        if price is not None:
+            price_base=convert_to_base(action.currency.symbol,Decimal(price))
+            total_money_engaged+=ss.quantity*price_base
+        else:
+            print("price for "+symbol+" is nan")
         
     return total_money_engaged
 
@@ -969,7 +975,50 @@ class IBData(RemoteData):
             return quantity/price
         else:                        
             return quantity*price
+        
+    @classmethod     
+    def find_option(cls,action,buy, max_delta,min_days_distance):
+        
+        
+        contract=cls.get_contract(action.ib_ticker(),action.stock_ex.ib_ticker,False)
+        chains = cls.client.reqSecDefOptParams(contract.symbol, '', contract.secType, contract.conId)
+        
+        if len(chains)>0:
+            print(chains)
+            chain = next(c for c in chains if c.tradingClass == 'SPX' and c.exchange == 'SMART')
+            buy_to_right={True:"C",False:"P"}
+            
+            date_limit=datetime.now()+timedelta(days=min_days_distance)
+            expirations = sorted(exp for exp in chain.expirations)
+            
+            for kk, e in enumerate(expirations):
+                if datetime(int(e[:4]),int(e[4:6]),int(e[6:8]))>date_limit:
+                    break
+            expirations=expirations[kk:]    
+            
+            contracts = [ Option(action.ib_ticker(), expiration, strike, buy_to_right[buy], 'SMART', tradingClass='SPX') 
+            for expiration in expirations 
+            for strike in chain.strikes]
+            
+            contracts = cls.client.qualifyContracts(*contracts)
+            tickers = cls.client.reqTickers(*contracts)
+            tickers=[ticker for ticker in tickers if ticker.lastGreeks.delta<max_delta]
+            
+            print(tickers)
+            tickers = sorted(ticker.bids for ticker in tickers)
+            
+            print(tickers[0])
+        else:
+            print("no option found")
+      
 
+@connect_ib
+def find_option_id(symbol,buy, max_delta,min_days_distance,**kwargs): 
+    print(symbol)
+    
+    a=Action.objects.get(symbol=symbol)  
+    print(a)    
+    return IBData.find_option(a,buy, max_delta,min_days_distance)   
 #Following functions should be part of IBData
 @connect_ib
 def get_last_price_ib(
@@ -1010,7 +1059,8 @@ def cash_balance_ib(
 @connect_ib
 def convert_to_base_ib(
         currency: str,
-        quantity: numbers.Number):
+        quantity: numbers.Number,
+        **kwargs):
     """
     Convert the amount in the base currency
 
@@ -1117,7 +1167,7 @@ def get_ratio_input_ib(
             if len(bars)!=0:
                 df=util.df(bars)
                 cours_ref=df.iloc[0]["close"] #closing price of the day before
-                cours_pres=IBData.get_last_price(contract)
+                cours_pres=IBData.get_last_price_sub(contract)
                 return cours_pres, cours_ref
     return 0, 0    
 
