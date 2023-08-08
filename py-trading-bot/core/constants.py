@@ -6,6 +6,10 @@ Created on Sun Dec 12 11:27:07 2021
 @author: maxime
 """
 
+
+'''
+List of patterns and the expected value that indicate a bear behavior, so a sell signal
+'''
 BEAR_PATTERNS={
     "CDLLONGLINE":-100,
     "CDLENGULFING":-100,
@@ -24,6 +28,9 @@ BEAR_PATTERNS={
     "CDLMARUBOZU":-100
     }
 
+'''
+List of patterns and the expected value that indicate a bull behavior, so a buy signal
+'''
 BULL_PATTERNS={
     "CDLKICKINGBYLENGTH":100,
     "CDLKICKING":100,
@@ -42,13 +49,17 @@ BULL_PATTERNS={
     "CDLKICKING_INV":100,
     }
 
-#Selected according to strategy D, bear
+'''
+Sub-selection of BEAR_PATTERNS, purely arbitrary, put whatever you want
+'''
 BEAR_PATTERNS_LIGHT={
     "CDLBREAKAWAY":-100,
     "CDLEVENINGDOJISTAR":-100,
     "CDLDARKCLOUDCOVER":-100,
     }
-
+'''
+Sub-selection of BULL_PATTERNS, purely arbitrary, put whatever you want
+'''
 BULL_PATTERNS_LIGHT={
     "CDLKICKING":100,
     "CDLMARUBOZU":100,
@@ -57,6 +68,14 @@ BULL_PATTERNS_LIGHT={
     "CDLHANGINGMAN":-100,
     }
 
+'''
+### General note ###
+All lists below are also in the Django DB. However, we need to be able to call them without Django, for backtesting.
+'''
+
+'''
+List of YF tickers for Paris CAC40 index
+'''
 CAC40=[
     "AC.PA",
     "ACA.PA",
@@ -92,7 +111,7 @@ CAC40=[
     "SGO.PA",
     "SLB.PA",
     "STLA.PA", 
-    "STM.PA",
+    "STMPA.PA",
     "SU.PA",
     "SW.PA",
     "TEP.PA", 
@@ -102,15 +121,26 @@ CAC40=[
     "WLN.PA",
     ]
 
+'''
+Introduction date of the stocks if relevant, note that it is also in the Django DB. However, we need to be able to call it without
+Django, for backtesting.
+'''
 CAC40_INTRO={
     "STLA.PA":"2021-01-18",
     "LR.PA":"2006-06-01", #from YF
     "WLN.PA":"2014-07-02",
-    "ACA.PA":"2002-01-01",
-    "ACA.PA":"2007-01-22", #for some inexplicable reason on YF
+    "ACA.PA":"2007-01-22", #for some inexplicable reason on YF #"ACA.PA":"2002-01-01",
     "SW.PA":"2000-03-01",
     }
 
+'''
+Delisting date of the stocks if relevant
+'''
+CAC40_DELIST={}
+
+'''
+List of YF tickers for Frankfurt DAX index
+'''
 DAX=[
     "1COV.DE",
     "ADS.DE",
@@ -124,7 +154,7 @@ DAX=[
     "CBK.DE",
     "CON.DE",
     "DB1.DE",
-    "DBK.DE", #DB
+    "DBK.DE", #=DB
     "DHER.DE",
     "DPW.DE",
     "DTE.DE", 
@@ -156,6 +186,9 @@ DAX=[
     "ZAL.DE",
     ]
 
+'''
+Introduction date of the stocks if relevant
+'''
 DAX_INTRO={
     "DTG.DE":"2021-12-10",
     "ENR.DE":"2020-09-28",
@@ -169,7 +202,15 @@ DAX_INTRO={
     "BNR.DE":"2010-05-01",
     "VNA.DE":"2013-08-01"
     }
-  
+
+'''
+Delisting date of the stocks if relevant
+'''
+DAX_DELIST={}
+
+'''
+List of YF tickers for Nasdaq 100 index
+'''
 NASDAQ=[
     "AAPL",  
     "ABNB", 
@@ -210,7 +251,7 @@ NASDAQ=[
     "EXC",
     "FAST",
     "META",
-    "FISV",
+    #"FISV",
     "FTNT",
     "GILD",
     "GOOG", 
@@ -273,6 +314,9 @@ NASDAQ=[
     "ZS"
     ]
 
+'''
+Introduction date of the stocks if relevant
+'''
 NASDAQ_INTRO={
     "AAPL":"1982-12-12",
     "ABNB":"2020-12-01",
@@ -306,6 +350,14 @@ NASDAQ_INTRO={
     "ZM":"2019-05-01",
     }
 
+'''
+Delisting date of the stocks if relevant
+'''
+NASDAQ_DELIST={}
+
+'''
+List of YF tickers for NYSE stocks in the S&P 500
+'''
 NYSE=["MMM",
       "AOS",
       "ABT",
@@ -648,7 +700,7 @@ NYSE=["MMM",
       "STT",
       "STE",
       "SYK",
-      "SIVB",
+      "SIVBQ",
       "SYF",
       "SNPS",   
       "SYY",
@@ -712,6 +764,9 @@ NYSE=["MMM",
       "ZTS"
     ]
 
+'''
+Introduction date of the stocks if relevant
+'''
 NYSE_INTRO={
     "ABBV":"2013-02-01",
     "ALLE":"2013-12-01",
@@ -781,19 +836,38 @@ NYSE_INTRO={
     "ZTS":"2013-02-01",
     }
 
-#S&P by sector, no distinction between NYSE and NASDAQ
+'''
+Delisting date of the stocks if relevant
+'''
+NYSE_DELIST={
+    "CTXS":"2022-10-01",
+    "DRE":"2022-10-01",
+    "FBHS":"2022-10-15",
+    "FISV":"2023-05-01",
+    "FRC":"2023-05-01",
+    "NLOK":"2023-09-01",
+    "NLSN":"2023-10-01",
+    "SIVBQ":"2023-03-27",
+    "SBNY":"2023-03-24",
+    "TWTR":"2022-11-01"
+    }
+
+
+'''
+List of YF ticker for S&P stocks sorted by sector, no distinction between NYSE and NASDAQ
+'''
 REALESTATE=["ARE","AMT","AVB","BXP","CPT","CBRE","CCI","DLR","DRE","EQIX","EQR","ESS","EXR","FRT","PEAK",
             "HST","IRM","KIM","MAA","PLD","PSA","O","REG","SBAC","SPG","UDR","VTR","VICI","VNO","WELL",
             "WY"]
 INDUSTRY=["MMM","AOS","ALK","ALLE","AAL","AME","BA","CHRW","CARR","CAT","CTAS","CPRT","CSX","CMI","DE",
-          "DAL","DOV","ETN","EMR","EFX","EXPD","FAST","FDX","FTV","FBHS","GNRC","GD","GE","HON","HWM",
+          "DAL","DOV","ETN","EMR","EFX","EXPD","FAST","FDX","FTV","GNRC","GD","GE","HON","HWM", "FBHS",
           "HII","IEX","ITW","IR","JBHT","J","JCI","LHX","LDOS","LMT","MAS","NLSN","NDSN","NSC","NOC",
           "ODFL","OTIS","PCAR","PH","PNR","PWR","RTX","RSG","RHI","ROK","ROL","SNA","LUV","SWK","TXT",
           "TT","TDG","UNP","UAL","UPS","URI","VRSK","WAB","WM","GWW","XYL"]
 IT=["ACN","ADBE","ADP","AKAM","AMD","APH","ADI","ANSS","AAPL","AMAT","ANET","ADSK","AVGO","BR","CDNS",
-    "CDW","CDAY","CSCO","CTXS","CTSH","GLW","DXC","ENPH","EPAM","FFIV","FIS","FISV","FLT","FTNT","IT",
+    "CDW","CDAY","CSCO","CTSH","GLW","DXC","ENPH","EPAM","FFIV","FIS","FLT","FTNT","IT",          "FISV", "CTXS",
     "GPN","HPE","HPQ","IBM","INTC","INTU","JKHY","JNPR","KEYS","KLAC","LRCX","MA","MCHP","MU","MSFT",
-    "MPWR","MSI","NTAP","NLOK","NVDA","NXPI","ON","ORCL","PAYX","PAYC","PYPL","PTC","QRVO","QCOM","ROP",
+    "MPWR","MSI","NTAP","NVDA","NXPI","ON","ORCL","PAYX","PAYC","PYPL","PTC","QRVO","QCOM","ROP", "NLOK",
     "CRM","STX","NOW","SWKS","SEDG","SNPS","TEL","TDY","TER","TXN","TRMB","TYL","VRSN","V","WDC","ZBRA"]
 COM=["ATVI","GOOGL","T","CHTR","CMCSA","DISH","DIS","EA","FOX","IPG","LYV","LUMN","MTCH","META","NFLX",
      "NWS","OMC","PARA","TMUS","TTWO","TWTR","VZ","WBD"]
@@ -811,7 +885,7 @@ UTILITIES=["AES","LNT","AEE","AEP","AWK","ATO","CNP","CMS","ED","CEG","D","DTE",
 FIN=["AFL","ALL","AXP","AIG","AMP","AON","AJG","AIZ","BAC","WRB","BRK-B","BLK","BK","BRO","COF","CBOE",
     "SCHW","CB","CINF","C","CFG","CME","CMA","DFS","RE","FDS","FITB","BEN","GL","GS","HIG","HBAN",
     "ICE","IVZ","JPM","KEY","LNC","L","MTB","MKTX","MMC","MET","MCO","MS","MSCI","NDAQ","NTRS","PNC",
-    "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SIVB","SYF","TROW","TRV","TFC","USB","WFC","WTW",
+    "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SYF","TROW","TRV","TFC","USB","WFC","WTW", "SIVBQ",
     "ZION"]
 MATERIALS=["APD","ALB","AMCR","AVY","BALL","CE","CF","CTVA","DOW","DD","EMN","ECL","FMC","FCX","IP",
            "IFF","LIN","LYB","MLM","MOS","NEM","NUE","PKG","PPG","SEE","SHW","VMC","WRK"]
@@ -821,9 +895,12 @@ HEALTHCARE=["ABT","ABBV","ABMD","A","ALGN","ABC","AMGN","BAX","BDX","BIO","TECH"
    "PKI","PFE","DGX","REGN","RMD","STE","SYK","TFX","TMO","UNH","UHS","VRTX","VTRS","WAT","WST","ZBH",
    "ZTS" ]
 
-
 INTRO={**CAC40_INTRO,**DAX_INTRO,**NASDAQ_INTRO,**NYSE_INTRO}
+DELIST={**CAC40_DELIST,**DAX_DELIST,**NASDAQ_DELIST,**NYSE_DELIST} #the issue with delist is that YF cannot retrieve delisted symbol even in for a period when they were listed
 
+'''
+List of indexes tickers
+'''
 INDEXES=["^GSPC", #SP500
          "^FCHI", #cac40 
          "^IXIC", #NASDAQ
@@ -832,7 +909,29 @@ INDEXES=["^GSPC", #SP500
          "^FTSE",
          "^DJI"
     ]
+
+'''
+List of raw material tickers
+'''
 RAW=["BZ=F", #brent
      "CL=F",  #crude
      "GC=F", #gold
      ]
+
+'''
+Conversion between a trend and a number in the strategy array
+'''
+mode_to_int={
+    "bull":0,
+    "bear":1,
+    "uncertain":2
+    }
+
+short_to_str={True: "short", False: "long"}
+short_to_sign={True:-1, False:1}
+
+
+
+
+    
+    

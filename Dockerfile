@@ -23,13 +23,13 @@ USER ${NB_UID}
 
 RUN pip install --quiet --no-cache-dir \
     'jupyter-dash' \
-    'plotly>=5.0.0' && \
-    fix-permissions "${CONDA_DIR}" && \
-    fix-permissions "/home/${NB_USER}" && \
+    'plotly>=5.0.0' \
+    'kaleido' && \
     jupyter lab build --minimize=False
 
-#first to determine the version of numpy and TA-lib
-#copied from vectorbtpro Dockerfile
+RUN pip install --quiet --no-cache-dir 'pybind11'
+RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
+
 RUN pip install --quiet --no-cache-dir \
     'numpy==1.23.3' \
     'numba==0.56.4' \
@@ -46,7 +46,7 @@ RUN pip install --quiet --no-cache-dir \
     'websocket-client' \
     'hyperopt' \
     'optuna' \
-    'yfinance>=0.2.10' \
+    'yfinance>=0.2.20' \
     'python-binance>=1.0.16' \
     'alpaca-py' \
     'ccxt>=1.89.14' \
@@ -65,19 +65,18 @@ RUN pip install --quiet --no-cache-dir \
     'dill' \
     'lz4' \
     'blosc'
+    
+RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
+RUN pip install --quiet --no-cache-dir 'pandas_datareader'
+RUN conda install --quiet --yes -c conda-forge cvxopt    
 
-RUN pip install --quiet --no-cache-dir django==4.1.2 \
-    'asyncio'==3.4.3 \
-    'celery[redis]'==5.2.7 \
-    'ib_insync'==0.9.70 \
-    'whitenoise'==6.2.0 \
-    'django-filter' \
-    'psycopg2-binary' 
+COPY . $HOME/
+RUN pip install --quiet --no-cache-dir -r $HOME/requirements.txt
 
 ARG GH_TOKEN
 RUN pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
 
-COPY . $HOME/
+
 
 USER root
 WORKDIR $HOME/py-trading-bot/

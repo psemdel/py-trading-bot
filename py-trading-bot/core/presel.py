@@ -8,15 +8,20 @@ Created on Sat May 14 22:36:16 2022
 import vectorbtpro as vbt
 import pandas as pd
 import numpy as np
+import sys
 
-from core.strat import Strat
-from core.macro import VBTMACROTREND
+from core import strat, strat_legacy
+from core.strat import StratHold
+from core.macro import VBTMACROTREND, VBTMACROTRENDPRD
 import core.indicators as ic
-from core.common import VBTfunc, copy_attr#, save_vbt_both
+#from core.common import save_vbt_both
+from core.constants import short_to_sign, short_to_str
+from core.common import candidates_to_YF
 
 from trading_bot.settings import _settings
 import logging
 logger = logging.getLogger(__name__)
+logger_trade = logging.getLogger('trade')
 """
 Strategies with preselection
 a) It select one, two,... actions
@@ -27,908 +32,971 @@ I just select one, two,... actions and put all my orders on them
 
 Those strategies are home made (even though quite similar to classic one). For classic ones look at presel_classic
 """
+def name_to_ust_or_presel(
+        ust_or_presel_name: str, 
+        period: str,
+        it_is_index:bool=False,
+        st=None,
+        **kwargs):
+    '''
+    Function to call class from strat or presel
 
-class Presel(VBTfunc):
-    def __init__(self,symbol_index,period,**kwargs):
-        self.period=period
-        self.symbol_index=symbol_index
-        self.st=Strat(symbol_index,period,**kwargs)
-        
-        copy_attr(self,self.st)
-        
-        if kwargs.get("suffix"):
-            self.suffix="_" + kwargs.get("suffix")
+    Arguments
+    ----------
+        ust_or_presel_name: Name of the underlying strategy or preselection strategy to be called
+        period: period of time in year for which we shall retrieve the data
+        it_is_index: is it indexes that are provided 
+        st: strategy associated
+    '''
+    try:
+        if ust_or_presel_name[:6]=="Presel":
+            if not it_is_index: #Presel for index makes no sense
+                if ust_or_presel_name[6:8].lower()=="wq":
+                    nb=int(ust_or_presel_name[8:])
+                    pr=PreselWQ(period,nb=nb,st=st,**kwargs)
+                else:
+                    PR=getattr(sys.modules[__name__],ust_or_presel_name)
+                    pr=PR(period,st=st,**kwargs)
+                    
+                pr.run()
+                return pr
+            else:
+                return None
+        elif ust_or_presel_name[:5]=="Strat":
+            try:
+                UST=getattr(strat,ust_or_presel_name)
+            except:
+                try:
+                    UST=getattr(strat_legacy,ust_or_presel_name)
+                except:
+                    raise ValueError(ust_or_presel_name + " underlying strategy not found")
+            ust=UST(period,st=st,it_is_index=it_is_index,**kwargs)
+            ust.run()
+            return ust
         else:
-            self.suffix=""
+            print("Class " +ust_or_presel_name + " does not respect the convention of starting with Presel or Strat")
+            return None
+        
+    except Exception as e:
+          _, e_, exc_tb = sys.exc_info()
+          print(e)
+          print("line " + str(exc_tb.tb_lineno))
+              
+class Presel():
+    def __init__(
+            self,
+            period: str,
+            symbol_index=None,
+            prd: bool=False,
+            suffix: str="",
+            actions: list=None,
+            symbols: list=None,
+            input_ust=None,
+            vol=None,
+            macd_tot=None,
+            macro_trend_ind=None,
+            macro_trend_select:str=None,
+            macro_trend=None,
+            macro_trend_ind_mod=None,
+            dur=None,
+            divergence=None,
+            grow=None,
+            exchange:str=None,
+            st=None,
+            ):
+        """
+        Strategies on one action, no preselection. For production and non production, to make the strats as child of the main one.
 
-        self.longshort=kwargs.get("longshort","long")
+        So it determines entries and exits for one action to optimize the return
 
-        self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
-        self.init_sub()
-        
-    def init_sub(self):
-        self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        
-        self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.entries_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
+        Arguments
+        ----------
+            symbol_index: main index to be retrieved
+            period: period of time in year for which we shall retrieve the data
+            prd: for production or backtesting
+            suffix: suffix for files
+            actions: list of actions
+            symbols: list of YF tickers
+            input_st: input underlying strategy with already all data downloaded, avoid downloading the same several times
+            vol: volatility signal
+            macd_tot: macd signal
+            macro_trend_ind: trend of the main index
+            macro_trend_ind_mod: trend of the main index with modified threshold
+            macro_trend_select: selection of the mod to use
+            
+            dur: duration in a KAMA direction
+            divergence: divergence signal
+            exchange: stock exchange name
+            st: strategy associated
+        """
+        self.suffix=suffix
+        if self.suffix!="":
+            self.suffix="_" + self.suffix
+            
+        for k in ["prd","symbol_index","period","vol","actions","symbols","macd_tot","macro_trend_ind","macro_trend_ind_mod",
+                  "macro_trend_select", "dur", "divergence", "grow","exchange","st"]:
+            setattr(self,k,locals()[k])
 
-        self.entries2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.exits2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        
-        self.exits_short2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.entries_short2=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        
+        if input_ust is not None:
+            self.ust=input_ust
+        else:
+            if not self.prd:
+                self.ust=StratHold(
+                    self.period,
+                    symbol_index=symbol_index,
+                    suffix=suffix,
+                    )
+            else:
+                self.ust=StratHold(
+                    self.period,
+                    actions=actions,
+                    symbols=symbols,
+                    prd=True,
+                    suffix=suffix,
+                   )
+
+        for k, v in self.ust.__dict__.items():
+            if k not in self.__dict__ or getattr(self, k) is None:
+                setattr(self,k,v)
+
         self.symbols_simple=self.close.columns.values
         
-        self.candidates=[[] for ii in range(len(self.close))]
-        self.candidates_short=[[] for ii in range(len(self.close))]
+        self.candidates={
+            "long":[[] for ii in range(len(self.close))],
+            "short":[[] for ii in range(len(self.close))]
+            }
         
         self.excluded=[]
-        self.hold_dur=0
+        self.hold_dur=0#{}
         
         self.start_capital=10000
         self.order_size=self.start_capital
-        self.capital=self.start_capital
-        
-        self.last_order_dir="long"
-        
-        self.pf=[]
-        self.pf_short=[]
-        self.pf_keep=[]
-        self.pf_short_keep=[]
+
+        self.only_exit_ust=False
+        self.no_ust=False
+        self.calc_all=False #Normally on production, we rely on the state evaluate in the bot, 
+                            #and not on a state recalculated, however for retard it proved to be 
+                            #more secure to recalculate every time, to have less discrepancy between 
+                            #backtesting and evaluation live. 
+        self.blocked=False     #when the trend becomes short, no more candidate is added, but the stocks presently owned are sold by exit signal
+        self.blocked_im=False  #when the trend becomes short, no more candidate is added, but the stocks presently owned are sold immediately
+
+        self.reinit()
     
     def reinit(self):
         self.capital=self.start_capital        
-        self.pf=[]
-        self.pf_short=[]
-        self.pf_keep=[]
-        self.pf_short_keep=[]
-        self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.entries_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-    
-    def overwrite_strat_underlying(self,ent,ex):
-        self.reinit()
-        self.ent_underlying=ent
-        self.ex_underlying=ex
-        self.symbols_complex_ent=self.ent_underlying.columns.values
-        self.symbols_complex_ex=self.ex_underlying.columns.values
+        self.pf={
+            "long":[],
+            "short":[],
+            }
+        for k in ["entries","exits","exits_short","entries_short"]:
+            setattr(self,k,pd.DataFrame.vbt.empty_like(self.close, fill_value=False))   
         
-    def overwrite_ex_strat_underlying(self,ex):
-        self.reinit()
-        self.ex_underlying=ex
-        self.symbols_complex_ex=self.ex_underlying.columns.values
+    def get_candidates(self):
+        return self.candidates["long"][-1], self.candidates["short"][-1]   
         
     def symbols_simple_to_complex(self,symbol_simple,ent_or_ex):
-        if ent_or_ex=="ent":
-            symbols=self.symbols_complex_ent
-        else:
-            symbols=self.symbols_complex_ex
+        if "entries" not in self.ust.__dir__():
+            self.ust.run()
 
-        if type(symbols[0])==str:
-            return symbol_simple
-        for ii, e in enumerate(symbols):
-            if e[-1]==symbol_simple: #9
-                return e
+        return self.ust.symbols_simple_to_complex(symbol_simple,ent_or_ex)
+        #UnderlyingStrat
             
-    ##create buy/sell from candidates
-    def calculate(self,**kwargs): #day basis
-        daily_sl=kwargs.get("daily_sl")
-        sl=kwargs.get("sl")
-        last_entry_price=0
+    def calculate(
+            self,
+            ii,
+            short:bool=False,
+            ): #day basis
+        '''
+        create buy/sell from candidates and underlying strategy
+        
+        no_ust means that the buy/sell will only depends on the candidates. So if a stock is in the candidates, it is entered. 
+        If it is not anymore in candidates, it is exited.
+        
+        only_exit_ust consider only the candidates for the entry, but the underlying strategy for the exit.
+        
+        Arguments
+        ----------
+            ii: index
+            short: order direction
+        '''
+        #all presel strat are monodirectionel
+        #So if the trends reverse, the opposite direction should be empty
+        #clean at the same time the excluded
+        
+        try:
+            if short:
+                for symbol_simple in self.pf["long"]:
+                    self.exits[symbol_simple].iloc[ii]=True
+                    self.capital+=self.order_size
+                    self.pf["long"].remove(symbol_simple)
+                    self.hold_dur=0
+                for symbol_simple in self.pf["short"]:
+                    if symbol_simple in self.excluded:
+                        self.exits_short[symbol_simple].iloc[ii]=True
+                        self.capital+=self.order_size
+                        self.pf["short"].remove(symbol_simple)
+                        self.hold_dur=0
+            else:
+                for symbol_simple in self.pf["short"]:
+                    self.exits_short[symbol_simple].iloc[ii]=True
+                    self.capital+=self.order_size
+                    self.pf["short"].remove(symbol_simple)
+                    self.hold_dur=0
+                for symbol_simple in self.pf["long"]:
+                    if symbol_simple in self.excluded:
+                        self.exits[symbol_simple].iloc[ii]=True  
+                        self.capital+=self.order_size
+                        self.pf["long"].remove(symbol_simple)
+                        self.hold_dur=0
+                        
+            #perform orders
+            #exit
+            for symbol_simple in self.pf[short_to_str[short]]:
+                symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
     
-        for ii in range(len(self.close.index)): #for each day
-            if ii!=0:
-                if not kwargs.get("short",False):
-                    #sell
-                    new_pf=self.pf.copy()
-                    for symbol_simple in self.pf:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
-                        
-                        if self.ex_underlying[symbol_complex].values[ii] or kwargs.get("nostrat_underlying",False) or\
-                        (daily_sl is not None and self.close[symbol_simple].iloc[ii]/self.close[symbol_simple].iloc[ii-1]<(1-daily_sl)) or\
-                        (sl is not None and last_entry_price!=0 and self.close[symbol_simple].iloc[ii]/last_entry_price<(1-sl)):
-                            new_pf.remove(symbol_simple)
-                            self.capital+=self.order_size
-                            self.exits[symbol_simple].iloc[ii]=True
-                                
-                    self.pf=new_pf
-                    #buy
-                    for symbol_simple in self.candidates[ii]:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
-                        
-                        if self.capital>=self.order_size and\
-                            (kwargs.get("nostrat_underlying",False)
-                             or kwargs.get("only_exit_strat_underlying",False) or self.ent_underlying[symbol_complex].values[ii]):
-                            self.pf.append(symbol_simple)
-                            self.capital-=self.order_size
-                            self.entries[symbol_simple].iloc[ii]=True
-                            last_entry_price=self.close[symbol_simple].iloc[ii]
-                            
-                if kwargs.get("short",False):
-                    #re-buy
-                    new_pf=self.pf_short.copy()
-                    for symbol_simple in self.pf_short:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
-              
-                        if kwargs.get("nostrat_underlying",False) or self.ent_underlying[symbol_complex].values[ii]:
-                            new_pf.remove(symbol_simple)
-                            self.capital+=self.order_size #wrong but I want only one
-                            self.exits_short[symbol_simple].iloc[ii]=True 
-                    self.pf_short=new_pf
-
-                    for symbol_simple in self.candidates_short[ii]:
-                        symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
-                        
-                        if self.capital>=self.order_size and\
-                        (kwargs.get("nostrat_underlying",False) or 
-                         kwargs.get("only_exit_strat_underlying",False) or 
-                         self.ex_underlying[symbol_complex].values[ii]):
-                            self.pf_short.append(symbol_simple)
-                            self.capital-=self.order_size
-                            self.entries_short[symbol_simple].iloc[ii]=True  
-                            
-    ##create buy/sell from candidates, when macro trend is involved
-    def calculate_macro(self,**kwargs):
-        for ii in range(len(self.close.index)): #for each day
-            #sell
-            for symbol_simple in self.pf:
-                symbol_complex_ent=self.symbols_simple_to_complex(symbol_simple,"ent")
-                symbol_complex_ex=self.symbols_simple_to_complex(symbol_simple,"ex")
-                
-                if (self.last_order_dir=="long" and self.ex_underlying[symbol_complex_ex].values[ii] ) or\
-                   (self.last_order_dir!="long" and self.ent_underlying[symbol_complex_ent].values[ii] ) or\
-                    kwargs.get("nostrat_underlying",False):
-                        
-                    self.pf.remove(symbol_simple)
+                if ((not self.no_ust and not short and self.ust.exits[symbol_complex].values[ii]) or  #not short and 
+                   (not self.no_ust and short and self.ust.exits_short[symbol_complex].values[ii]) or
+                    (self.no_ust and symbol_simple not in self.candidates[short_to_str[short]][ii])):
+       
+                    self.pf[short_to_str[short]].remove(symbol_simple)
                     self.capital+=self.order_size
                     
-                    if self.last_order_dir=="long":
-                        self.exits[symbol_simple].iloc[ii]=True
-                    else:
+                    if short:
                         self.exits_short[symbol_simple].iloc[ii]=True 
-            #buy
-            if len(self.candidates[ii])==0 and len(self.candidates_short[ii])!=0:
-                short=True
-                cand=self.candidates_short[ii]
-            else:
-                short=False
-                cand=self.candidates[ii]
-                
-            
-            for symbol_simple in cand:
-                symbol_complex_ent=self.symbols_simple_to_complex(symbol_simple,"ent")
-                symbol_complex_ex=self.symbols_simple_to_complex(symbol_simple,"ex")
-                
-                if self.capital>=self.order_size and\
-                    (not short and (self.ent_underlying[symbol_complex_ent].values[ii] or kwargs.get("nostrat_underlying",False)
-                     or kwargs.get("only_exit_strat_underlying",False))) or \
-                    (short and (self.ex_underlying[symbol_complex_ex].values[ii] or kwargs.get("nostrat_underlying",False)
-                     or kwargs.get("only_exit_strat_underlying",False))):
-                        
-                    self.pf.append(symbol_simple)
+                    else:
+                        self.exits[symbol_simple].iloc[ii]=True
+    
+                    self.hold_dur=0 
+                else:
+                    self.hold_dur+=1
+    
+            #entry
+            for symbol_simple in self.candidates[short_to_str[short]][ii]:
+                symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
+    
+                if (self.capital>=self.order_size and
+                    ((self.no_ust or self.only_exit_ust) or
+                    (not short and self.ust.entries[symbol_complex].values[ii]) or
+                    (short and self.ust.entries_short[symbol_complex].values[ii])) and
+                    symbol_simple not in self.excluded):
+    
+                    self.pf[short_to_str[short]].append(symbol_simple)
                     self.capital-=self.order_size
- 
+                    
                     if short:
                         self.entries_short[symbol_simple].iloc[ii]=True
-                        self.last_order_dir="short"                    
-                    else:               
+                    else:
                         self.entries[symbol_simple].iloc[ii]=True
-                        self.last_order_dir="long"
+        
+        except Exception as e:
+              _, e_, exc_tb = sys.exc_info()
+              print(e)
+              print("line " + str(exc_tb.tb_lineno))     
+                     
+    def presub(self,ii:int):
+        '''
+        Used in run to add a function there if needed
+        '''
+        pass
     
-    def get_exclu_list(self, **kwargs):
-        #if kwargs.get("PRD",False):
-        #    return self.excluded.retrieve()
-        #else:
-            return self.excluded
+    def sorting(self, ii:int, **kwargs):
+        print("sorting function is not defined at parent level")
+        pass
+    
+    def supplementary_criterium(self,symbol_simple: str,ii: int,v,**kwargs)-> bool:
+        '''
+        Add a supplementary test to be checked before adding a candidate
+        '''
+        return True
+    
+    def underlying(self):
+        '''
+        Change the underlying strategy
+        '''
+        self.underlying_creator("StratG") 
         
-    #same with hold_dur and exclusion
-    def calculate_retard(self,ii,short,**kwargs):
-        
-        if ii!=0:
-             if kwargs.get("keep",False):
-                 for symbol_simple in self.pf_keep:
-                     symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
-                     if self.ex_underlying[symbol_complex].values[ii]:
-                         self.pf_keep.remove(symbol_simple)
-                         self.exits2[symbol_simple].iloc[ii]=True
-                         
-                 for symbol_simple in self.pf_short_keep:
-                     symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
-                     if self.ent_underlying[symbol_complex].values[ii]:
-                         self.pf_short_keep.remove(symbol_simple)
-                         self.exits_short2[symbol_simple].iloc[ii]=True       
-                         #print("exiting short " + str(ii))
-
-             #sell
-             if short:
-                 cand=self.candidates_short[ii]
-             else:
-                 cand=self.candidates[ii]   
-  
-             for symbol in self.pf:
-                 if symbol not in cand:
-                     self.pf.remove(symbol)
-                     self.capital+=self.order_size
-                     
-                     if self.last_order_dir=="long":
-                         self.exits[symbol].iloc[ii]=True
-                     else:
-                         self.exits_short[symbol].iloc[ii]=True
-                     self.hold_dur=0
-                     
-                     if kwargs.get("keep",False):
-                         if self.last_order_dir=="long":
-                             if len(self.pf_keep)==0:
-                                 self.pf_keep.append(symbol)
-                                 self.entries2[symbol].iloc[ii]=True  
-                         else:
-                             if len(self.pf_short_keep)==0:
-                                 self.pf_short_keep.append(symbol)
-                                 self.entries_short2[symbol].iloc[ii]=True 
-                 else:
-                     self.hold_dur+=1
-
-             #buy
-             for symbol in cand:
-                 if symbol not in self.pf and symbol not in self.excluded: #should not be called in production
-                     if self.capital>=self.order_size:
-                         self.pf.append(symbol)
-                         self.capital-=self.order_size #not correct, but we want only 1 order
-                          
-                         if short:
-                             self.entries_short[symbol].iloc[ii]=True 
-                             self.last_order_dir="short"                             
-                         else:
-                             self.entries[symbol].iloc[ii]=True  
-                             self.last_order_dir="long"
-            
-    #See preselect_vol
-    def preselect_vol_sub(self, ii, **kwargs):
-        v={}
-        self.candidates[ii]=[]
-        self.max_candidates_nb=_settings["VOL_MAX_CANDIDATES_NB"]
-        
-        for symbol in self.symbols_simple:
-            v[symbol]=self.vol[symbol].values[ii]
-        res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-        
-        for e in res:
-            symbol_simple=e[0]
-            symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
-
-            #we need a candidate that fulfill strat_underlying criterium
-            #otherwise the chance to buy something is very low.
-            if (len(self.candidates[ii])<self.max_candidates_nb and
-               self.ent_underlying[symbol_complex].values[ii] or kwargs.get("nostrat_underlying",False)):
-               self.candidates[ii].append(symbol_simple)
-        return res
-     
-    #Preselect action based on the volatility. The highest volatility is chosen.      
-    def preselect_vol(self, **kwargs):
-        self.st.strat_kama_stoch_matrend_bbands()
-        self.overwrite_strat_underlying(self.st.entries,self.st.exits)        
-
-        #take stoch
-        if kwargs.get("PRD",False):
-            res=self.preselect_vol_sub(len(self.close)-1,**kwargs)
+    def underlying_creator(self,f_name: str):
+        '''
+        Wrapper around underlying
+        '''
+        f=getattr(strat,f_name)
+        if self.prd:
+            self.ust=f(self.period,prd=True,input_ust=self.ust)
         else:
-            for ii in range(len(self.close.index)):
-                res=self.preselect_vol_sub(ii,**kwargs)
-            self.calculate(**kwargs)
-        self.out=res #last one                 
+            self.ust=f(self.period,input_ust=self.ust)
+            
+        self.ust.run()
 
-    #See preselect_retard
-    #Coded only for one candidate
-    def preselect_retard_sub(self,ii,short,**kwargs):
-        v={}       
-        self.candidates[ii]=[]
-        self.candidates_short[ii]=[]
-             
-        for symbol in self.symbols_simple:
-            v[symbol]=self.dur[symbol].loc[self.close.index[ii]]
-            if symbol in self.get_exclu_list(**kwargs): #if exclude take the next
+    def sub(
+            self, 
+            ii:int,
+            short=False
+            ) -> list:
+        '''
+        Function called at every step of the calculation, handle the filling of candidates array
+        '''
+        self.candidates[short_to_str[short]][ii]=[]
+        self.sorting(ii, short=short)
+
+        for e in self.sorted:
+            symbol_simple=e[0]
+    
+            if (len(self.candidates[short_to_str[short]][ii])<self.max_candidates_nb and
+               symbol_simple not in self.excluded and
+               self.supplementary_criterium(symbol_simple, ii, e[1], short=short)
+               ) :
+               if ((not self.blocked and not self.blocked_im) or 
+                   ((self.blocked or self.blocked_im) and not short)):
+
+                   self.candidates[short_to_str[short]][ii].append(symbol_simple)
+
+        return self.sorted #for display
+    
+    def run(self,skip_underlying:bool=False,**kwargs):
+        '''
+        Main function for presel
+        '''
+        try:
+            if not skip_underlying:
+                self.underlying()
+            if self.prd and not self.calc_all:
+                ii=len(self.close)-1
+                self.presub(ii)
+                self.out=self.sub(ii,**kwargs)
+            else:
+                for ii in range(len(self.close.index)):
+                    self.presub(ii)
+                    self.out=self.sub(ii,**kwargs)
+                    t=self.calculate(ii,**kwargs)
+                    if t=="abc":
+                        print("len close")
+                        print(len(self.close.index))
+                        print(len(self.ust.close.index))
+                        return
+            
+        except Exception as e:
+              import sys
+              _, e_, exc_tb = sys.exc_info()
+              print(e)
+              print("line " + str(exc_tb.tb_lineno))
+              
+    def perform_cand_entry(self,r):
+        candidates, _=self.get_candidates()
+        r.ss_m.cand_to_quantity_entry(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.st.name, False)
+    
+  
+    def get_order(self,symbol: str, strategy:str):
+        from django.db.models import Q
+        from orders.models import Action, Strategy, Order
+        """
+        Search for an open order for an action
+        
+        Arguments
+        ----------
+        buy: should the order buy or sell the stock
+        """
+        action=Action.objects.get(symbol=symbol)
+        c1 = Q(action=action)
+        c2 = Q(active=True)
+
+        st=Strategy.objects.get(name=strategy)
+        c3 = Q(strategy=st)
+        orders=Order.objects.filter(c1 & c2 & c3)
+
+        if len(orders)>1:
+            print("several active orders have been found for: "+symbol+" , check the database")
+            
+        if len(orders)==0:
+            print("no order found for: "+symbol+" , check the database")
+        else:
+            return orders[0]
+
+    def get_last_exit(self, entering_date, symbol_complex_ent: str, symbol_complex_ex: str, short:bool=False):
+        """
+        Search for an exit between the entry time and now. Return the desired quantity
+        
+        Arguments
+        ----------
+        entering_date: datetime when the order was performed by the preselection strategy
+        symbol_complex_ent: symbol in self.ust.entries and self.ust.exits_short
+        symbol_complex_ex: symbol in self.ust.exits and self.ust.entries_short
+        short: was the preselection strategy in short direction?        
+        """
+        ii=len(self.ust.entries[symbol_complex_ent].values)-1
+        
+        #look for an exit between the entry time and now
+        while entering_date<self.ust.entries.index[ii] and ii>0:
+            if short:
+                if (self.ust.entries[symbol_complex_ent].values[ii] or self.ust.exits_short[symbol_complex_ent].values[ii]) and not\
+                (self.ust.exits[symbol_complex_ex].values[ii] or self.ust.entries_short[symbol_complex_ex].values[ii]):
+                    return 0
+            else:
+                if (self.ust.exits[symbol_complex_ex].values[ii] or self.ust.entries_short[symbol_complex_ex].values[ii]) and not\
+                    (self.ust.entries[symbol_complex_ent].values[ii] or self.ust.exits_short[symbol_complex_ent].values[ii]):
+                    return 0
+            ii-=1
+            
+        if short:
+            return -1
+        else:
+            return 1
+              
+    def perform_only_exit(self,r):
+        from orders.models import get_pf
+        
+        if not r.it_is_index and self.ust.exchange is not None: #index
+            #even if the strategy is not anymore used, we should be able to exit
+            for short in [True, False]:
+                pf=get_pf(self.st.name,self.ust.exchange,short)
+
+                ##only_exit_substrat
+                if len(pf)>0:
+                    r.concat("symbols in "+self.st.name+" strategy: " +str(pf) + " direction: "+ str(short))
+                    for symbol in self.ust.symbols:
+                        if self.ust.symbols_to_YF[symbol] in pf: 
+                            o=self.get_order(symbol, self.st.name)
+                            symbol_complex_ex=self.ust.symbols_simple_to_complex(symbol,"ex")  
+                            symbol_complex_ent=self.ust.symbols_simple_to_complex(symbol,"ent")  
+                            target_order=self.get_last_exit(o.entering_date, symbol_complex_ent, symbol_complex_ex, short)
+                            if target_order==0: #exit
+                                r.ss_m.add_target_quantity(symbol,self.st.name, target_order)     
+
+class PreselMacro(Presel):
+    '''
+    Parent class for preselection relying on trends
+    '''
+    def preliminary(self):
+        if self.macro_trend_select=="ind_mod" and self.macro_trend_ind_mod is None:
+            self.macro_trend_ind_mod=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
+        if self.macro_trend_select=="ind" and self.macro_trend_ind is None:
+            self.macro_trend_ind=VBTMACROTRENDPRD.run(self.close_ind).macro_trend
+            
+    def run(self,**kwargs):
+        self.underlying()
+        
+        if self.prd and not self.calc_all:
+            ii=len(self.close)-1
+            
+            if self.macro_trend_select=="ind_mod":
+                short=(self.macro_trend_ind_mod.values[ii]==1)
+            else:
+                short=(self.macro_trend_ind.values[ii]==1)
+                
+            self.presub(ii)
+            self.out=self.sub(ii,short=short,**kwargs)
+        for ii in range(len(self.close.index)):
+            if self.macro_trend_select=="ind_mod":
+                short=(self.macro_trend_ind_mod.values[ii]==1)
+            else:
+                short=(self.macro_trend_ind.values[ii]==1)
+            
+            self.presub(ii)
+            self.out=self.sub(ii,short=short,**kwargs)
+            
+            if self.blocked:
+                self.calculate(ii,short=False,**kwargs)
+            else: #self.blocked_im
+                self.calculate(ii,short=short,**kwargs)
+        return short #to be removed later
+
+class PreselVol(Presel):
+    '''
+    Preselect stocks based on the volatility. The highest volatility is chosen.  
+    '''
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        if self.vol is None:
+            self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
+        self.max_candidates_nb=_settings["VOL_MAX_CANDIDATES_NB"]
+    
+    def underlying(self):
+        self.underlying_creator("StratKamaStochMatrendBbands")
+        
+    def sorting(self,ii: int,**kwargs):
+        v={}
+        for symbol in self.close.columns.values:
+            v[symbol]=self.vol[symbol].values[ii]
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+
+class PreselMacdVol(PreselVol):
+    '''
+    Preselect stocks based on the volatility. The highest volatility is chosen.  
+    As supplementary criterium, the MACD must be positive for the long variant.
+    '''
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        if self.macd_tot is None:
+            self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
+        self.max_candidates_nb=_settings["MACD_VOL_MAX_CANDIDATES_NB"]
+        
+    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
+        return self.macd_tot.macd[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0 
+    
+    def perform(self, r):
+        candidates, candidates_short=self.get_candidates()
+        
+        if len(candidates)==0:
+            short=True
+            cand=candidates_short
+        else:
+            short=False
+            cand=candidates
+
+        for symbol in cand:
+            symbol_complex= self.ust.symbols_simple_to_complex(symbol,"ent")
+            if short:
+                r.ss_m.ex_ent_to_target(
+                    False,
+                    False,
+                    self.ust.exits[symbol_complex].values[-1],
+                    self.ust.entries[symbol_complex].values[-1],
+                    self.ust.symbols_to_YF[symbol], 
+                    self.st.name
+                    )
+            else:
+                r.ss_m.ex_ent_to_target(
+                    self.ust.entries[symbol_complex].values[-1],
+                    self.ust.exits[symbol_complex].values[-1],
+                    False,
+                    False,
+                    self.ust.symbols_to_YF[symbol], 
+                    self.st.name
+                    )
+
+class PreselHistVol(PreselMacdVol):
+    '''
+    Preselect stocks based on the volatility. The highest volatility is chosen.  
+    As supplementary criterium, the MACD must be positive for the long variant.
+    '''
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        self.max_candidates_nb=_settings["HIST_VOL_MAX_CANDIDATES_NB"]
+        
+    def underlying(self):
+        self.underlying_creator("StratF")           
+    
+    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
+        return self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0
+
+class PreselMacdVolMacro(PreselMacdVol):
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        if self.macro_trend_select is None:
+            self.macro_trend_select="ind"
+        PreselMacro.preliminary(self)
+    
+    def run(self,**kwargs):
+        PreselMacro.run(self,**kwargs)    
+
+class PreselRetard(Presel):
+    '''
+    Calculate the number of day in a row when the smoother price of an action has been decreasing
+    The action the longest duration is bought
+    (Follow the loser) similar to RMR
+    '''
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        if self.dur is None:
+            self.dur=ic.VBTKAMATREND.run(self.close).duration
+        self.max_candidates_nb=1
+        self.no_ust=True
+        self.calc_all=True
+        self.last_short=False
+        self.strategy="retard"
+
+    def sorting(
+            self,
+            ii: int, 
+            short: bool=False,
+            **kwargs
+            ):
+        
+        v={}   
+        for symbol in self.close.columns.values:
+            v[symbol]=self.dur[symbol].values[ii]
+            if symbol in self.excluded: #if exclude take the next
                 if v[symbol]==0: #trend change
                     self.excluded.remove(symbol)
    
-        res=sorted(v.items(), key=lambda tup: tup[1], reverse=not short)
-            
-        for e in res:
-            symbol=e[0]
-            #if kwargs.get("PRD",False):
-            #    print("retard for production is defined in BtP")
-                #self.check_dur(symbol,**kwargs)
-            if symbol not in self.get_exclu_list(**kwargs):
-                if short:
-                    self.candidates_short[ii].append(symbol)
-                    break                 
-                else:
-                    self.candidates[ii].append(symbol)
-                    break
-
-        return res
-
-    #Calculate the number of day in a row when the smoother price of an action has been decreasing
-    #The action the longest duration is bought
-    #(Follow the loser) similar to RMR
-    def preselect_retard(self,**kwargs):
-        self.dur=ic.VBTKAMATREND.run(self.close).duration
-           
-        short=kwargs.get("short",False)
-        if kwargs.get("PRD",False):
-            self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)   
-        else:
-            for ii in range(len(self.close.index)):
-                 if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
-                     self.excluded.append(self.pf[0])
-                  
-                 res=self.preselect_retard_sub(ii,short,**kwargs)                         
-                 self.calculate_retard(ii,short,**kwargs)
-                    
-        self.out=res #last one  
-        return res                   
-
-        
-    #See preselect_macd_vol
-    def preselect_macd_vol_sub(self,ii,short,**kwargs):    
-        v={}
-        macd=self.macd_tot.macd
-        self.candidates[ii]=[]
-        self.candidates_short[ii]=[]
-        self.max_candidates_nb=_settings["MACD_VOL_MAX_CANDIDATES_NB"]
-        
-        for symbol in self.symbols_simple:
-            v[symbol]=self.vol[symbol].values[ii]
-        res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-        
-        for e in res:
-            if len(self.candidates[ii])<self.max_candidates_nb:
-                symbol=e[0]
-                
-                if short and macd[('simple','simple',symbol)].values[ii]<0:
-                   self.candidates_short[ii].append(symbol)
-                elif not short and macd[('simple','simple',symbol)].values[ii]>0:
-                   self.candidates[ii].append(symbol)
-        return res
-    
-    #Preselect action based on the volatility. The highest volatility is chosen.  
-    #As supplementary criterium, the MACD must be positive for the long variant.
-    def preselect_macd_vol(self,**kwargs):
-         self.st.strat_kama_stoch_matrend_bbands()
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-        
-         short=kwargs.get("short",False)
-         
-         if kwargs.get("PRD",False):
-             res=self.preselect_macd_vol_sub(len(self.close.index)-1,short)
-         else:
-             self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
-
-             for ii in range(len(self.close.index)):
-                 res=self.preselect_macd_vol_sub(ii,short)
-
-             self.calculate(**kwargs)
-         self.out=res #last one 
-                
-    #See preselect_hist_vol
-    def preselect_hist_vol_sub(self,ii,short,**kwargs):  
-        v={}
-        hist=self.macd_tot.hist
-        self.candidates[ii]=[]
-        self.candidates_short[ii]=[]
-        self.max_candidates_nb=_settings["HIST_VOL_MAX_CANDIDATES_NB"]
-        
-        for symbol in self.symbols_simple:
-            v[symbol]=self.vol[symbol].values[ii]
-        res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-        
-        for e in res:
-            if len(self.candidates[ii])<self.max_candidates_nb:
-                symbol=e[0]
-                if short and hist[('simple','simple',symbol)].values[ii]<0:
-                   self.candidates_short[ii].append(symbol)
-                elif not short and hist[('simple','simple',symbol)].values[ii]>0:
-                   self.candidates[ii].append(symbol)
-        return res   
-      
-    #Preselect action based on the volatility. The highest volatility is chosen.  
-    #As supplementary criterium, the hist (see MACD) must be positive for the long variant.           
-    def preselect_hist_vol(self,**kwargs):
-         self.st.stratF()        
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-         short=kwargs.get("short",False)
-
-         if kwargs.get("PRD",False):
-             res=self.preselect_hist_vol_sub(len(self.close.index)-1,short)
-         else:
-             self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
-             
-             for ii in range(len(self.close.index)):
-                 res=self.preselect_hist_vol_sub(ii,short)
-
-         self.calculate(**kwargs)                
-         self.out=res #last one 
-
-### Macro trend ### 
-# Preselection using the macro trend
-
-    #See preselect_macd_vol_macro
-    def preselect_macd_vol_macro_sub(self,ii,**kwargs):
-        try:
-            v={}       
-            macd=self.macd_tot.macd
-            self.candidates[ii]=[]
-            self.candidates_short[ii]=[]
-            
-            for symbol in self.symbols_simple:
-                v[symbol]=self.vol[symbol].values[ii]
-            res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-            
-            for e in res:
-                symbol=e[0]
-                #symbol_complex=self.symbols_simple_to_complex(symbol)
-                
-                if kwargs.get("macro_trend_index",False):
-                    short=(self.macro_trend.values[ii]==1)
-                else:
-                    short=(self.macro_trend[symbol].values[ii]==1)
-                    
-                if short and macd[('simple','simple',symbol)].values[ii]<0:
-                   self.candidates_short[ii].append(symbol)
-                   break              
-                else:
-                   self.candidates[ii].append(symbol)
-                   break
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=not short)
+                      
+    def presub(self,ii:int):
+        for key in ["long","short"]:
+            for s in self.pf[key]:
+                if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
+                    self.excluded.append(s)
      
-            return res
+    def perform(self, r):
+        candidates, candidates_short=self.get_candidates()
         
-        except Exception as e:
-            logger.error(e, stack_info=True, exc_info=True)
+        if self.last_short:
+            direction="short"
+            candidates=candidates_short
+        else:
+            direction="long"
+
+        r.concat(self.strategy.capitalize()+", " + "direction " + direction + ", stockex: " + self.ust.exchange +\
+                    ", action duration: " +str(self.out))
+  
+        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.strategy, self.last_short)
+              
+class PreselRetardMacro(PreselRetard):
+    '''
+    Like retard, but the long/short is decided in function of the macro trend
+    '''
+    def __init__(self,period: str,**kwargs):
+        print("retard macro called")
+
+        super().__init__(period,**kwargs)
+        if self.macro_trend_select is None:
+            self.macro_trend_select="ind_mod"
+        PreselMacro.preliminary(self)
+        self.strategy="retard_macro"
+    
+    def run(self,**kwargs):
+        self.last_short=PreselMacro.run(self,**kwargs)
+
+class PreselRetardKeep(Presel):
+    '''
+    Only the "keep" part of the strategy, so inheritence from PreselRetard
+    '''
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        self.strategy="retard_keep"
         
-    #Like preselect_macd_vol, but the long/short is decided in function of the macro trend
-    def preselect_macd_vol_macro(self,**kwargs):
-         self.st.stratD()        
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
+    def underlying(self):
+        self.underlying_creator("StratG")    
+    
+    def run(self,**kwargs):
+        '''
+        No preselection and no sorting needed for RetardKeep
+        '''
+        self.underlying()
+    
+    def perform(self,r):
+        #entry is handled by retard
+        self.perform_only_exit(r)
         
-         if kwargs.get("macro_trend_index",False):
-             self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend
-         else:
-             self.macro_trend=VBTMACROTREND.run(self.close).macro_trend
-         #self.macro_trend=kwargs.get("macro_trend")
-         self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
-         
-         if kwargs.get("PRD",False):
-             res=self.preselect_macd_vol_macro_sub(len(self.close.index)-1,**kwargs)
-         else:
-             #self.macd_tot=kwargs.get("macd") 
-             for ii in range(len(self.close.index)):
-                res=self.preselect_macd_vol_macro_sub(ii,**kwargs)
-           
-             self.calculate_macro(**kwargs)
-         self.out=res #last one 
 
-     #Like retard, but the long/short is decided in function of the macro trend
-     #Obviously the logic is reverted
-    def preselect_retard_macro(self,**kwargs):
-        if kwargs.get("keep",False):
-            self.st.stratF()        
-            self.overwrite_strat_underlying(self.st.entries,self.st.exits)            
+class PreselDivergence(Presel):
+    '''
+    This strategy measures the difference between the variation of each action smoothed price and 
+    the variation of the corresponding smoothed price
+    When the difference is negative, the action is bought. So the action which evolves lower than 
+    the index is bought
+    (Follow the loser)
+    
+    The buying criteria is the divergence, an underlying strategy determines the exit
+    '''
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        self.only_exit_ust=True
+        if self.divergence is None:
+            self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
+        self.threshold=_settings["DIVERGENCE_THRESHOLD"]
+        self.max_candidates_nb=1
         
-        self.dur=ic.VBTKAMATREND.run(self.close).duration
-        self.macro_trend=VBTMACROTREND.run(self.close_ind,threshold=0.03).macro_trend #theshold 3% is clearly better in this case than 4%
-                
-        #if kwargs.get("PRD",False) and not kwargs.get("reset_excluded",False):
-            #short=(self.macro_trend.values[-1]==1)
-            #res=self.preselect_retard_sub(len(self.close.index)-1,short,**kwargs)
-        #else:    
-        if kwargs.get("reset_excluded",False):
-            self.excluded.reset()
-
-        for ii in range(len(self.close.index)):
-            short=(self.macro_trend.values[ii]==1)
-            
-            if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
-                self.excluded.append(self.pf[0])
-
-            res=self.preselect_retard_sub(ii,short,**kwargs)  
-            
-            self.calculate_retard(ii,short,**kwargs)
-        self.out=res #last one    
-        self.last_short=short
-        #return res #for display
-
-    #See preselect_divergence
-    def preselect_divergence_sub(self,ii,short,**kwargs):
-        v={}
-        self.candidates[ii]=[]
-        self.candidates_short[ii]=[]
+    def underlying(self):
+        self.underlying_creator("StratDiv")
         
-        threshold=_settings["DIVERGENCE_THRESHOLD"]
-
-       # if not short:
-        for symbol in self.divergence.columns:
+    def sorting(
+            self,
+            ii: int, 
+            short: bool=False,
+            **kwargs
+            ):
+        
+        v={}   
+        for symbol in self.close.columns.values:
             v[symbol]=self.divergence[symbol].values[ii]
+   
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=short)
+        
+    def supplementary_criterium(self,symbol_simple, ii, v, short=False):
+        if short:
+            return v> self.threshold
+        else:
+            return v< -self.threshold
+        
+    def calc(self,**kwargs):
+        #only exit
+        self.calculate(only_exit_ust=True,**kwargs)
+        
+        
+    def perform(self, r):
+        self.perform_only_exit(r)
+        self.perform_cand_entry(r)
+
+class PreselDivergenceBlocked(PreselDivergence):
+    '''
+    Like preselect_divergence, but the mechanism is blocked when macro_trend is bear
+    Reverting the mechanism did not prove to be very rewarding for this strategy
+    '''
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs)
+        if self.macro_trend_select is None:
+            self.macro_trend_select="ind"
+        PreselMacro.preliminary(self)
+        self.blocked=True
             
-        res=sorted(v.items(), key=lambda tup: tup[1], reverse=short)
+    def run(self,**kwargs):
+        PreselMacro.run(self,**kwargs)
 
-        for e in res:
-            if not short and e[1]<-threshold:
-                symbol=e[0]
-                self.candidates[ii].append(symbol)
-                break
-            elif short and e[1]>threshold:
-                symbol=e[0]
-                self.candidates_short[ii].append(symbol)
-                break
-               
-    #This strategy measures the difference between the variation of each action smoothed price and 
-    #the variation of the corresponding smoothed price
-    #When the difference is negative, the action is bought. So the action which evolves lower than 
-    #the index is bought
-    #(Follow the loser)
-    def preselect_divergence(self,**kwargs):
-        self.st.stratDiv()
-        self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-        
-        self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
-
-        if kwargs.get("PRD",False):
-            self.preselect_divergence_sub(len(self.close.index)-1,False,**kwargs)
-        else:
-            for ii in range(len(self.close)):
-                self.preselect_divergence_sub(ii,False,**kwargs)
-            self.calculate(only_exit_strat_underlying=True,**kwargs) 
-            #self.entries.to_csv('initial')
-            
-    #Like preselect_divergence, but the mechanism is blocked when macro_trend is bear
-    #Reverting the mechanism did not prove to be very rewarding for this strategy
-    def preselect_divergence_blocked(self,**kwargs):
-        self.st.stratDiv()
-        self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-        
-        self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
-        self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend   
-        
-        if kwargs.get("PRD",False):
-            short=(self.macro_trend.values[-1]==1)
-            self.preselect_divergence_sub(len(self.close.index)-1,short,**kwargs)
-        else:
-            for ii in range(len(self.close)):
-                short=(self.macro_trend.values[ii]==1)
-                self.preselect_divergence_sub(ii,short,**kwargs)
-            self.calculate(only_exit_strat_underlying=True,**kwargs) #for a blocked behavior
-            #self.calculate_macro(only_exit_strat_underlying=True,**kwargs)  #for a macro behavior
-
-    def preselect_divergence_sl(self,**kwargs):
-        self.st.stratDiv()
-        self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-        
-        self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
-
-        if kwargs.get("PRD",False):
-            self.preselect_divergence_sub(len(self.close.index)-1,False,**kwargs)
-        else:
-            for ii in range(len(self.close)):
-                self.preselect_divergence_sub(ii,False,**kwargs)
-            self.calculate(only_exit_strat_underlying=True,sl=0.1, **kwargs) 
-            #self.entries.to_csv('initial')            
+class PreselDivergenceBlockedIm(PreselDivergenceBlocked):
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs)   
+        self.blocked=False
+        self.blocked_im=True
 ### Slow ###
-#Not called for production
+'''
+Not called for production
 
-#Slow strategy re-actualise the candidates on a given frequency, typically every 10 days
-#The issue with strategy that reactualize the candidates every day is that the entry mechanism replace the one
-#from the underlying strategy.
+Slow strategy re-actualise the candidates on a given frequency, typically every 10 days
+The issue with strategy that reactualize the candidates every day is that the entry mechanism replace the one
+from the underlying strategy.
+'''
 
-    #Like preselect_vol but slow
-    def preselect_vol_slow(self, **kwargs):
-        #take stoch
-        self.st.stratF()        
-        self.overwrite_strat_underlying(self.st.entries,self.st.exits)
+class PreselSlow(Presel):
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
 
-        v={}
+    def actualize(self, strategy):
+        from orders.models import  get_candidates
+        
+        if self.exchange is None:
+            raise ValueError("exchange not defined in actualize hist vol")
+        cand=get_candidates(strategy,self.exchange) #
+        cand.reset()
+        return cand
+        
+    def run(
+        self,
+        short=False,
+        **kwargs):
+        
+        self.underlying()
+        if not self.prd:
+            for ii in range(len(self.close.index)):
+                if ii%self.frequency==0: #every 10 days
+                    self.sorting(ii)
+                    
+                    if self.blocked:
+                        if self.macro_trend_select=="ind_mod":
+                            short=(self.macro_trend_ind_mod.values[ii]==1)
+                        else:
+                            short=(self.macro_trend_ind.values[ii]==1)
+
+                    for e in self.sorted:
+                        symbol_simple=e[0]
+                        
+                        if (len(self.candidates[short_to_str[short]][ii])<self.max_candidates_nb and
+                           self.supplementary_criterium(symbol_simple, ii, e[1], short=short)
+                           ):
+                            if not self.blocked or (self.blocked and not short):
+                                self.candidates[short_to_str[short]][ii].append(symbol_simple)
+                else:
+                    if not self.blocked or (self.blocked and not short):
+                        self.candidates[short_to_str[short]][ii]=self.candidates[short_to_str[short]][ii-1]
+                self.calculate(ii,**kwargs)   
+                
+    def perform_entry(self,r):
+        from orders.models import get_candidates #from the DB not this calculation
+        
+        if not r.it_is_index and self.ust.exchange is not None: 
+            cand=get_candidates(self.st.name,self.ust.exchange).retrieve()
+
+            for s in cand:
+                if s in self.ust.symbols:
+                    symbol_complex_ent=self.ust.symbols_simple_to_complex(s,"ent") 
+                    r.ss_m.ex_ent_to_target(
+                        self.ust.entries[symbol_complex_ent].values[-1],
+                        self.ust.exits[symbol_complex_ent].values[-1],
+                        False, #both strategy use only long
+                        False,
+                        self.ust.symbols_to_YF[s], 
+                        self.st.name,
+                        )    
+                                    
+    def perform(self, r):
+        self.perform_only_exit(r)
+        self.perform_entry(r)
+        
+class PreselVolSlow(PreselSlow):
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs) 
+        if self.vol is None:
+            self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
         self.frequency=_settings["VOL_SLOW_FREQUENCY"]
         self.max_candidates_nb=_settings["VOL_SLOW_MAX_CANDIDATES_NB"]
         
-        for ii in range(len(self.close.index)):
-            if ii%self.frequency==0: #every 10 days
-                for symbol in self.symbols_simple:
-                    v[symbol]=self.vol[symbol].values[ii]
-                res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-            
-                for e in res:
-                    if len(self.candidates[ii])<self.max_candidates_nb:
-                        symbol_simple=e[0]
-                        #start _underlying managed in calculate
-                        self.candidates[ii].append(symbol_simple)
-            elif ii!=0:
-                self.candidates[ii]=self.candidates[ii-1]
-               
-        self.calculate(**kwargs)
-
-    #Like preselect_macd_vol but slow
-    def preselect_macd_vol_slow(self,**kwargs):
-         self.st.strat_kama_stoch_matrend_bbands()
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-         v={}
-         
-         self.frequency=_settings["MACD_VOL_SLOW_FREQUENCY"]
-         self.max_candidates_nb=_settings["MACD_VOL_SLOW_MAX_CANDIDATES_NB"]
-         
-         macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
-         macd=macd_tot.macd
-
-         for ii in range(len(self.close.index)):
-             if ii%self.frequency==0: #every 10 days
-                 for symbol in self.symbols_simple:
-                     v[symbol]=self.vol[symbol].values[ii]
-                 res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-                 
-                 for e in res:
-                     if len(self.candidates[ii])<self.max_candidates_nb:
-                         symbol=e[0]
-                     
-                         if not kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]>0:
-                            self.candidates[ii].append(symbol)
-                         elif kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]<0:
-                            self.candidates_short[ii].append(symbol)
-             elif ii!=0:
-                 self.candidates[ii]=self.candidates[ii-1]                            
-                            
-         self.calculate(**kwargs)
-         
-    #Like preselect_hist_vol but slow
-    def preselect_hist_vol_slow(self,**kwargs):
-         self.st.stratE()        
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
+    def underlying(self):
+        self.underlying_creator("StratF")
         
-         v={}
-         
-         self.frequency=_settings["HIST_VOL_SLOW_FREQUENCY"]  
-         self.max_candidates_nb=_settings["HIST_VOL_SLOW_MAX_CANDIDATES_NB"]
-         
-         macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
-         macd=macd_tot.hist
+    def sorting(self,ii: int,**kwargs):
+        PreselVol.sorting(self,ii)
+   
+class PreselMacdVolSlow(PreselVolSlow):
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs)   
+        if self.macd_tot is None:
+            self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
+        self.frequency=_settings["MACD_VOL_SLOW_FREQUENCY"]
+        self.max_candidates_nb=_settings["MACD_VOL_SLOW_MAX_CANDIDATES_NB"]
 
-         for ii in range(len(self.close.index)):
-             if ii%self.frequency==0: #every 10 days
-                 for symbol in self.symbols_simple:
-                     v[symbol]=self.vol[symbol].values[ii]
-                 res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-                 
-                 for e in res:
-                     if len(self.candidates[ii])<self.max_candidates_nb:
-                         symbol=e[0]
-                     
-                         if not kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]>0:
-                            self.candidates[ii].append(symbol)
-                         elif kwargs.get("short",False) and macd[('simple','simple',symbol)].values[ii]<0:
-                            self.candidates_short[ii].append(symbol)
-             elif ii!=0:
-                 self.candidates[ii]=self.candidates[ii-1]
-                 
-         self.calculate(**kwargs)   
-         
-#Strategy that bet on the actions that growed the most in the past (Follow the winner)
-#Bet on the one that usually win    
-    def preselect_realmadrid(self,**kwargs):   
-         self.st.stratReal()
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-
-         distance=_settings["REALMADRID_DISTANCE"]
-         self.frequency=_settings["REALMADRID_FREQUENCY"]
-         self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
-
-         v={}
-         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
+    def underlying(self):
+        self.underlying_creator("StratKamaStochMatrendBbands")
         
-         for ii in range(len(self.close.index)):
-             if ii%self.frequency==0: #every 10 days
-                 for symbol in self.symbols_simple:
-                     v[symbol]=grow[(distance,True,symbol)].values[ii]
-                 res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-
-                 for e in res:
-                    if len(self.candidates[ii])<self.max_candidates_nb:
-                        symbol=e[0]
-                        self.candidates[ii].append(symbol)
-             elif ii!=0:
-                 self.candidates[ii]=self.candidates[ii-1]                         
-         self.calculate(**kwargs)           
-
-    def preselect_realmadrid_blocked(self,**kwargs):   
-         self.st.stratReal()
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
+    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
+        return self.macd_tot.macd[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0 
         
-         distance=_settings["REALMADRID_DISTANCE"]
-         self.frequency=_settings["REALMADRID_FREQUENCY"]
-         self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
-         self.macro_trend=VBTMACROTREND.run(self.close_ind).macro_trend  
-         v={}
-         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
-        
-         for ii in range(len(self.close.index)):
-             short=(self.macro_trend.values[ii]==1)
-             if ii%self.frequency==0: #every 10 days
-                 if not short:
-                     for symbol in self.symbols_simple:
-                         v[symbol]=grow[(distance,True,symbol)].values[ii]
-                     res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+class PreselHistVolSlow(PreselMacdVolSlow):
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs)   
+        self.frequency=_settings["HIST_VOL_SLOW_FREQUENCY"]  
+        self.max_candidates_nb=_settings["HIST_VOL_SLOW_MAX_CANDIDATES_NB"]
+
+    def underlying(self):
+        self.underlying_creator("StratE")
+         
+    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
+        return self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0 
     
-                     for e in res:
-                         if len(self.candidates[ii])<self.max_candidates_nb:
-                             symbol=e[0]
-                             self.candidates[ii].append(symbol)
-             elif ii!=0 and not short:
-                 self.candidates[ii]=self.candidates[ii-1]                         
-         self.calculate(**kwargs)   
-         
-    def preselect_realmadrid_sl(self,**kwargs):   
-         self.st.stratReal()
-         self.overwrite_strat_underlying(self.st.entries,self.st.exits)
-
-         distance=_settings["REALMADRID_DISTANCE"]
-         self.frequency=_settings["REALMADRID_FREQUENCY"]
-         self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
-
-         v={}
-         grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
+    def actualize(self):
+        '''
+        Actualize the candidates, so the stocks that can be trade by the underlying strats
+        '''
+        cand=super().actualize("hist_slow")
+        short=False
+        ii=-1
         
-         for ii in range(len(self.close.index)):
-             if ii%self.frequency==0: #every 10 days
-                 for symbol in self.symbols_simple:
-                     v[symbol]=grow[(distance,True,symbol)].values[ii]
-                 res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
+        self.sorting(ii)
+        for e in self.sorted:
+            symbol_simple=e[0]
+            if (len(cand.retrieve())<self.max_candidates_nb and
+               self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0):
+                    cand.append(symbol_simple)   
 
-                 for e in res:
-                    if len(self.candidates[ii])<self.max_candidates_nb:
-                        symbol=e[0]
-                        self.candidates[ii].append(symbol)
-             elif ii!=0:
-                 self.candidates[ii]=self.candidates[ii-1]                         
-         self.calculate(sl=0.005,**kwargs)             
-         
-    def preselect_onlybull_vol(self,**kwargs):
-        self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
+class PreselRealMadrid(PreselSlow):
+    '''
+    Strategy that bet on the actions that growed the most in the past (Follow the winner)
+    Bet on the one that usually win  
+    '''
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs) 
+        self.distance=_settings["REALMADRID_DISTANCE"]
+        if self.grow is None:
+            self.grow=ic.VBTGROW.run(self.close,distance=self.distance,ma=True).out
+        self.frequency=_settings["REALMADRID_FREQUENCY"]
+        self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
+
+    def underlying(self):
+        self.underlying_creator("StratReal")
+
+    def sorting(
+            self,
+            ii: int, 
+            short: bool=False,
+            **kwargs
+            ):
         
-        for ii in range(len(self.close.index)):
-            bull_symbols=self.macro_trend.loc[:,(self.macro_trend.iloc[ii] == -1)].columns
-
-            #we want to change the action only if it is not anymore bull
-            find_new_cand=True
+        v={}   
+        for symbol in self.close.columns.values:
+            v[symbol]=self.grow[(self.distance,True,symbol)].values[ii]
+   
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=True)   
+        
+    def actualize(self):
+        '''
+        Actualize the candidates, so the stocks that can be trade by the underlying strats
+        '''
+        from orders.models import Excluded
+        
+        cand=super().actualize("realmadrid")
+        try:
+            self.excluded=Excluded.objects.get(name="realmadrid").retrieve()
+        except:
+            self.excluded=[]
             
-            if ii!=0 and len(self.candidates[ii-1])>0:
-                if self.candidates[ii-1][0] in bull_symbols:
-                    find_new_cand=False #keep the same
-                    self.candidates[ii]=self.candidates[ii-1]
-                    
-            if find_new_cand:
-                v={}    
-                self.candidates[ii]=[]
-                for symbol in bull_symbols:
-                    v[symbol]=self.vol[symbol].values[ii]
-                res=sorted(v.items(), key=lambda tup: tup[1], reverse=False)
-                for e in res:
-                    symbol=e[0]
-                    self.candidates[ii].append(symbol)
-                    break
-            self.calculate_retard(ii,False,**kwargs)            
-
-    def preselect_onlybull_hist(self,**kwargs):
-        self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
-        macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
-        macd=macd_tot.macd
+        ii=-1
         
-        for ii in range(len(self.close.index)):
-            bull_symbols=self.macro_trend.loc[:,(self.macro_trend.iloc[ii] == -1)].columns
+        self.sorting(ii)    
+        for e in self.sorted:
+            symbol_simple=e[0]
+            if (len(cand.retrieve())<self.max_candidates_nb and
+                symbol_simple not in self.excluded):
+                cand.append(symbol_simple)   
 
-            #we want to change the action only if it is not anymore bull
-            find_new_cand=True
-            
-            if ii!=0 and len(self.candidates[ii-1])>0:
-                if self.candidates[ii-1][0] in bull_symbols:
-                    find_new_cand=False #keep the same
-                    self.candidates[ii]=self.candidates[ii-1]
-                    
-            if find_new_cand:
-                v={}    
-                self.candidates[ii]=[]
-                for symbol in bull_symbols:
-                    v[symbol]=macd[('simple','simple',symbol)].values[ii]/self.close[symbol].values[ii]
-                res=sorted(v.items(), key=lambda tup: tup[1], reverse=False)
-                for e in res:
-                    symbol=e[0]
-                    self.candidates[ii].append(symbol)
-                    break
-            self.calculate_retard(ii,False,**kwargs)     
- 
-    def preselect_onlybull_grow(self,**kwargs):
-        distance=_settings["REALMADRID_DISTANCE"]
-        self.macro_trend=VBTMACROTREND.run(self.close).macro_trend   
-        grow=ic.VBTGROW.run(self.close,distance=distance,ma=True).out
+class PreselRealMadridBlocked(PreselRealMadrid):
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs) 
+        if self.macro_trend_select is None:
+            self.macro_trend_select="ind"
+        PreselMacro.preliminary(self)
+        self.blocked=True
         
-        for ii in range(len(self.close.index)):
-            bull_symbols=self.macro_trend.loc[:,(self.macro_trend.iloc[ii] == -1)].columns
-
-            #we want to change the action only if it is not anymore bull
-            find_new_cand=True
-            
-            if ii!=0 and len(self.candidates[ii-1])>0:
-                if self.candidates[ii-1][0] in bull_symbols:
-                    find_new_cand=False #keep the same
-                    self.candidates[ii]=self.candidates[ii-1]
-                    
-            if find_new_cand:
-                v={}    
-                self.candidates[ii]=[]
-                for symbol in bull_symbols:
-                    v[symbol]=v[symbol]=grow[(distance,True,symbol)].values[ii]
-                res=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
-                for e in res:
-                    symbol=e[0]
-                    self.candidates[ii].append(symbol)
-                    break
-            self.calculate_retard(ii,False,**kwargs)     
-
-#WQ uses the prebuild 101 Formulaic Alphas
-#No underlying strategy is necessary
-class WQ(VBTfunc):
-    def __init__(self,symbol_index,period, nb):
-        super().__init__(symbol_index,period)
-        self.candidates=[[] for ii in range(len(self.close))]
-        self.pf=[]
         
-        self.entries=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.exits=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        
-        #actually only long are used in those strategy
-        self.exits_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-        self.entries_short=pd.DataFrame.vbt.empty_like(self.close, fill_value=False)
-
-        self.start_capital=10000
-        self.order_size=self.start_capital
-        self.capital=self.start_capital
-        
-        self.symbols_simple=self.close.columns.values
-
+class PreselWQ(Presel):
+    '''
+    WQ uses the prebuild 101 Formulaic Alphas
+    No underlying strategy is necessary
+    
+    wq "1" is not supported
+    '''
+    def __init__(
+            self,
+            period: str,
+            nb:int,
+            **kwargs
+            ):
+        super().__init__(period,**kwargs)
         self.nb=nb
-        self.out = vbt.wqa101(self.nb).run(open=self.open, high=self.high,\
-                                      low=self.low, close=self.close,volume=self.volume).out
+        #preliminary calculation
+        self.wb_out = vbt.wqa101(self.nb).run(
+            open=self.ust.open, 
+            high=self.ust.high,
+            low=self.ust.low, 
+            close=self.ust.close,
+            volume=self.ust.volume
+            ).out
+        self.no_ust=True
+        
+    def sub(
+            self, 
+            ii:int,
+            ) -> list:
+        '''
+        Function called at every step of the calculation, handle the filling of candidates array
+        '''
+        if not np.isnan(self.wb_out.iloc[ii].values).all():
+            ind_max=np.nanargmax(self.wb_out.iloc[ii].values)
+            self.candidates["long"][ii]=[self.wb_out.columns[ind_max]]
 
-    ##create buy/sell from candidates
-    def calculate(self,**kwargs): #day basis
-        for ii in range(len(self.close.index)): #for each day
-            if ii!=0:
-                #sell
-                for symbol_simple in self.pf:
-                    if symbol_simple not in self.candidates[ii]:
-                        self.pf.remove(symbol_simple)
-                        self.capital+=self.order_size
-                        self.exits[symbol_simple].iloc[ii]=True
+    def underlying(self):
+        pass
+    
+    def perform(self, r):
+        '''
+        Preselected actions strategy, using 101 Formulaic Alphas
+        
+        Arguments
+       	----------
+           ust: underlying strategy 
+           exchange: name of the stock exchange
+        '''
+        from orders.models import Strategy, StockEx
+        stock_ex=StockEx.objects.get(name=self.ust.exchange)
+
+        strategy="wq"+str(self.nb)
+        strats=Strategy.objects.filter(name=strategy) #normally there should be only one
+        if len(strats)>0 and strats[0] in stock_ex.strategies_in_use.all():
+            self.run()
+            candidates=self.candidates["long"][-1]
             
-                #buy
-                for symbol_simple in self.candidates[ii]:
-                    if self.capital>=self.order_size:
-                        self.pf.append(symbol_simple)
-                        self.capital-=self.order_size
-                        self.entries[symbol_simple].iloc[ii]=True
-
-    def def_cand(self):
-        self.candidates=[[] for ii in range(len(self.close))]
-        if self.nb in [1]:
-            threshold= np.sum(self.out.iloc[0].values)/len(self.out.iloc[0].values)*1.1
-
-        for ii in range(len(self.out)):
-            try:
-                ind_max=np.nanargmax(self.out.iloc[ii].values)
-                if self.nb in [1]:
-                    if self.out.iloc[ii,ind_max]>threshold:
-                        symbol=self.out.columns[ind_max]
-                        self.candidates[ii].append(symbol)
-                else:
-                    symbol=self.out.columns[ind_max]
-                    self.candidates[ii].append(symbol) 
-            except:
-                pass
+            r.ss_m.order_nosubstrat(
+                candidates_to_YF(self.ust.symbols_to_YF,candidates), 
+                self.ust.exchange, 
+                strategy,
+                False,
+                )
 

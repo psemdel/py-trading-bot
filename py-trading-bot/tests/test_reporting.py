@@ -6,17 +6,13 @@ Created on Thu Jun 30 13:49:54 2022
 @author: maxime
 """
 
-import unittest
-import numpy as np
 from django.test import TestCase
 import reporting.models as m
-from reporting.models import Alert
 
 from orders.models import (Fees, StockEx, Action, ActionCategory, ActionSector, Strategy, 
-                          Currency, StratCandidates, PF, Excluded, OrderCapital)
+                          Currency, StratCandidates, Excluded)
                           
 from trading_bot.settings import _settings                         
-import vectorbtpro as vbt
 
 #Test reporting, it looks for errors.
 class TestReporting(TestCase):
@@ -27,7 +23,7 @@ class TestReporting(TestCase):
         self.e=e
         e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
-        e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
+        e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True,presel_at_sector_level=True)
         e5=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         e6=StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=True)
         
@@ -38,24 +34,29 @@ class TestReporting(TestCase):
         cat2=ActionCategory.objects.create(name="ETF",short="ETF")
         cat3=ActionCategory.objects.create(name="index",short="IND")
         strategy=Strategy.objects.create(name="none")
-        strategy2=Strategy.objects.create(name="normal")
-        strategy3=Strategy.objects.create(name="divergence")
-        strategy4=Strategy.objects.create(name="retard")
-        strategy5=Strategy.objects.create(name="macd_vol")
-        strategy6=Strategy.objects.create(name="realmadrid")
-        strategy7=Strategy.objects.create(name="wq7")
-        strategy8=Strategy.objects.create(name="wq31")
-        strategy9=Strategy.objects.create(name="wq53")
-        strategy10=Strategy.objects.create(name="wq54")
-        strategy11=Strategy.objects.create(name="retard_keep")
-        strategy12=Strategy.objects.create(name="hist_slow")
+        strategy2=Strategy.objects.create(name="normal",class_name="StratG")
+        strategy3=Strategy.objects.create(name="divergence",class_name="PreselDivergence")
+        strategy4=Strategy.objects.create(name="retard",class_name="PreselRetard")
+        strategy5=Strategy.objects.create(name="macd_vol",class_name="PreselMacdVol")
+        strategy6=Strategy.objects.create(name="realmadrid",class_name="PreselRealMadrid")
+        strategy7=Strategy.objects.create(name="wq7",class_name="PreselWQ7")
+        strategy8=Strategy.objects.create(name="wq31",class_name="PreselWQ31")
+        strategy9=Strategy.objects.create(name="wq53",class_name="PreselWQ53")
+        strategy10=Strategy.objects.create(name="wq54",class_name="PreselWQ54")
+        strategy11=Strategy.objects.create(name="retard_keep",class_name="PreselRetardKeep")
+        strategy12=Strategy.objects.create(name="hist_slow",class_name="PreselHistVolSlow")
+        
+        self.strategy7=strategy7
+        self.strategy8=strategy8
+        self.strategy9=strategy9
+        self.strategy10=strategy10
         
         StratCandidates.objects.create(strategy=strategy2)
         s=ActionSector.objects.create(name="undefined")
         s2=ActionSector.objects.create(name="it")
         s3=ActionSector.objects.create(name="fin")
         
-        self.strategy=strategy
+        self.ustrategy=strategy
         a=Action.objects.create(
             symbol='AC.PA',
             #ib_ticker='AC',
@@ -264,27 +265,12 @@ class TestReporting(TestCase):
             etf_short=etf1,
             sector=s,
             )    
-
-         
-        #PF.objects.create(name="divergence",short=False,strategy= strategy3,stock_ex=e,sector=s)
-        #PF.objects.create(name="retard",short=False,strategy= strategy4,stock_ex=e,sector=s)
-        #PF.objects.create(name="retard",short=True,strategy= strategy4,stock_ex=e,sector=s)
        
         Excluded.objects.create(name="retard", strategy=strategy4)
         Excluded.objects.create(name="all",strategy=strategy)
-        OrderCapital.objects.create(capital=1,strategy=strategy3,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy4,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy5,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy6,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy7,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy8,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy9,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy10,stock_ex=e,sector=s)
-        OrderCapital.objects.create(capital=1,strategy=strategy11,stock_ex=e,sector=s)
         
         self.report1=m.Report(sector=s)
-        self.report1.save()
-        
+        self.report1.save(testing=True)
         _settings["PERFORM_ORDER"]=False #avoid to perform orders
         
         e.main_index=self.a5
@@ -292,10 +278,6 @@ class TestReporting(TestCase):
         e.strategies_in_use.add(strategy4)
         e.strategies_in_use.add(strategy5)
         e.strategies_in_use.add(strategy6)
-        e.strategies_in_use.add(strategy7)
-        e.strategies_in_use.add(strategy8)
-        e.strategies_in_use.add(strategy9)
-        e.strategies_in_use.add(strategy10)
         e.strategies_in_use.add(strategy11)
         e.save()
         
@@ -355,40 +337,27 @@ class TestReporting(TestCase):
         self.assertEqual(self.report1.text,"test\n")
 
     def test_daily_report_index(self):
-        self.report1.daily_report_index(["^FCHI","^GDAXI"])
+        self.report1.daily_report(symbols=["^FCHI","^GDAXI"],it_is_index=True,testing=True)
 
-    def test_presel(self):
-        self.st=self.report1.daily_report_action("Paris")   
-        print("non")
-        print(self.st)
-        self.report1.presel(self.st,"Paris")
+    def test_Paris(self):
+        self.report1.daily_report(exchange="Paris",testing=True)  
         
-    def test_presel_wq(self):
-        self.st=self.report1.daily_report_action("Paris")  
-        self.report1.presel_wq(self.st,"Paris")
-        
-    def test_presel_XETRA(self):
-        self.st=self.report1.daily_report_action("XETRA")   
-        self.report1.presel(self.st,"XETRA")
-        
-    def test_presel_wq_XETRA(self):
-        self.st=self.report1.daily_report_action("XETRA")      
-        self.report1.presel_wq(self.st,"XETRA")
+    def test_Paris_wq(self):
+        self.e.strategies_in_use.add(self.strategy7)
+        self.e.strategies_in_use.add(self.strategy8)
+        self.e.strategies_in_use.add(self.strategy9)
+        self.e.strategies_in_use.add(self.strategy10)
+        self.e.save()
+        self.report1.daily_report(exchange="Paris",testing=True)      
+
+    def test_XETRA(self):
+        self.ust=self.report1.daily_report(exchange="XETRA",testing=True)   
         
     def test_presel_Nasdaq(self):
-        self.st=self.report1.daily_report_action("Nasdaq")   
-        self.report1.presel(self.st,"Nasdaq")
-        
-    def test_presel_wq_Nasdaq(self):
-        self.st=self.report1.daily_report_action("Nasdaq")      
-        self.report1.presel_wq(self.st,"Nasdaq")   
+        self.ust=self.report1.daily_report(exchange="Nasdaq",testing=True)   
         
     def test_presel_NYSE(self):
-        for s in ["it","fin"]: 
-            report=m.Report()
-            st=report.daily_report_action("NYSE",sec=s) 
-            report.presel(st,"NYSE",sec=s)
-            report.presel_wq(st,"NYSE",sec=s)
+        #should perform the report at sector level
+        report=m.Report()
+        report.daily_report(exchange="NYSE",testing=True) 
                  
-if __name__ == '__main__':
-    unittest.main() 

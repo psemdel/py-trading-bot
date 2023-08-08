@@ -3,11 +3,12 @@ This trader bot automatizes orders on all kind of financial products, and is not
 
 Features implemented:
 
-- Backstaging of complex strategies (including [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf)) using [vectorbtpro](https://vectorbt.pro/)
+- Backstaging of complex strategies (including [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf)) using [vectorbtpro](https://vectorbt.pro/), on historical data but also on recent data.
 - Performing live automatically orders using the tested strategies and interactive brockers, thanks to ib_insync
 - Send Telegram messages when performing an order
-- Send Telegram alerts when the action price variation exceeds a certain threshold
+- Send Telegram alerts when the action price variation exceeds a certain threshold. Note: last version from IB mobile app has also this function.
 - Writting at regular interval reports on the market, using Django and Celery with Redis
+- Perform strategy optimization on data set
  
 # Vision and comparison with other tools
 I want to trade without having to spend hours every day watching at curves or read tweets to find out which product to trade and when to trade it. I want to be able trading American and European stocks. I want to receive alerts on my phone in case anything abnormal happens on my assets. I want to be able to use complex trading strategies, that can rely on machine learning for their design.
@@ -26,9 +27,6 @@ For installation see [installation guide](https://github.com/psemdel/py-trading-
 
 # Branches
 The main branches contain many strategies that can be used right away. However, the amount of code can make it difficult to understand how the bot works. For this reason a branch "minimum" is available. It contains only the minimum infrastructure to make run the code with usual functionalities, the strategy implementation is then left to you.
-
-# To do
-Using USE_IB_FOR_DATA and PERFORM_ORDER on True is still in beta phase. Generally the bot is in beta. For USE_IB_FOR_DATA, please note that you need the permission for all actions that you need to retrieve. One missing permission lead to the failure of the process.
 
 # Deployment
 Deployment of the bot on external machine has not been achieved yet for several reasons:

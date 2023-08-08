@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Messaging using Python Telegram Bot."""
 
@@ -290,6 +290,8 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
 
         def send_to_all(self, kind: str, *args, **kwargs) -> None:
             """Send message of any kind to all in `TelegramBot.chat_ids`."""
+            if len(self.chat_ids)==0:
+                print("No chat_id found, think of performing /start in your telegram bot!")
             for chat_id in self.chat_ids:
                 self.send(kind, chat_id, *args, **kwargs)
 

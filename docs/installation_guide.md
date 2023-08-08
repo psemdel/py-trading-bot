@@ -6,13 +6,7 @@ For this installation, it is assumed that python with a version >3.8, git and pi
 * [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
 # Vectorbt
-I recommend using [vectorbt](https://vectorbt.dev/) in its [pro version](https://vectorbt.pro/) (requires fee), but basically vectorbt "dev" is the same with less features (I will create a branch for the bot using vectorbt normal). Install it with:
-
-- Vectorbt "normal"
-
-```sh
-pip install -U "vectorbt[full]"
-```
+The bot requires [vectorbt](https://vectorbt.dev/) in its [pro version](https://vectorbt.pro/) (requires fee). Install it with:
 
 - Vectorbtpro
 
@@ -20,40 +14,41 @@ pip install -U "vectorbt[full]"
 pip install -U "vectorbtpro"
 ```
 
+Note: it is clearly imaginable to use the bot with the basic version of vbt, but it would need some adaptions.
+
 It will install some other dependencies needed for the bot, for instance: pandas, numpy, python-telegram-bot and TA-Lib. 
-Note: you have to choose between the pro and the dev versions. You can have both installed at the same time.
 
 # Django
-Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. asyncio is used for asynchronous tasks. ib_insync is a library to communicate with interactive brokers.
+Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt
 
-```sh
-pip install django celery[redis] asyncio ib_insync whitenoise
-```
+    ```sh
+    pip install -r requirements.txt
+    ```
 
 # Clone from git
 Pull the project from git:
 
-```
-git clone https://github.com/psemdel/py-trading-bot.git
-```
+    ```
+    git clone https://github.com/psemdel/py-trading-bot.git
+    ```
 
 # Database
 You can perfectly use SQlite as Database, then go in trading_bot/settings.py and replace DATABASES through this snippet. Then there is no preliminary steps.
 
-
+    ```
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-
+    ```
 
 By default however, privilege a more production oriented database. By default, PostgresQL is used. [To install PostgresQL](https://www.postgresql.org/download/). In this case, you have to create a database in PostgresQL, an user and grant priviledges for the database to this user. 
 
 Corresponding code in trading_bot/settings.py is the one used by default:
 
-
+    ```
     DATABASES = {
     'default': {
          'ENGINE': 'django.db.backends.postgresql',
@@ -64,7 +59,7 @@ Corresponding code in trading_bot/settings.py is the one used by default:
          'PORT': '',
      }
     }
-
+    ```
 
 pgtradingbotdb is the name of the database in postgres (but you can use whatever you want), DB_USER is the user you use in postgres, DB_SECRET_KEY the corresponding password. 
 
@@ -79,39 +74,51 @@ It is optional, but you Jupyter to read the Jupyter notebooks. Vectorbt is very 
 # Configuration
 Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software and to uncheck the "read-only" setting). Note that TWS and IB Gateway have different ports.
 
-
-    ## IB configuration
-    IB_LOCALHOST='127.0.0.1'
-    IB_PORT=7496
-
-
+    ```
+    "IB_LOCALHOST":'127.0.0.1',
+    "IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
+    ```
 Set the settings you want for Telegram
 
-
+    ```
     ## Configuration of Telegram ##
-    PF_CHECK=True
-    INDEX_CHECK=True
-    REPORT_17h=True #for Paris and XETRA
-    REPORT_22h=True
-    HEARTBEAT=False # to test telegram
+    "PF_CHECK":True,
+    "INDEX_CHECK":True,
+    "REPORT":True, #for Paris and XETRA
+    "INTRADAY":False,
+    "HEARTBEAT":False, # to test telegram
+    "HEARTBEAT_IB":False, # to test telegram
+    "UPDATE_SLOW_STRAT":True, 
 
-    ALERT_THRESHOLD=3 #in %
-    ALARM_THRESHOLD=5 #in %
-    ALERT_HYST=1 #margin to avoid alert/recovery at high frequency
+    "ALERT_THRESHOLD":3, #in %
+    "ALARM_THRESHOLD":5, #in %
+    "ALERT_HYST":1, #margin in % to avoid alert/recovery at high frequency, so if ALERT_THRESHOLD=3 and ALERT_HYST=1
+                #then the alert will be deactivated when the price variation is 2% (3-1)
 
-    TIME_INTERVAL_CHECK=10 #in minutes, interval between two checks of pf values
+    "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
+    "TIME_INTERVAL_UPDATE":60,
+    "TIME_INTERVAL_INTRADAY":15,
 
+    "OPENING_CHECK_MINUTE_SHIFT":5,
+    "DAILY_REPORT_MINUTE_SHIFT":15,    
+    ```
 
-Set USE_IB_FOR_DATA to the correct value depending if you use Interactive brokers or not. If you use IB for the data, also adapt the list of stock exchanges where you have access, respectively no access to avoid bugs.
+Set USED_API_DEFAULT to the correct value depending if you use Interactive brokers or not. Three parameters are defined: 
 
+- Orders: which API should perform your orders
+- Alerting: from which API should the data be retrieved within the day to generate alert
+- Reporting: from which API should the data be retrieved for report generation
 
-    ## Order settings ##
-    USE_IB_FOR_DATA=True #use IB for Data or YF
-    IB_STOCKEX_NO_PERMISSION=["IBIS","EUREX","NASDAQ IND"]
-    IB_STOCKEX_PERMISSION=["SMART","SBF","NYSE","BVME"]
-    IB_STOCK_NO_PERMISSION=["NDX"]
+If you use IB for the data, a list of stocks where you have no access can be defined in IB_STOCK_NO_PERMISSION. The permission in IB for the stock exchanges is set with the parameter ib_auth which can be accessed in the admin panel. 
 
-
+    ```
+    "USED_API_DEFAULT":{
+        "orders": os.environ.get("USED_API_FOR_ORDER_PERF","IB"), #"IB", "MT5", "TS" or "CCXT" (YF does not allow performing orders)
+        "alerting":os.environ.get("USED_API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5", "TS" or "CCXT"
+        "reporting":os.environ.get("USED_API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5", "TS" or "CCXT"
+        },
+    "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],    
+    ```
 
 In trading_bot/etc/ adapt the values in files (never commit those files!! Uncomment **/trading_bot/etc/ in .gitignore to avoid this drama):
 
@@ -123,20 +130,20 @@ In trading_bot/etc/ adapt the values in files (never commit those files!! Uncomm
 I would recommend to leave TIME_ZONE = 'UTC' except if you know what you are doing. 
 
 # Import the dump (optional)
-Reimport the dump file using "python manage.py loaddata dump.rdb" to fill your database with some financial products: CAC40, DAX, Nasdaq100 and S&P 500.
+Reimport the dump file using "python manage.py loaddata dump.json" to fill your database with some financial products: CAC40, DAX, Nasdaq100 and S&P 500.
 
 # Start the bot
 Click on start_bot.sh
 
 I recommend to open it in a terminal, so you can see the console messages and can close it more easily. Don't open several instances of the bot at the same times, it does not work!
-When starting the bot, the message appearing will relate to Django, Redis, Telegram. Look at the file [start_messages](https://github.com/psemdel/py-trading-bot/blob/dev/docs/appendix/start_messages.txt) for an example. Afterwards a message from the scheduler defining which job will run at which time will appear. Later the alerting check will run every few minutes depending on the setting. It shows:
+When starting the bot, the message appearing will relate to Django, Redis, Telegram (see [example of starting message](https://github.com/psemdel/py-trading-bot/blob/main/docs/appendix/start_messages.txt). Afterwards a message from the scheduler defining which job will run at which time will appear. Later the alerting check will run every few minutes depending on the setting. It shows:
 
      0%|          | 0/1 [00:00<?, ?it/s]kPoolWorker-2] 
      AAPL:   0%|          | 0/1 [00:00<?, ?it/s]ker-2] 
      AAPL: 100%|##########| 1/1 [00:00<00:00,  8.02it/s]
      AAPL: 100%|##########| 1/1 [00:00<00:00,  8.01it/s]
      
-If everything goes well, your Telegram should display a message "I'm back online".
+If everything goes well, your Telegram should display a message "I'm back online". If not, type "/start" in Telegram, it will add your chat_id to the list.
 
 Note the admin panel from Django that allows creating finance products.
 

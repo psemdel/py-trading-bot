@@ -5,34 +5,31 @@
             <th>Symbol</th>
             <th>Name</th>
             <th>Stock exchange</th>
+            <th>Sector</th>
+            <th>Auto</th>
             <th>Strategy</th>
             <th>Direction</th>
-            <th>Sector</th>
         </tr>
     </thead>
-        {% for pf in pfs %}   
-            {% if pf.actions %}
-                {% for action in pf.actions.all %}
-                    <tr>
-                        <td>{{action.symbol}}</td>
-                        <td>{{action.name}}</td>
-                        <td>{{action.stock_ex.name}}</td>
-                        <td>{{pf.strategy.name}}</td>
-                        
-                        {% if pf.short %}
-                            <td>Short</td>
-                        {% else %}
-                            <td>Long</td>
-                        {% endif %}
-                        <td>{{pf.sector.name}}</td>
-                    </tr>
-                {% endfor %}
-            {% endif %}
+        {% for ss in stockstatuss %}
+            <tr>
+                <td>{{ss.action.symbol}}</td>
+                <td>{{ss.action.name}}</td>
+                <td>{{ss.action.stock_ex.name}}</td>
+                <td>{{ss.action.sector}}</td>
+                <td>{{ss.order_in_ib}}</td>
+                <td>{{ss.strategy.name}}</td>
+                {% if ss.quantity < 0 %}
+                    <td>Short</td>
+                {% else %}
+                    <td>Long </td>
+                {% endif %}
+            </tr>
         {% endfor %}
 </table>   
 
 <h1>Manual order entry</h1> 
-<p>If you performed an order manually, insert it into the bot, with the form below. Stop loss is optional and makes sense only for opening (leave 0 otherwise).</p>
+<p>If you performed an order manually outside of IB, insert it into the bot with the form below. Stop loss is optional and makes sense only for opening (leave 0 otherwise). For reverse, give the position of present order.</p>
 <form method="post">
 {% csrf_token %}
 {{form.as_table }}

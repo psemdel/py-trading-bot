@@ -5,17 +5,43 @@ Created on Mon Aug 29 20:33:22 2022
 
 @author: maxime
 """
+import numbers
 import vectorbtpro as vbt
 import numpy as np
 import talib
 from numba import njit
 from trading_bot.settings import _settings
 
-#Determine when the trend is bull/bear or uncertain in order to improve the underlying strategy or
-#to determine the ideal direction (long/short/both)
-
 @njit
-def major_int_sub(kama, init, last_top_ind, last_bot_ind, threshold, threshold_uncertain, deadband):
+def major_int_sub(
+        kama: np.array, 
+        init: int, 
+        last_top_ind: int, 
+        last_bot_ind: int, 
+        threshold: numbers.Number, 
+        threshold_uncertain: numbers.Number, 
+        deadband: numbers.Number
+        )-> (np.array, int, int):
+    '''
+    Determine when the trend is bull/bear or uncertain in order to improve the underlying strategy or
+    to determine the ideal direction (long/short/both)
+    
+    The convention is -1=bull, 1=bear, 0=uncertain
+    '''
+
+    '''
+    Determine the top and bottom from the KAMA function
+
+    Arguments
+    ----------
+        kama: smoothed price (KAMA method)
+        init: initial index
+        last_top_ind: index of the last top
+        last_bot_ind: index of the last bottom
+        threshold: threshold to determine when there is a top or a bottom
+        threshold_uncertain: threshold to determine when we are in an uncertain period
+        deadband: deadband before changing the trend decision
+    '''
     macro_trend_nouncertain= np.full(kama.shape, 0)
     macro_trend= np.full(kama.shape, 0)
     max_ind= np.full(kama.shape, 0)
@@ -85,7 +111,22 @@ def major_int_sub(kama, init, last_top_ind, last_bot_ind, threshold, threshold_u
             
     return macro_trend, min_ind, max_ind
 
-def major_int(close,threshold=0.04, threshold_uncertain=0, deadband=0.1):
+def major_int(
+        close: np.array,
+        threshold: numbers.Number=0.04, 
+        threshold_uncertain: numbers.Number=0, 
+        deadband: numbers.Number=0.1
+        )-> (np.array, int, int):
+    '''
+    Determine the top and bottom from the KAMA function
+
+    Arguments
+    ----------
+        close: close price
+        threshold: threshold to determine when there is a top or a bottom
+        threshold_uncertain: threshold to determine when we are in an uncertain period
+        deadband: deadband before changing the trend decision
+    '''
     kama=talib.KAMA(close,timeperiod=30)
 
     #by kama the begin is nan
@@ -111,8 +152,15 @@ VBTMACROTREND= vbt.IF(
      threshold_uncertain=0,
      deadband=0.1
      )  
-    
-def major_int_prd(close,threshold=0.04, threshold_uncertain=0, deadband=0.1):
+  
+def major_int_prd(close: np.array,
+                  threshold: numbers.Number=0.04, 
+                  threshold_uncertain: numbers.Number=0, 
+                  deadband: numbers.Number=0.1
+                  )-> (np.array, int, int):
+    '''
+    Like major_int but can be forced to a certain value
+    '''  
     macro_trend, min_ind, max_ind=major_int(close,threshold,threshold_uncertain,deadband)
     if _settings["FORCE_MACRO_TO"]=="bear":
         macro_trend[-1]=1 
@@ -136,101 +184,26 @@ VBTMACROTRENDPRD= vbt.IF(
      deadband=0.1
      )     
 
-##Old one, only temporarily for comparison
-def major_int_sub_old(kama):
-    threshold=0.03
-    ll=1-threshold
-    lu=1+threshold
-    window=150
-    deadband=0.1
-
-    macro_trend= np.full(kama.shape, 0)
-    macro_trend_raw= np.full(kama.shape, 0)
-    max_ind= np.full(kama.shape, 0)
-    min_ind= np.full(kama.shape, 0)
-    
-    ext=[]
-    ext_bot=[]
-    max_arr=[]
-    min_arr=[]
-    
-    for ii in range(2,len(kama)):
-        win_start=max(0,ii-window)
-        win_end=ii  #min(len(self.res),ii)
-        change=0
-
-        if not np.isnan(kama[win_start]) and not np.isnan(kama[win_end]):
-            maximum=np.max(kama[win_start:win_end+1])
-            ind=win_start+np.argmax(kama[win_start:win_end+1])
-            
-            if ind==win_start:
-                local_min=kama[win_start]
-            else:
-                local_min=np.min(kama[win_start:ind])
-           
-            minimum=np.min(kama[win_start:win_end+1])
-            ind_bot=win_start+np.argmin(kama[win_start:win_end+1]) 
-
-            if ind_bot==win_start:
-                local_max=kama[win_start]
-            else:
-                local_max=np.max(kama[win_start:ind_bot])
-
-            if local_min<ll*maximum and kama[win_end]<ll*maximum:
-                if ind not in ext:
-                    ext.append(ind)
-                    max_arr.append(maximum)
-                    change=1
-                    macro_trend_raw[ii]=1
-                    if ii > len(kama)-2: #for alerting
-                        max_ind[-1]=ind
-            
-            if local_max>lu*minimum and kama[win_end]>lu*minimum:
-                if ind_bot not in ext_bot:
-                    ext_bot.append(ind_bot)  
-                    min_arr.append(minimum)
-                    change=1
-                    macro_trend_raw[ii]=-1
-                    if ii > len(kama)-2: #for alerting
-                        min_ind[-1]=ind
-   
-        if change==0:
-            macro_trend_raw[ii]=macro_trend_raw[ii-1]
-        macro_trend[ii]=macro_trend_raw[ii]
-            
-        if deadband!=0:
-            #the max or min were exceeded, correction of the direction
-            if macro_trend[ii]==1 and kama[ii]>max_arr[-1]:
-                macro_trend[ii]=-1
-            elif macro_trend[ii]==-1 and kama[ii]<min_arr[-1]:
-                macro_trend[ii]=1
-            #uncertain, as in a small band around the min/max
-            elif macro_trend[ii]==1 and kama[ii]/max_arr[-1]>(1-deadband):
-                macro_trend[ii]=0
-            elif macro_trend[ii]==-1 and kama[ii]/min_arr[-1]<(1+deadband):
-                macro_trend[ii]=0
-   
-    return macro_trend, min_ind, max_ind    
-
-def major_int_old(close,threshold=0.04, threshold_uncertain=0, deadband=0.1):
-    kama=talib.KAMA(close,timeperiod=30)
-    
-    return major_int_sub_old(kama)
-
-VBTMACROTRENDOLD= vbt.IF(
-     class_name='Major',
-     short_name='major',
-     input_names=['close'],
-     output_names=['macro_trend', 'min_ind', 'max_ind']
-).with_apply_func(
-     major_int_old, 
-     takes_1d=True,  
-     ) 
-
-#Translate the entries and exits in entries, exits, entries_short, exits_short depending on the direction chosen 
-    
 @njit        
-def macro_mode(temp_ent,temp_ex, macro_trend, macro_trend_bull, macro_trend_bear, macro_trend_uncertain):
+def macro_mode(
+        temp_ent: np.array,
+        temp_ex: np.array, 
+        macro_trend: np.array, 
+        dir_bull: str, 
+        dir_bear: str, 
+        dir_uncertain: str) -> (np.array, np.array, np.array, np.array):
+    '''
+    Translate the entries and exits in entries, exits, entries_short, exits_short depending on the direction chosen 
+
+    Arguments
+    ----------
+        temp_ent: entries but without consideration of the trend
+        temp_ex: exits but without consideration of the trend
+        macro_trend: trend for each symbols and moment in time
+        dir_bull: direction to use during bull trend
+        dir_bear: direction to use during bear trend
+        dir_uncertain: direction to use during uncertain trend
+    '''       
     entries= np.full(temp_ent.shape, False)   
     exits= np.full(temp_ent.shape, False)   
     entries_short= np.full(temp_ent.shape, False)   
@@ -240,48 +213,48 @@ def macro_mode(temp_ent,temp_ex, macro_trend, macro_trend_bull, macro_trend_bear
     for ii in range(len(temp_ent)):
         if macro_trend[ii]==-1:
             #handle the transition from one macro trend to another
-            if (temp!=0 and macro_trend_bull not in ["both", "short"]):
+            if (temp!=0 and dir_bull not in ["both", "short"]):
                 exits_short[ii] = True
-            if (temp!=0 and macro_trend_bull not in ["both", "long"]):
+            if (temp!=0 and dir_bull not in ["both", "long"]):
                 exits[ii] = True
 
-            if macro_trend_bull in ["both", "short"]:
+            if dir_bull in ["both", "short"]:
                 entries_short[ii] = temp_ex[ii]
                 exits_short[ii] = temp_ent[ii] 
 
-            if macro_trend_bull in ["both", "long"]:
+            if dir_bull in ["both", "long"]:
                 entries[ii] = temp_ent[ii]
                 exits[ii] = temp_ex[ii]
             temp=0
 
         elif macro_trend[ii]==1:
             #handle the transition from one macro trend to another
-            if (temp!=1 and macro_trend_bear not in ["both", "short"]):
+            if (temp!=1 and dir_bear not in ["both", "short"]):
                 exits_short[ii] = True
-            if (temp!=1 and macro_trend_bear not in ["both", "long"]):
+            if (temp!=1 and dir_bear not in ["both", "long"]):
                 exits[ii] = True
 
-            if macro_trend_bear in ["both", "short"]:
+            if dir_bear in ["both", "short"]:
                 entries_short[ii] = temp_ex[ii]
                 exits_short[ii] = temp_ent[ii] 
 
-            if macro_trend_bear in ["both", "long"]:
+            if dir_bear in ["both", "long"]:
                 entries[ii] = temp_ent[ii]
                 exits[ii] = temp_ex[ii]
             temp=1
 
         else:
             #handle the transition from one macro trend to another
-            if (temp!=2 and macro_trend_uncertain not in ["both", "short"]):
+            if (temp!=2 and dir_uncertain not in ["both", "short"]):
                 exits_short[ii] = True
-            if (temp!=2 and macro_trend_uncertain not in ["both", "long"]):
+            if (temp!=2 and dir_uncertain not in ["both", "long"]):
                 exits[ii] = True
 
-            if macro_trend_uncertain in ["both", "short"]:
+            if dir_uncertain in ["both", "short"]:
                 entries_short[ii] = temp_ex[ii]
                 exits_short[ii] = temp_ent[ii] 
 
-            if macro_trend_uncertain in ["both", "long"]:
+            if dir_uncertain in ["both", "long"]:
                 entries[ii] = temp_ent[ii]
                 exits[ii] = temp_ex[ii]   
             temp=2
@@ -291,19 +264,30 @@ VBTMACROMODE= vbt.IF(
       class_name='VBTMacromode',
       short_name='macro_mode',
       input_names=['temp_ent','temp_ex', 'macro_trend'],
-      param_names=['macro_trend_bull','macro_trend_bear', 'macro_trend_uncertain'],
+      param_names=['dir_bull','dir_bear', 'dir_uncertain'],
       output_names=['entries', 'exits', 'entries_short', 'exits_short']
  ).with_apply_func(
       macro_mode, 
       takes_1d=True, 
-      macro_trend_bull="long",
-      macro_trend_bear="both", #most of the time better than short as bear trend can quickly revert
-      macro_trend_uncertain="both"
+      dir_bull="long",
+      dir_bear="both", #most of the time better than short as bear trend can quickly revert
+      dir_uncertain="both"
  )    
     
-    
-#restrain to the correct period the entries and exits
-def vbt_macro_filter(ent, macro_trend, mode): 
+def vbt_macro_filter(
+        ent: np.array, 
+        macro_trend: np.array, 
+        mode: int
+        ) -> np.array: 
+    '''
+    restrain to the correct period the entries or exits 
+
+    Arguments
+    ----------
+        ent: entries or exits without consideration of the trend
+        macro_trend: trend for each symbols and moment in time
+        mode: mode to select: bull/bear/uncertain
+    '''   
     out=np.full(ent.shape,False)
     try:
         ind=(macro_trend[:]==mode)
@@ -326,8 +310,15 @@ VBTMACROFILTER= vbt.IF(
      takes_1d=True,  
      )    
 
-#only to visualize macro_mode
-def macro_vis( macro_trend, mode_to_vis ):
+def macro_vis( macro_trend: np.array, mode_to_vis:int ):
+    '''
+    Function to visualize macro_mode in vbt (will put an entry/exit when the mode is entered or exited)
+
+    Arguments
+    ----------
+        macro_trend: trend for each symbols and moment in time
+        mode: mode to select: bull/bear/uncertain
+    '''  
     entries=(macro_trend[:]==mode_to_vis)
     exits=~entries
       

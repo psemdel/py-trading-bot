@@ -2,61 +2,43 @@
 import os
 
 _settings={
-## IB configuration
-"IB_LOCALHOST":'127.0.0.1',
-"IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
-
-## Preselection to be used for the different stock exchanges ##
-# possible values out-of-the-box:
-# "retard","macd_vol","divergence", "wq7","wq31","wq53","wq54", "realmadrid"
-
-"ETF_IB_auth":False,   
-
-"17h_stock_exchanges":["Paris","XETRA","EUREX"], #exchange to scan at 17h  
-"22h_stock_exchanges":["Nasdaq","NYSE"], #exchange to scan at 22h   
-"NYSE_SECTOR_TO_SCAN":["it", "fin"],  ##"realestate","industry","it","com","staples","consumer","utilities","energy",\ 
-          #"fin","materials","healthcare"
-          
-          
+      
 ## Configuration of Telegram ##
 "PF_CHECK":True,
 "INDEX_CHECK":True,
-"REPORT_17h":True, #for Paris and XETRA
-"REPORT_22h":True, #for Nasdaq and Nyse
+"REPORT":True, #for Paris and XETRA
+"INTRADAY":False,
 "HEARTBEAT":False, # to test telegram
-"HEARTBEAT_IB":False, # to test telegram
+"HEARTBEAT_IB":False, # to test telegram, note ["USED_API_DEFAULT"]["alerting] must be set to IB otherwise, it makes no sense.
 "UPDATE_SLOW_STRAT":True, 
 
 "ALERT_THRESHOLD":3, #in %
 "ALARM_THRESHOLD":5, #in %
-"ALERT_HYST":1, #margin to avoid alert/recovery at high frequency
+"ALERT_HYST":1, #margin in % to avoid alert/recovery at high frequency, so if ALERT_THRESHOLD=3 and ALERT_HYST=1
+                #then the alert will be deactivated when the price variation is 2% (3-1)
 
 "TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
+"TIME_INTERVAL_UPDATE":60,
+"TIME_INTERVAL_INTRADAY":15,
+
+"OPENING_CHECK_MINUTE_SHIFT":5,
+"DAILY_REPORT_MINUTE_SHIFT":15,
 
 ## Order settings ##
-"USE_IB_FOR_DATA":{
-    "alerting":os.environ.get("USE_IB_FOR_DATA_ALERTING",True), #use IB for Data if true (otherwise YF), for alerting
-    "reporting":os.environ.get("USE_IB_FOR_DATA_REPORTING",False), #use IB for Data if true (otherwise YF), for the generation of the reports
+"USED_API_DEFAULT":{
+    "orders": os.environ.get("USED_API_FOR_ORDER_PERF","IB"), #"IB", "MT5", "TS" or "CCXT" (YF does not allow performing orders)
+    "alerting":os.environ.get("USED_API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5", "TS" or "CCXT"
+    "reporting":os.environ.get("USED_API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5", "TS" or "CCXT"
     },
-    
+"USED_API":{
+    "orders": "", #don't modify
+    "alerting":"",  #don't modify
+    "reporting":"",  #don't modify
+    },
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
 "PERFORM_ORDER":True, #test or use IB to perform orders
-"BYPASS_ORDERCAPITAL_IF_IB":False, #bypass the restriction linked to order capital if using IB. with other words, 
-#if there is enough money on your account, the order will be performed, 
-#without considering how many orders/strategy you want to perform
-"ORDER_SIZE":15000, 
 ## Configuration of the strategies ##
-"DIVERGENCE_MACRO":False, #if set to true divergence_blocked will used, otherwise divergence, when the key word divergence is selected
-"RETARD_MACRO":True, #if set to true retard_macro will used, otherwise retard, when the key word retard is selected
-
-"STRATEGY_NORMAL_STOCKS":"stratG",
-"STRATEGY_NORMAL_INDEX":"stratIndexB",
-"STRATEGY_SL_STOCKS":"stratSL",
-"STRATEGY_SL_INDEX":"stratIndexSL",
-"STRATEGY_TSL_STOCKS":"stratTSL",
-"STRATEGY_TSL_INDEX":"stratIndexTSL",
-"STRATEGY_RETARD_KEEP":"stratG",
 
 # Frequency is the number of days between successive candidates actualisation
 "DAILY_REPORT_PERIOD":3, #in year
@@ -84,9 +66,40 @@ _settings={
 "CALCULATE_TREND":True,   #trend calculation is time consuming
 
 #for some major events, that cannot be detected only with technical analysis
-"FORCE_MACRO_TO":"" #"bull"/"uncertain"/""
+"FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
+
+"STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
+          "PreselDivergenceBlocked","PreselWQ7","PreselWQ31","PreselWQ53","PreselWQ54"],
+
+## API configurations
+"IB_LOCALHOST":'127.0.0.1',
+"IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
+
+"ETF_IB_auth":False, 
+"IB_BASE_CURRENCY":"EUR",
+
+"CCXT_EXCHANGE":"ace",
+"MT5_HOST":os.environ.get("MT5_HOST",0),
+"MT5_PORT":os.environ.get("MT5_PORT",0),
+"TD_API_KEY":os.environ.get("TD_API_KEY","YOUR_KEY")
 }
 
+### For other API ###
+## CCXT ##
+'''
+vbt.CCXTData.set_custom_settings(
+             exchanges=dict(
+                 binance=dict(
+                     exchange_config=dict(
+                         apiKey=os.environ.get("CCXT_KEY","YOUR_KEY"),
+                         secret=os.environ.get("CCXT_SECRET","YOUR_SECRET")
+                     )
+                 )
+             )
+        )
+''' 
+    
+    
 """
 Django settings for trading_bot project.
 
@@ -309,3 +322,5 @@ LOGGING = {
        }, 
     },
 }
+
+

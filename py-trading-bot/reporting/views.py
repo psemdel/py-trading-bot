@@ -1,10 +1,10 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from reporting.telegram import start
+from reporting.telegram import start, send_entry_exit_txt, cleaning_sub
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, ListOfActions
-from orders.models import Action, exchange_to_index_symbol
-from trading_bot.settings import _settings
+from orders.models import Action, StockStatus, exchange_to_index_symbol, ActionSector, StockEx
+from orders.ib import actualize_ss
 
 from .filter import ReportFilter
 
@@ -18,13 +18,6 @@ def reportView(request,pk):
     ars=ActionReport.objects.filter(report=pk)
 
     context={'report':report[0], 'ars':ars}
-    return render(request, 'reporting/report.html', context)
-
-def dailyView(request):
-    report= Report.objects.latest('id')
-    actions=ActionReport.objects.filter(report=report.id)
-    indexes=ActionReport.objects.filter(report=report.id)
-    context={'report':report, 'actions':actions, 'indexes':indexes}
     return render(request, 'reporting/report.html', context)
     
 def trendView(request,pk): 
@@ -46,105 +39,106 @@ def start_bot(request):
     return redirect('reporting:reports')
 
 #For testing purpose
-def daily_report_sub(exchange,**kwargs):
-    report1=Report()
-    report1.save()
+def daily_report_sub(
+        exchange:str,
+        it_is_index:bool=False,
+        **kwargs):
     
-    st=report1.daily_report_action(exchange,**kwargs)
-    if st is None:
-        raise ValueError("The creation of the strategy failed, report creation interrupted")
-        
-    report1.presel(st,exchange,**kwargs)
-    report1.presel_wq(st,exchange,**kwargs)
+    if exchange is not None:
+        report1=Report.objects.create(stock_ex=StockEx.objects.get(name=exchange))
+    else:
+        report1=Report.objects.create()
+    report1.daily_report(exchange=exchange,it_is_index=it_is_index,**kwargs)
     send_order_test(report1)
+
+def daily_report(
+        request,
+        exchange:str,
+        **kwargs):
+    '''
+    Write report for an exchange and/or sector
+    Identical to the telegrambot function, but here without bot, so sync instead of async
+    Either for test purpose, or if your telegram was stopped
     
-def daily_report_index_sub(indexes):
-    report3=Report()
-    report3.save()    
-
-    report3.daily_report_index(indexes) # "BZ=F" issue
-    send_order_test(report3)
-
-def daily_report(**kwargs):
+    Arguments
+   	----------
+       request: incoming http request
+       exchange: name of the stock exchange
+    '''  
     try:
-        short_name=kwargs.get("short_name")
-        key=kwargs.get("key")
-        print("writting daily report "+short_name)
-        for exchange in _settings[key]:
-            if exchange=="NYSE":
-                for s in _settings["NYSE_SECTOR_TO_SCAN"]:  
-                    print("starting report " + s)
-                    daily_report_sub("NYSE",sec=s)
-            else:
-               daily_report_sub(exchange)
+        s_ex=StockEx.objects.get(name=exchange)
+        a="strategies_in_use"
+        print("writting daily report "+s_ex.name)
+        if s_ex.presel_at_sector_level:
+            for sec in ActionSector.objects.all():
+                strats=getattr(sec,a).all()
+                if len(strats)!=0: #some strategy is activated for this sector
+                    print("starting report " + sec)
+                    daily_report_sub(s_ex.name,sec=sec)
+        else:
+            strats=getattr(s_ex,a).all()
+            if len(strats)!=0: 
+                daily_report_sub(s_ex.name)
 
-        indexes=[exchange_to_index_symbol(exchange)[1] for exchange in _settings[key]]
-        daily_report_index_sub(indexes)
-        
-        return HttpResponse("report written")
+        daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
+        return render(request, 'reporting/success_report.html')
 
     except Exception as e:
         print(e)
         pass
 
-def trigger_17h(request):
-    return daily_report(short_name="17h",key="17h_stock_exchanges")
-    
-def trigger_22h(request):
-    return daily_report(short_name="22h",key="22h_stock_exchanges")
-
 def send_order_test(report):
+    '''
+    Send message if orders have been performed, test for the telegram function
+    
+    Arguments
+   	----------
+       report: report for which the calculation happened
+    '''   
     for auto in [False, True]:
         for entry in [False, True]:
             for short in [False, True]:
                 try:
                     ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
                     for a in ent_ex_symbols.actions.all():
-                        send_entry_exit_msg_test(a.symbol,entry,short,auto) 
+                        #reverse, buy
+                        print(send_entry_exit_txt(a.symbol,entry,short, auto))
                 except:
                     pass
 
     if report.text:
          print(report.text)      
-    
-def send_entry_exit_msg_test(symbol,entry,short, auto):
-    if auto:
-        part1=""
-        part2=""
-    else:
-        part1="Manual "
-        part2="requested for "
-    
-    if entry:
-        part1+="entry "
-    else:
-        part1+="exit "
-        
-    if short:
-        part3=" short"
-    else:
-        part3=""
-        
-    print(part1+part2+symbol + " "+ part3) 
 
 def cleaning(request):
-    alerts=Alert.objects.filter(active=True)
-    for alert in alerts:
-        alert.active=False
-        alert.save()
+    '''
+    Deactivate the alert at the end of the day
+    '''
+    cleaning_sub()
         
     return HttpResponse("cleaning done")
+
+def actualize_ss_view(request):
+    actualize_ss()
+    return HttpResponse("Stock status actualized")
+
+def create_ss_sub():
+    for a in Action.objects.all():
+        ss, created=StockStatus.objects.get_or_create(action=a)
+
+def create_ss(request):
+    create_ss_sub()
+    return HttpResponse("Stock status created")
 
 def test_order(request):
     symbol=""
     strategy=""
     exchange="XETRA"
     short=False
-    
+    return render(request, 'reporting/success_report.html')
     #with MyIB() as myIB:
     #    return myIB.entry_order(symbol,strategy, exchange,short), True
     
-    return HttpResponse("test order done")
+    return HttpResponse("test")
 
 def test(request):
     from ib_insync import Stock

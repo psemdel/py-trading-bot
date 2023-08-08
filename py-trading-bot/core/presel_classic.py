@@ -10,7 +10,7 @@ import vectorbtpro as vbt
 import numpy as np
 
 from core.common import remove_multi
-from core.presel import Presel
+from core.presel import Presel, name_to_ust_or_presel
 from numba import njit
 
 import logging
@@ -24,8 +24,10 @@ or once a year) and periodic strategies. For strategies that are already "fast" 
 "one action" strategy is implemented.
 
 This file is for backtesting.
-"""
 
+As those strategies are very slow, there is no automatic implementation. I would recommend to perform the calculation once and set the 
+actions in StratCandidates / normal (in the admin panel)
+"""
 @njit
 def signal_to_size(entries,exits, entries_short, exits_short, idx_arr):
     idx=0
@@ -66,8 +68,8 @@ SIGNALTOSIZE = vbt.IF(
  )       
 
 class PreselClassic(Presel):
-    def __init__(self,symbol_index,period,**kwargs):
-        super().__init__(symbol_index,period,**kwargs)
+    def __init__(self,period,**kwargs):
+        super().__init__(period,**kwargs)
         self.pf_opt=None 
         self.cands={}
     
@@ -117,10 +119,10 @@ class PreselClassic(Presel):
 
         #transform the entries and exits in 1 and 0
         t=SIGNALTOSIZE.run(
-            self.st.entries,
-            self.st.exits,
-            self.st.entries_short,
-            self.st.exits_short,
+            self.ust.entries,
+            self.ust.exits,
+            self.ust.entries_short,
+            self.ust.exits_short,
             idx_arr=[idx_arr]
             )
 
@@ -130,7 +132,7 @@ class PreselClassic(Presel):
         self.size=self.new_alloc #remove_multi(self.new_alloc)* remove_multi(size_underlying)
 
     def apply_underlying_strat(self, strat_name):
-        getattr(self.st,strat_name)()
+        self.ust=name_to_ust_or_presel(strat_name,self.period, symbol_index=self.symbol_index)
         self.fill_allocations_underlying()
         
         #as function from_optimizer

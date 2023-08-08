@@ -6,12 +6,10 @@ Created on Tue Jan 31 17:40:09 2023
 @author: maxime
 """
 
-import unittest
+from django.test import TestCase
 from opt import opt_strat 
 
-import vectorbtpro as vbt
-
-class TestOptStrat(unittest.TestCase):
+class TestOptStrat(TestCase):
     @classmethod
     def setUpClass(self):  
         self.a_bull=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
@@ -23,11 +21,11 @@ class TestOptStrat(unittest.TestCase):
         self.a_uncertain= [0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
         0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
-
+        
+    def test_check_tested_arrs(self):
         self.o=opt_strat.Opt("2007_2022_08",
                          loops=1)
         
-    def test_check_tested_arrs(self):
         self.o.calc_arrs=[self.a_bull,self.a_bear,self.a_uncertain]
         self.assertTrue(self.o.check_tested_arrs(just_test=True))
         self.assertTrue(len(self.o.tested_arrs)==0)
@@ -43,8 +41,35 @@ class TestOptStrat(unittest.TestCase):
         self.assertTrue(self.o.check_tested_arrs())
         self.assertTrue(len(self.o.tested_arrs)==2)
         
+    def test1(self):
+        self.o=opt_strat.Opt("2007_2022_08",
+                         loops=1,
+                         nb_macro_modes=1)        
+        self.o.perf()            
+
+    def test2(self):
+        self.o=opt_strat.Opt("2007_2022_08",
+                         loops=1,
+                         nb_macro_modes=3)        
+        self.o.perf()          
         
-                         
-        
-    
+    def test3(self):              
+       a_bull=[1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+       a_bear=[0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1,
+       0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0]
+       a_uncertain= [1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]
+
+       self.o=opt_strat.Opt("2007_2023",
+              loops=1,
+              predefined=True,
+              a_bull=a_bull,
+              a_bear=a_bear,
+              a_uncertain=a_uncertain,   
+              dir_bull="long", 
+              dir_uncertain="long",
+              dir_bear="long",
+              )
+       self.o.perf()
     

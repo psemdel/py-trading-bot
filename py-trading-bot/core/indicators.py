@@ -5,12 +5,14 @@ Created on Mon May 16 08:27:34 2022
 
 @author: maxime
 """
-
+import numbers
 import vectorbtpro as vbt
 import talib
 from talib.abstract import *
 import numpy as np
 from numba import njit
+from scipy.signal import morlet
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -20,17 +22,36 @@ from trading_bot.settings import _settings
 
 ### General functions ###
 @njit 
-def rel_dif(n,d): #for instance to calculate distance between MA and signal
+def rel_dif(n: numbers.Number,d: numbers.Number): #for instance to calculate distance between MA and signal
+    '''
+    Perform a division
+    '''
     if d==0 or np.isnan(n) or np.isnan(d):
         return 0
     else:
         return round(n/d-1,4)
 
-#Wrapper for talib functions
-def func_name_to_res(func_name, open_, high, low, close):
+def func_name_to_res(
+        f_name: str, 
+        open_: np.array, 
+        high: np.array, 
+        low: np.array, 
+        close: np.array
+        ):
+    '''
+    Wrapper for talib functions
+
+    Arguments
+    ----------
+        f_name: name of the function in indicators
+        open_: open prices
+        high: high prices
+        low: low prices
+        close: close prices
+    '''
     try:
-        if func_name[-4:]=="_INV":
-            func_name=func_name[:-4]
+        if f_name[-4:]=="_INV":
+            f_name=f_name[:-4]
             inputs={
                 'open': open_,
                 'high': low, #error that makes different patterns actually
@@ -45,13 +66,16 @@ def func_name_to_res(func_name, open_, high, low, close):
                 'close': close,
             }
         
-        f=getattr(talib.abstract,func_name)
+        f=getattr(talib.abstract,f_name)
         return f(inputs)
     
     except Exception as e:
         logger.error(e, stack_info=True, exc_info=True)   
         pass 
 
+'''
+Or function
+'''
 VBTOR= vbt.IF(
      class_name='VbtOr',
      short_name='or',
@@ -61,7 +85,10 @@ VBTOR= vbt.IF(
      np.logical_or, 
      takes_1d=True,  
      )
-    
+   
+'''
+And function
+'''    
 VBTAND= vbt.IF(
      class_name='VbtOr',
      short_name='or',
@@ -72,15 +99,27 @@ VBTAND= vbt.IF(
      takes_1d=True,  
      )
     
-### Supertrend ###
-def get_basic_bands(med_price, atr, multiplier):
+'''
+Super trend function
+
+See definition of this function.
+'''     
+def get_basic_bands(
+        med_price: numbers.Number, 
+        atr: numbers.Number,
+        multiplier: numbers.Number
+        )-> (numbers.Number, numbers.Number):
     matr = multiplier * atr
     upper = med_price + matr
     lower = med_price - matr
     return upper, lower
 
 @njit
-def get_final_bands_nb(close, upper, lower): 
+def get_final_bands_nb(
+        close: np.array, 
+        upper: np.array, 
+        lower: np.array
+        ) -> (np.array, np.array, np.array, np.array, np.array, np.array): 
     trend = np.full(close.shape, np.nan)  
 
     dir_ = np.full(close.shape, 1)
@@ -110,7 +149,12 @@ def get_final_bands_nb(close, upper, lower):
              
     return trend, dir_, long, short, entries, exits
 
-def faster_supertrend(high, low, close, period=5, multiplier=3):
+def faster_supertrend(
+        high: np.array, 
+        low: np.array, 
+        close: np.array, 
+        multiplier=3
+        )-> (np.array, np.array, np.array, np.array, np.array, np.array):
     medprice=talib.MEDPRICE(high, low)
     atr=talib.ATR(high, low, close)
 
@@ -121,23 +165,31 @@ VBTSUPERTREND = vbt.IF(
      class_name='SuperTrend',
      short_name='st',
      input_names=['high', 'low', 'close'],
-     param_names=['period', 'multiplier'],
+     param_names=['multiplier'],
      output_names=['supert', 'superd', 'superl', 'supers','entries','exits']
 ).with_apply_func(
      faster_supertrend, 
      takes_1d=True,  
-     period=5,  
      multiplier=3)
-    
-### Supertrend
-#Supertrend is a method to calculate trends based on MA.
-def supertrend_ma(high, low, close):
+  
+'''
+Strategy that base on the crossing of the MA function and the supertrend
+
+Arguments
+----------
+    high: high prices
+    low: low prices
+    close: close prices
+'''     
+def supertrend_ma(
+        high: np.array,
+        low: np.array,
+        close: np.array
+        ) -> (np.array, np.array):
     fast_ma = vbt.MA.run(close, 5)
     slow_ma = vbt.MA.run(close, 15)
     ent =  fast_ma.ma_crossed_above(slow_ma)
     ex = fast_ma.ma_crossed_below(slow_ma)
-
-
     _, _, _, supers, _, _=faster_supertrend(high, low, close)
 
     for ii in range(len(supers)):
@@ -156,9 +208,20 @@ VBTSUPERTRENDMA = vbt.IF(
      takes_1d=True,  
      )
 
-### Vol ###
-#Calculate the volatility
-def natr_f(high, low, close):
+'''
+Calculate the volatility
+
+Arguments
+----------
+    high: high prices
+    low: low prices
+    close: close prices
+'''
+def natr_f(
+        high: np.array,
+        low: np.array,
+        close: np.array
+        ) -> np.array:
     return talib.NATR(high, low, close,timeperiod=14)
 
 VBTNATR = vbt.IF( #just to keep everything the same shape... but useless here
@@ -171,10 +234,14 @@ VBTNATR = vbt.IF( #just to keep everything the same shape... but useless here
      takes_1d=True,  
      )
     
-### MA only ###
-#Calculate the entries and exits depending on the crossing of a 5 days and 15 days smoothed price
-#When the fast_ma becomes > slow_ma an entry signal is emitted 
-def ma(close):    
+'''
+Strategy where the exit and entries depends on the crossing of moving average with 5 and 15 days period
+
+Arguments
+----------
+    close: close prices
+'''
+def ma(close: np.array)-> (np.array, np.array):    
     fast_ma = vbt.MA.run(close, 5)
     slow_ma = vbt.MA.run(close, 15)
         
@@ -192,11 +259,24 @@ VBTMA = vbt.IF( #just to keep everything the same shape... but useless here
      ma, 
      takes_1d=True,  
      )
-   
-### STOCH or KAMA ###
-#Calculate entry and exit signals based on KAMA extrema and STOCH value
+
+'''
+Strategy that combines entry and exits based on KAMA extrema on one side, and on the crossing of STOCH value of predefined thresholds
+
+Arguments
+----------
+    high: high prices
+    low: low prices
+    close: close prices
+'''
 @njit
-def stoch_kama_sub(close, top_ext, ex_stoch, bot_ext, ent_stoch):
+def stoch_kama_sub(
+        close: np.array,
+        top_ext: np.array,
+        ex_stoch: np.array,
+        bot_ext: np.array,
+        ent_stoch: np.array
+        )-> (np.array, np.array):
     entries= np.full(close.shape, False)
     exits= np.full(close.shape, False)       
     
@@ -207,7 +287,12 @@ def stoch_kama_sub(close, top_ext, ex_stoch, bot_ext, ent_stoch):
             entries[ii]=True
     return entries, exits
             
-def stoch_kama(high, low, close):
+def stoch_kama(
+        high: np.array,
+        low: np.array,
+        close: np.array
+        )->(np.array, np.array, np.array, np.array, np.array, np.array, np.array):
+    
     _, direction, top_ext, bot_ext=kama_f(close)
 
     stoch = vbt.STOCH.run(high,low,close)
@@ -228,15 +313,21 @@ VBTSTOCHKAMA = vbt.IF(
      stoch_kama, 
      takes_1d=True,  
      )
-    
-### KAMA with extremum ###
-#Calculate KAMA extrema, the direction between the extrema, and also the KAMA itself
-def kama_f(close):
+
+'''
+Strategy that perform entry and exits based on KAMA extrema
+It also define the direction, depending on those extrema
+
+Arguments
+----------
+    close: close prices
+'''    
+def kama_f(close: np.array) -> (np.array, np.array, np.array, np.array):
     kama=talib.KAMA(close,timeperiod=30)
     return kama_f_sub(kama)
     
 @njit
-def kama_f_sub(kama):
+def kama_f_sub(kama: np.array) -> (np.array, np.array, np.array, np.array):
     direction = np.full(kama.shape, np.nan)
     top_ext= np.full(kama.shape, False)
     bot_ext= np.full(kama.shape, False)
@@ -251,7 +342,7 @@ def kama_f_sub(kama):
             if kama[ii-1]>kama[ii-2] and kama[ii-1]>kama[ii]:
                 top_ext[ii]=True 
                 #note that the extremum is in ii-1, 
-                #but setting it to ii-1 would lead to backtesting "looking into the future"
+                #but setting it to ii would lead to backtesting "looking into the future"
             if kama[ii-1]<kama[ii-2] and kama[ii-1]<kama[ii]:
                 bot_ext[ii]=True
 
@@ -267,9 +358,14 @@ VBTKAMA = vbt.IF(
      takes_1d=True,  
 )
 
-### Very bear ###    
-#Forbid any entry if the trend is bear
-def false_1d(close):
+'''
+Set all points to false
+
+Arguments
+----------
+    close: close prices
+''' 
+def false_1d(close: np.array)-> np.array:
     ent= np.full(close.shape, False)
     return ent
         
@@ -282,8 +378,15 @@ VBTFALSE = vbt.IF(
       false_1d, 
       takes_1d=True,  
  )  
+     
+'''
+Forbid any entry if the trend is bear
 
-def very_bear_1d(close):
+Arguments
+----------
+    close: close prices
+''' 
+def very_bear_1d(close:np.array)-> (np.array, np.array):
     ent= np.full(close.shape, False)
     ex= np.full(close.shape, True)   
     return ent, ex
@@ -297,10 +400,15 @@ VBTVERYBEAR = vbt.IF(
       very_bear_1d, 
       takes_1d=True,  
  )       
-     
-### Very bull ###   
-#Forbid any exit if the trend is bull 
-def very_bull_1d(close):
+
+'''
+Forbid any exit if the trend is bull 
+
+Arguments
+----------
+    close: close prices
+'''      
+def very_bull_1d(close: np.array)-> (np.array, np.array):
     ent= np.full(close.shape, True)
     ex= np.full(close.shape, False)   
     return ent, ex
@@ -315,15 +423,20 @@ VBTVERYBULL = vbt.IF(
       takes_1d=True,  
  )      
     
-### KAMA trend for retard ###
-#Calculate the duration of a trend based on the KAMA
-#So if the KAMA of an action decreases since 20 days, it will return 20
-def kama_trend(close):
+'''
+Calculate the duration of a trend based on the KAMA
+So if the KAMA of an action decreases since 20 days, it will return 20
+
+Arguments
+----------
+    close: close prices
+'''        
+def kama_trend(close: np.array)->(np.array, np.array):
     kama=talib.KAMA(close,timeperiod=30)
     return kama_trend_sub(kama)
     
 @njit    
-def kama_trend_sub(kama): 
+def kama_trend_sub(kama: np.array)->(np.array, np.array): 
     trend=np.full(kama.shape, 0.0)
     duration=np.full(kama.shape, 0)
 
@@ -358,12 +471,27 @@ VBTKAMATREND = vbt.IF(
       kama_trend, 
       takes_1d=True,  
  )  
+     
+'''
+Calculate entry and exit signals based on candlelight patterns
+Calculate for a list of patterns and give the result for all
 
-### PATTERN ###
-#Calculate entry and exit signals based on candlelight patterns
-
-#Calculate for a list of patterns and give the result for all
-def pattern(open_, high, low, close, light=False):  
+Arguments
+----------
+    open_: open prices
+    high: high prices
+    low: low prices
+    close: close prices
+    light: reduce the number of patterns considered
+'''       
+def pattern(
+        open_: np.array,
+        high: np.array,
+        low: np.array,
+        close: np.array,
+        light: bool=False
+        )-> (np.array, np.array): 
+    
     if light:
         arr=[constants.BEAR_PATTERNS_LIGHT, constants.BULL_PATTERNS_LIGHT]
     else:
@@ -392,19 +520,36 @@ VBTPATTERN = vbt.IF(
       pattern, 
       takes_1d=True,  
  )  
-   
-     
-#For only one pattern
-def pattern_one(open_, high, low, close, func_name, ent_or_ex):
+        
+'''
+For only one pattern
+
+Arguments
+----------
+    open_: open prices
+    high: high prices
+    low: low prices
+    close: close prices
+    f_name: name of the function in indicators
+    ent_or_ex: the function should return entries or exit
+'''  
+def pattern_one(
+        open_: np.array,
+        high: np.array,
+        low: np.array,
+        close: np.array,
+        f_name: str,
+        ent_or_ex: str
+        ):
     try:
         if ent_or_ex=="ent":
             arr=constants.BULL_PATTERNS
         else:
             arr=constants.BEAR_PATTERNS
         
-        res=func_name_to_res(func_name, open_, high, low, close)
+        res=func_name_to_res(f_name, open_, high, low, close)
     
-        return res==arr[func_name]
+        return res==arr[f_name]
     except Exception as e:
         logger.error(e, stack_info=True, exc_info=True)  
         pass 
@@ -420,11 +565,18 @@ VBTPATTERNONE = vbt.IF(
       takes_1d=True,  
  )       
  
-### Bbands trend
-#Determine the strenght of a trend based on the value of the bbands bandwidth
-#The direction is determined by kama_f
-#This trend tends to work in bang-bang alterning between -10 and 10
-def bbands_trend(close):
+'''
+Bbands trend
+
+Determine the strenght of a trend based on the value of the bbands bandwidth
+The direction is determined by kama_f
+This trend tends to work in bang-bang alterning between -10 and 10
+
+Arguments
+----------
+    close: close prices
+''' 
+def bbands_trend(close: np.array) -> (np.array, np.array, np.array):
     kama, direction, _, _=kama_f(close)
     bbands=vbt.BBANDS.run(close)
     
@@ -432,7 +584,11 @@ def bbands_trend(close):
     
     return trend, kama, bbands.bandwidth
 
-def bbands_trend_sub(close,bb_bw, direction):
+def bbands_trend_sub(
+        close: np.array,
+        bb_bw: np.array,
+        direction: np.array
+        )->np.array:
     trend= np.full(close.shape, 0.0)  
     for ii in range(len(close)):
         if bb_bw[ii]>0.1:
@@ -451,11 +607,24 @@ VBTBBANDSTREND = vbt.IF(
       bbands_trend, 
       takes_1d=True,  
  ) 
-     
-### Bbands MACD trend
-#Determine the strenght of a trend based on the value of the bbands bandwidth and the MACD
-#This trend is more smooth than the previous one, however the result on the strategy is not always better
-def macd_trend_sub(close,macd, hist, lim1, lim2):
+
+'''
+Bbands MACD trend
+
+Determine the strenght of a trend based on the value of the bbands bandwidth and the MACD
+This trend is more smooth than the previous one, however the result on the strategy is not always better
+
+Arguments
+----------
+    close: close prices
+''' 
+def macd_trend_sub(
+        close: np.array,
+        macd: np.array,
+        hist: np.array,
+        lim1: numbers.Number,
+        lim2: numbers.Number
+        )-> np.array:
     trend= np.full(close.shape, 0.0)  
      
     for ii in range(len(macd)):
@@ -478,8 +647,12 @@ def macd_trend_sub(close,macd, hist, lim1, lim2):
         trend[ii]=t
     return trend 
 
+def macd_trend_sub2(
+        close: np.array,
+        bb_bw: np.array,
+        direction: np.array
+        )-> np.array:   
 
-def macd_trend_sub2(close, bb_bw, direction):   #trend,
     trend= np.full(close.shape, 0.0)  
     bband_lim=_settings["BBAND_THRESHOLD"]
     trend_dir_arr=0 #append to table perf very bad so we make a work around
@@ -512,13 +685,16 @@ def macd_trend_sub2(close, bb_bw, direction):   #trend,
     return trend  
               
 @njit 
-def trend_or(trend1, trend2):
+def trend_or(
+        trend1: np.array,
+        trend2: np.array
+        )-> np.array:
     for ii in range(len(trend1)):
         if trend2[ii]!=0:
             trend1[ii]=trend2[ii]
     return trend1
 
-def macdbb_trend(close):
+def macdbb_trend(close: np.array)-> (np.array, np.array, np.array):
     #settings
     factor=960/(close[0]+close[-1])
     lim1=1/factor
@@ -544,11 +720,20 @@ VBTMACDBBTREND = vbt.IF(
       takes_1d=True,  
  ) 
         
-     
-### Grow
-#Calculate the grow of an action over past period
+'''
+Grow
+
+Calculate the grow of an action over past period
+
+Arguments
+----------
+    close: close prices
+''' 
 @njit 
-def grow_sub(close,dis):
+def grow_sub(
+        close: np.array,
+        dis: numbers.Number
+        )-> np.array:
     res=np.full(close.shape, 0.0)
     #ii=len(close)-1    #we only need the last
     for ii in range(len(close)): 
@@ -558,7 +743,11 @@ def grow_sub(close,dis):
             res[ii]=rel_dif(close[ii],close[ii-dis])*100
     return res
 
-def grow(close, distance=50, ma=False):
+def grow(
+        close: np.array,
+        distance: int=50,
+        ma: bool=False
+        )-> np.array:
     dis=min(distance,len(close)-1)
     
     if ma:
@@ -579,10 +768,20 @@ VBTGROW = vbt.IF(
       takes_1d=True,  
  ) 
 
-### Divergence
-#Calculate the difference between variation of an action and the index     
+'''
+Divergence
+
+Calculate the difference between variation of an action and the index  
+
+Arguments
+----------
+    close: close prices
+'''        
 @njit
-def divergence_f_sub(close,close_ind):
+def divergence_f_sub(
+        close: np.array,
+        close_ind: np.array
+        )-> np.array:
     out= np.full(close.shape, 0.0)
 
     for ii in range(2,len(close)):
@@ -595,7 +794,10 @@ def divergence_f_sub(close,close_ind):
         
     return out
 
-def divergence_f(close,close_ind):
+def divergence_f(
+        close: np.array,
+        close_ind: np.array
+        )-> np.array:
     window=15
     ma = vbt.MA.run(close, window).ma
     ma_ind = vbt.MA.run(close_ind, window).ma
@@ -612,16 +814,51 @@ VBTDIVERGENCE = vbt.IF(
       takes_1d=True,  
  ) 
      
-def sum_ent(ent,arr):
-    return np.multiply(arr,ent)
+'''
+Multiply and array by an entries array
+
+Arguments
+----------
+    ent: entries
+    k: 1 or 0
+'''       
+def sum_ent(
+        ent: np.array,
+        k: int
+        )-> np.array:
+    return np.multiply(k,ent)
 
 VBTSUM = vbt.IF(
       class_name='VBTSUM',
       short_name='vbt_sum',
       input_names=['ent'],
-      param_names=['arr'],
+      param_names=['k'],
       output_names=["out"]
  ).with_apply_func(
       sum_ent, 
       takes_1d=True,  
  )      
+
+def wavelet_transform(close, window_size):
+    wavelet = morlet(window_size, 5)
+    out = np.convolve(close, wavelet, mode='same')
+    return out
+
+VBTMORLET = vbt.IF(
+      class_name='VBTMORLET',
+      short_name='vbt_morlet',
+      input_names=['close'],
+      param_names=['window_size'],
+      output_names=["out"]
+ ).with_apply_func(
+      wavelet_transform, 
+      takes_1d=True,  
+ )   
+
+
+
+
+
+    
+
+ 

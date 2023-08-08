@@ -1,5 +1,5 @@
 <h1>Python Trading bot</h1>
-<p><b>Author: Psemdel, Version: 0.01, <a href="https://github.com/psemdel/py-trading-bot">Github</a></b></p>
+<p><b>Author: Psemdel, Version: 0.10, <a href="https://github.com/psemdel/py-trading-bot">Github</a></b></p>
 <table>
     <tr>
         <td><a href="{% url 'reporting:start_bot' %}">Start bot</a></td>
@@ -9,8 +9,12 @@
         <td><a href="{% url 'reporting:alerts' %}">Alerts</a></td>
     </tr>
     <tr>
-        <td><a href="{% url 'reporting:17h' %}">Write report 17h (Paris, Xetra)</a></td>
-        <td><a href="{% url 'reporting:22h' %}">Write report 22h (Nasdaq, NYSE)</a></td>
+        <td><a href="{% url 'reporting:report' 'Paris' %}">Write report for Paris</a></td>
+        <td><a href="{% url 'reporting:report' 'XETRA' %}">Write report for Xetra</a></td>
+    </tr>
+    <tr>    
+        <td><a href="{% url 'reporting:report' 'Nasdaq' %}">Write report for Nasdaq</a></td>
+        <td><a href="{% url 'reporting:report' 'NYSE' %}">Write report for NYSE</a></td>
     </tr>
     <tr>
         <td><a href="{% url 'reporting:cleaning' %}">Cleaning alerts</a></td>

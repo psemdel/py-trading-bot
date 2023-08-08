@@ -7,7 +7,7 @@ Created on Tue Mar 21 19:42:27 2023
 """
 
 from django import forms
-from orders.models import Action, Strategy, ActionSector
+from orders.models import Action, Strategy
 
 class ManualOrderForm(forms.Form):
     action = forms.ModelChoiceField(queryset=Action.objects.all())
@@ -17,7 +17,6 @@ class ManualOrderForm(forms.Form):
         (False,"False")
         )
     short = forms.ChoiceField(choices=TrueFalse)
-    sector= forms.ModelChoiceField(queryset=ActionSector.objects.all())
     sl_threshold=forms.DecimalField(max_digits=100, decimal_places=5) #as price
     daily_sl_threshold=forms.DecimalField(max_digits=100, decimal_places=5) #as pu
     

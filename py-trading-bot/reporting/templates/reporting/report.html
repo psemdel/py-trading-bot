@@ -14,14 +14,12 @@
 
 <p>{{report.text|linebreaks }}</p>
 
-<h1>Action list</h1>
+<h1>Stocks list</h1>
     <table>
         <thead>
             <tr>
-                <th>Action</th>
+                <th>Stock</th>
                 <th>Symbol</th>
-
-                <th>Present decision by normal strat</th>
                 <th>Pattern light, ent</th>
                 <th>Pattern light, ex</th>
                 <th>Kama, ent</th>
@@ -29,7 +27,6 @@
                 <th>Stoch, ent</th>
                 <th>Stoch, ex</th>   
                 <th>Stoch</th>  
-                
                 <th>Ma, ent</th>
                 <th>Ma, ex</th>            
 
@@ -39,12 +36,6 @@
         <tr>
             <td>{{ar.action.name}}{{ar.index.name}}</td>
             <td>{{ar.action.symbol}}{{ar.index.symbol}}</td>
-            
-            {% if ar.last_decision == "buy" %}
-                <td class="true">{{ar.last_decision}}</td> 
-            {% else %}
-                <td class="false">{{ar.last_decision}}</td> 
-            {% endif %} 
             
             {% if ar.pattern_light_ent %}
                 <td class="true">{{ar.pattern_light_ent}}</td> 
@@ -109,5 +100,10 @@
 <p>STOCH is the corresponding function. When it crosses 20, it is an entries signal, 80 an exit one here.</p>
 <p>MA is coded the following way. If the smoothed (MA) price over 5 days cross the one over 15 days, a signal is produced.
 Entries if the fast signal becomes greater than the slow one and exits if it is the opposite.</p>
+
+<h1>Target quantity by strategy</h1>
+<p>1 means that we want to have the product in long, -1 the product in short, 0 no product. NaN means no decision is taken by this strategy<br/>
+The columns are the different strategies</p>
+<p>{{report.target_ss_by_st|linebreaks }}</p>
 
 <p><a href="{% url 'reporting:reports' %}">Main page</a></p>
