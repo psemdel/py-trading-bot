@@ -21,34 +21,28 @@ It will install some other dependencies needed for the bot, for instance: pandas
 # Django
 Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt
 
-    ```sh
+    sh
     pip install -r requirements.txt
-    ```
 
 # Clone from git
 Pull the project from git:
 
-    ```
     git clone https://github.com/psemdel/py-trading-bot.git
-    ```
 
 # Database
 You can perfectly use SQlite as Database, then go in trading_bot/settings.py and replace DATABASES through this snippet. Then there is no preliminary steps.
 
-    ```
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-    ```
 
 By default however, privilege a more production oriented database. By default, PostgresQL is used. [To install PostgresQL](https://www.postgresql.org/download/). In this case, you have to create a database in PostgresQL, an user and grant priviledges for the database to this user. 
 
 Corresponding code in trading_bot/settings.py is the one used by default:
 
-    ```
     DATABASES = {
     'default': {
          'ENGINE': 'django.db.backends.postgresql',
@@ -59,8 +53,7 @@ Corresponding code in trading_bot/settings.py is the one used by default:
          'PORT': '',
      }
     }
-    ```
-
+    
 pgtradingbotdb is the name of the database in postgres (but you can use whatever you want), DB_USER is the user you use in postgres, DB_SECRET_KEY the corresponding password. 
 
 # Telegram
@@ -74,13 +67,11 @@ It is optional, but you Jupyter to read the Jupyter notebooks. Vectorbt is very 
 # Configuration
 Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software and to uncheck the "read-only" setting). Note that TWS and IB Gateway have different ports.
 
-    ```
     "IB_LOCALHOST":'127.0.0.1',
     "IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
-    ```
+    
 Set the settings you want for Telegram
 
-    ```
     ## Configuration of Telegram ##
     "PF_CHECK":True,
     "INDEX_CHECK":True,
@@ -101,7 +92,6 @@ Set the settings you want for Telegram
 
     "OPENING_CHECK_MINUTE_SHIFT":5,
     "DAILY_REPORT_MINUTE_SHIFT":15,    
-    ```
 
 Set USED_API_DEFAULT to the correct value depending if you use Interactive brokers or not. Three parameters are defined: 
 
@@ -111,14 +101,12 @@ Set USED_API_DEFAULT to the correct value depending if you use Interactive broke
 
 If you use IB for the data, a list of stocks where you have no access can be defined in IB_STOCK_NO_PERMISSION. The permission in IB for the stock exchanges is set with the parameter ib_auth which can be accessed in the admin panel. 
 
-    ```
     "USED_API_DEFAULT":{
         "orders": os.environ.get("USED_API_FOR_ORDER_PERF","IB"), #"IB", "MT5", "TS" or "CCXT" (YF does not allow performing orders)
         "alerting":os.environ.get("USED_API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5", "TS" or "CCXT"
         "reporting":os.environ.get("USED_API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5", "TS" or "CCXT"
         },
     "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],    
-    ```
 
 In trading_bot/etc/ adapt the values in files (never commit those files!! Uncomment **/trading_bot/etc/ in .gitignore to avoid this drama):
 

@@ -135,7 +135,7 @@ if __name__ == '__main__':
     
     selector="it"
     start_date='2007-01-01'
-    end_date='2022-08-31'
+    end_date='2023-08-01'
     
     if selector=="CAC40":
         all_symbols=constants.CAC40
@@ -180,10 +180,16 @@ if __name__ == '__main__':
 
     new_list=[]
     for s in all_symbols:
+        ok=True
+        if s in constants.DELIST:
+            if constants.DELIST[s]<end_date:
+                ok=False
+            
         if s in constants.INTRO: #cannot rely on the database, as django is not running at this point.
-            if constants.INTRO[s]<start_date:
-                new_list.append(s)
-        else:
+            if constants.INTRO[s]>start_date:
+                ok=False
+                
+        if ok:
             new_list.append(s)
 
     save_data(selector,index,new_list, start_date, end_date)

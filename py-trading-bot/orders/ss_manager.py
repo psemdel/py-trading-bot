@@ -314,6 +314,7 @@ class StockStatusManager():
             self.report.concat(strategy +" no candidates")     
         else:
             for s in candidates:
+                self.report.concat(strategy +" candidate: "+s)    
                 if short:
                     self.target_ss_by_st.loc[s,strategy]=-1
                 else:

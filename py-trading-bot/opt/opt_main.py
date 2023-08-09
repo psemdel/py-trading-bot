@@ -71,7 +71,7 @@ class OptMain():
             dir_bull: str="long",
             dir_bear: str="long",
             dir_uncertain: str="long",
-            test_window_start: int=None,
+            test_window_start_init: int=None,
             sl: numbers.Number=None,
             tsl: numbers.Number=None,
             a_bull: list=None,
@@ -98,7 +98,7 @@ class OptMain():
            dir_bull: direction to use during bull trend
            dir_bear: direction to use during bear trend
            dir_uncertain: direction to use during uncertain trend   
-           test_window_start: index where the test window should start, random otherwise
+           test_window_start_init: index where the test window should start, random otherwise
            sl: stop loss threshold
            tsl: daily stop loss threshold
            a_bull: starting strategy array for bull direction
@@ -107,7 +107,7 @@ class OptMain():
         '''
 
         for k in ["ratio_learn_train","split_learn_train", "indexes", "it_is_index","nb_macro_modes",
-                  "predefined", "fees", "sl", "tsl", "test_window_start"]:
+                  "predefined", "fees", "sl", "tsl"]:
             setattr(self,k,locals()[k])
         #init
         for key in ["close","open","low","high","data"]:
@@ -130,11 +130,15 @@ class OptMain():
             else: #symbol
                 self.total_len[ind]=len(getattr(self,"close"+self.suffix).columns)
             learn_len=int(math.floor(self.ratio_learn_train/100*self.total_len[ind]))
+            
             test_len=self.total_len[ind]-learn_len
             
-            if self.test_window_start is None:
+            if test_window_start_init is None:
                 self.test_window_start=np.random.randint(0,learn_len)
+            else:
+                self.test_window_start=test_window_start_init
             self.test_window_end=self.test_window_start+test_len
+            
             log("random test start at index number " + ind + " for : "+str(self.test_window_start) +
                 ", "+str(self.close.index[self.test_window_start]) +", "+\
                 "until index number: "+str(self.test_window_end) + ", "+str(self.close.index[self.test_window_end])
@@ -187,6 +191,7 @@ class OptMain():
         self.macro_trend={}
         self.macro_trend_mode={}
         #self.macro_trend_dir={}
+        
         
         if self.nb_macro_modes==3:
             for key in ["bull","bear","uncertain"]:

@@ -47,6 +47,9 @@ def major_int_sub(
     max_ind= np.full(kama.shape, 0)
     min_ind= np.full(kama.shape, 0)
     
+    if init is None:
+        return macro_trend, min_ind, max_ind
+    
     for ii in range(init,len(kama)):
         macro_trend_nouncertain[ii]=macro_trend_nouncertain[ii-1] #init
         
@@ -130,13 +133,16 @@ def major_int(
     kama=talib.KAMA(close,timeperiod=30)
 
     #by kama the begin is nan
+    init=None
+    last_top_ind=None
+    last_bot_ind=None
     for ii in range(2,len(kama)):
         if not np.isnan(kama[ii]):
             last_top_ind=ii
             last_bot_ind=ii
             init=ii+2 #needs at least 2 to make a max
             break
-    
+
     return major_int_sub(kama, init, last_top_ind, last_bot_ind, threshold, threshold_uncertain, deadband)
 
 VBTMACROTREND= vbt.IF(

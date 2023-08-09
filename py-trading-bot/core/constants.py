@@ -251,7 +251,7 @@ NASDAQ=[
     "EXC",
     "FAST",
     "META",
-    #"FISV",
+    "FI", #before FISV
     "FTNT",
     "GILD",
     "GOOG", 
@@ -840,13 +840,14 @@ NYSE_INTRO={
 Delisting date of the stocks if relevant
 '''
 NYSE_DELIST={
+    
     "CTXS":"2022-10-01",
     "DRE":"2022-10-01",
     "FBHS":"2022-10-15",
     "FISV":"2023-05-01",
     "FRC":"2023-05-01",
-    "NLOK":"2023-09-01",
-    "NLSN":"2023-10-01",
+    "NLOK":"2022-09-01",
+    "NLSN":"2022-10-01",
     "SIVBQ":"2023-03-27",
     "SBNY":"2023-03-24",
     "TWTR":"2022-11-01"
@@ -865,7 +866,7 @@ INDUSTRY=["MMM","AOS","ALK","ALLE","AAL","AME","BA","CHRW","CARR","CAT","CTAS","
           "ODFL","OTIS","PCAR","PH","PNR","PWR","RTX","RSG","RHI","ROK","ROL","SNA","LUV","SWK","TXT",
           "TT","TDG","UNP","UAL","UPS","URI","VRSK","WAB","WM","GWW","XYL"]
 IT=["ACN","ADBE","ADP","AKAM","AMD","APH","ADI","ANSS","AAPL","AMAT","ANET","ADSK","AVGO","BR","CDNS",
-    "CDW","CDAY","CSCO","CTSH","GLW","DXC","ENPH","EPAM","FFIV","FIS","FLT","FTNT","IT",          "FISV", "CTXS",
+    "CDW","CDAY","CSCO","CTSH","GLW","DXC","ENPH","EPAM","FFIV","FIS","FLT","FTNT","IT", "FI", "CTXS",
     "GPN","HPE","HPQ","IBM","INTC","INTU","JKHY","JNPR","KEYS","KLAC","LRCX","MA","MCHP","MU","MSFT",
     "MPWR","MSI","NTAP","NVDA","NXPI","ON","ORCL","PAYX","PAYC","PYPL","PTC","QRVO","QCOM","ROP", "NLOK",
     "CRM","STX","NOW","SWKS","SEDG","SNPS","TEL","TDY","TER","TXN","TRMB","TYL","VRSN","V","WDC","ZBRA"]

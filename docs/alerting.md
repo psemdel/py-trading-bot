@@ -16,13 +16,11 @@ Note 2: as of July 2023, the new version of IB mobile app also has alerting func
 # Source of the data
 You can select from why source the data will come. In trading_bot/settings.py:
 
-    ```
     "USED_API_DEFAULT":{
         "orders": os.environ.get("USED_API_FOR_ORDER_PERF","IB"), #"IB", "MT5", "TS" or "CCXT" (YF does not allow performing orders)
         "alerting":os.environ.get("USED_API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5", "TS" or "CCXT"
         "reporting":os.environ.get("USED_API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5", "TS" or "CCXT"
         }
-    ```
 
 The `alerting` defines the source of the data. As written, you can also define an environment variable `USED_API_FOR_DATA_ALERTING` that will overwrite the default setting.
 
