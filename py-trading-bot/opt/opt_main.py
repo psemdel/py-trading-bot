@@ -561,9 +561,8 @@ class OptMain():
                         self.best_arrs[self.best_arrs_index,:,:]= best_arrs_cand
                         self.best_arrs_ret[self.best_arrs_index]=best_ret_cand
                         self.best_arrs_index+=1
-                        log("Present best")
+                        log("Overall perf, learning: "+str(best_ret_cand),pr=True)
                         log(best_arrs_cand)
-                        log(best_ret_cand)
                         #next step
                         self.arrs=best_arrs_cand
                         self.test(dic=dic,dic_test=dic_test,*kwargs)

@@ -171,7 +171,7 @@ class TestIB(TestCase):
         
     def test_cash_balance(self):
         _settings["USED_API"]["orders"]="IB"
-        self.assertTrue(ib.cash_balance()>=0)   
+        self.assertTrue(ib.cash_balance("BASE")>=0)   
         self.assertTrue(ib.cash_balance(currency="USD")>=0)   
 
     def test_check_enough_cash(self):
@@ -339,7 +339,9 @@ class TestIB(TestCase):
         print(present_ss)
         
     def test_get_tradable_contract_ib(self):
-        c=ib.get_tradable_contract(self.a2,False)
+        ibData=ib.IBData()
+        
+        c=ibData.get_tradable_contract(self.a2,False)
         c2=ib.IBData.get_contract("AI","SBF",False)
         self.assertEqual(c,c2)
         
@@ -354,9 +356,9 @@ class TestIB(TestCase):
     def test_convert_to_base(self):
         _settings["USED_API"]["orders"]="IB"
         
-        self.assertEqual(ib.IBData.convert_to_base("EUR",1),1)
-        self.assertTrue(ib.IBData.convert_to_base("USD",1)<1) #EUR normally has more value than USD
-        self.assertTrue(ib.IBData.convert_to_base("GBP",1)>1) #GBP normally has more value than EUR
-        self.assertEqual(ib.IBData.convert_to_base("EUR",1,inverse=True),1)
-        self.assertTrue(ib.IBData.convert_to_base("USD",1,inverse=True)>1) #EUR normally has more value than USD
-        self.assertTrue(ib.IBData.convert_to_base("GBP",1,inverse=True)<1) #GBP normally has more value than EUR
+        self.assertEqual(ib.convert_to_base("EUR",1),1)
+        self.assertTrue(ib.convert_to_base("USD",1)<1) #EUR normally has more value than USD
+        self.assertTrue(ib.convert_to_base("GBP",1)>1) #GBP normally has more value than EUR
+        self.assertEqual(ib.convert_to_base("EUR",1,inverse=True),1)
+        self.assertTrue(ib.convert_to_base("USD",1,inverse=True)>1) #EUR normally has more value than USD
+        self.assertTrue(ib.convert_to_base("GBP",1,inverse=True)<1) #GBP normally has more value than EUR
