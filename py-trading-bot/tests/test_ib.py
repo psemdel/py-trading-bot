@@ -165,6 +165,10 @@ class TestIB(TestCase):
         t=ib.get_ratio(self.a)
         self.assertTrue(t!=0)
         
+        _settings["USED_API"]["alerting"]="IB"
+        t=ib.get_ratio(self.a)
+        self.assertTrue(t!=0)
+        
     def test_get_last_price(self):
         _settings["USED_API"]["alerting"]="YF"
         ib.get_last_price(self.a4)       

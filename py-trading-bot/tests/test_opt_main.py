@@ -45,7 +45,7 @@ class TestOptMain(TestCase):
 
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1,
-                         test_window_start=0)
+                         test_window_start_init=0)
         
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4005)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[1],39)
@@ -60,7 +60,7 @@ class TestOptMain(TestCase):
         
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1,
-                         test_window_start=0,
+                         test_window_start_init=0,
                          split_learn_train="symbol")
         
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4005)
@@ -108,7 +108,7 @@ class TestOptMain(TestCase):
                          a_bull=self.a_bull,
                          a_bear=self.a_bear,
                          a_uncertain=self.a_uncertain, 
-                         test_window_start=0,
+                         test_window_start_init=0,
                          )
         
         self.o.defi_i("total")
@@ -125,7 +125,7 @@ class TestOptMain(TestCase):
                          a_bull=self.a_bull,
                          a_bear=self.a_bear,
                          a_uncertain=self.a_uncertain,   
-                         test_window_start=0
+                         test_window_start_init=0
                          )
         self.o.defi_i("total")
         self.o.defi_ex("total")

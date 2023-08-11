@@ -1074,7 +1074,6 @@ class IBData(RemoteData):
         print(a)    
         return self.find_option(a,buy, max_delta,min_days_distance)   
 
-    @connect_ib
     def actualize_ss(self,**kwargs):
         """
         Synchronize ib and our bot, to know which stocks are owned (+direction)     
@@ -1098,8 +1097,9 @@ class IBData(RemoteData):
                 if action is not None: 
                     present_ss=StockStatus.objects.get(action=action)
                     if present_ss.quantity!=pos.position:
-                        logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position))
+                        logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + " update manually the strategy")
                         present_ss.quantity=pos.position
+                    present_ss.strategy=Strategy.objects.get(name="none")
                     present_ss.order_in_ib=True
                     present_ss.save()  
                 
@@ -1159,7 +1159,7 @@ class IBData(RemoteData):
         if ib_global["connected"] and self.client:
             contract=self.get_contract(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action))
             if contract is not None:
-                bars = kwargs['client'].reqHistoricalData(
+                bars = self.client.reqHistoricalData(
                         contract,
                         endDateTime='',
                         durationStr="2 D", #"10 D","1 M"

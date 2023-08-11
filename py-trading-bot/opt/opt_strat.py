@@ -62,7 +62,9 @@ class Opt(OptMain):
             best_arrs_cand,
             best_ret_cand,
             best_arrs_ret,
-            dic: str="learn"):
+            dic: str="learn",
+            bypass_tested_arrs: bool=False
+            ):
         '''
         To calculate a portfolio from strategy arrays
         
@@ -71,9 +73,11 @@ class Opt(OptMain):
            best_arrs_cand: table containing the best candidate by the strategy array presently tested
            best_ret_cand: table containing the return of the best candidate by the strategy array presently tested
            best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
+           dic: key of the dictionnary to be called: "learning", "test", "total"...
+           #bypass_tested_arrs: should the function tested_arrs be bypassed
         '''
         try:
-            if (not self.check_tested_arrs()) and not "test" in dic:
+            if (not self.check_tested_arrs()) and not "test" in dic and not bypass_tested_arrs:
                 return best_arrs_cand, best_ret_cand
             
             if self.it_is_index:
@@ -81,7 +85,7 @@ class Opt(OptMain):
             else:
                 ret=0
             
-            pf_dic=self.calculate_pf_sub(dic)
+            pf_dic=self.calculate_pf_sub(dic) 
 
             for ind in self.indexes: #CAC, DAX, NASDAQ
 

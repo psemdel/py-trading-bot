@@ -7,13 +7,13 @@ Created on Sat Jun  3 17:39:41 2023
 """
 
 from opt.opt_by_part import Opt as OptByPart
-from opt.opt_main import log
 
 class OptRecursive(OptByPart):
     def __init__(
             self,
             period:str,
             number_of_parts:int=10,
+            filename:str="recursive",
             **kwargs):
         '''
         Try to optimize the strategy depending on the performance of the different symbols on a predefined strategy
@@ -24,7 +24,7 @@ class OptRecursive(OptByPart):
            period: period of time in year for which we shall retrieve the data
            number_of_parts: Number of parts in which the total set must be divided
         '''
-        super().__init__(period,**kwargs)
+        super().__init__(period,filename=filename,**kwargs)
         self.period=period
         self.total_number_of_parts=number_of_parts
         self.test_window_start_fixed=self.test_window_start
@@ -55,10 +55,10 @@ class OptRecursive(OptByPart):
         ----------
            ii: index of the part to be worked on
         '''
-        log("Outer loop: "+str(ii),pr=True)
+        self.log("Outer loop: "+str(ii),pr=True)
 
         for ind in self.indexes:
-            log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
+            self.log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
 
         self.defi_i("learn_part_"+str(ii))
         self.init_best_arr() #reinit

@@ -10,7 +10,6 @@ from core.macro import VBTMACROTREND, VBTMACROVIS
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
-from opt.opt_main import log
 '''
 Script to optimize the parameters of macro_trend
 So to detect when the trend is bull/bear or uncertain
@@ -24,6 +23,7 @@ Parameters very good on some actions but very bad for others should not be selec
 The optimization algorithm calculates one point, look for the points around it and select the best one
 As it can obviously lead to local maximum, the starting point is selected in a random manner
 '''
+import os
 vbt.settings['caching']=Config(
     disable=True,
     disable_whitelist=True,
@@ -43,6 +43,7 @@ class Opt(VBTfunc):
             period: str,
             it_is_index:bool=False,
             loops:int=3,
+            filename:str="macro",
             ):
         '''
         Arguments
@@ -52,7 +53,7 @@ class Opt(VBTfunc):
            loops: maximum number of loops to be performed (to limit the total computing time before having a result)
           
         '''
-        
+        self.filename=filename
         for key in ["close","open","low","high","data"]:
             setattr(self,key+"_dic",{})
         self.indexes=["CAC40", "DAX", "NASDAQ"]
@@ -79,6 +80,28 @@ class Opt(VBTfunc):
         self.best_all=[]
         self.best_all_ret=self.init_threshold
         
+    def log(
+            self,
+            text: str,
+            pr: bool=False
+            ):
+        '''
+        Write a log file
+
+        Arguments
+        ----------
+           text: text to be added to the log file
+           pr: print it in the console
+        '''
+        if not "filename" in self.__dir__():
+            self.filename="strat"
+        
+        with open(os.path.join(os.path.dirname(__file__), "output/"+ self.filename+".txt"), "a") as f:
+            f.write("\n"+str(text))  
+            
+        if pr:
+            print(text) 
+            
     def calculate_eq_ret(self,pf,mode: int):
         '''
         Calculate an equivalent score for a portfolio  
@@ -202,7 +225,7 @@ class Opt(VBTfunc):
         '''  
         for jj in range(self.loops):
             print("loop " + str(jj))
-            log("loop " + str(jj))
+            self.log("loop " + str(jj))
             
             #new start point
             self.arr=self.random()
@@ -223,8 +246,8 @@ class Opt(VBTfunc):
                 if best_ret_cand>self.init_threshold:
                     self.best_arrs.append(best_arrs_cand)
                     self.best_arrs_ret.append(best_ret_cand)
-                    log(best_arrs_cand)
-                    log(best_ret_cand)
+                    self.log(best_arrs_cand)
+                    self.log(best_ret_cand)
                     
                     #next step
                     self.arr=best_arrs_cand
@@ -238,8 +261,8 @@ class Opt(VBTfunc):
                             self.best_all=self.best_arrs[-2]
                             self.best_all_ret=self.best_arrs_ret[-1]
                         
-            log("algorithm completed")                        
-            log("best of all")
-            log({'arr':self.best_all})
-            log("return : " + str(self.best_all_ret))
+            self.log("algorithm completed")                        
+            self.log("best of all")
+            self.log({'arr':self.best_all})
+            self.log("return : " + str(self.best_all_ret))
             

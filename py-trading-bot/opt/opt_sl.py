@@ -9,7 +9,6 @@ import numbers
 import vectorbtpro as vbt
 import numpy as np
 from opt.opt_strat import Opt as OptStrat
-from opt.opt_main import log
 
 class Opt(OptStrat):
     '''
@@ -68,4 +67,4 @@ class Opt(OptStrat):
             self.calculate_pf(sl=0.005*ii)
 
         print("best sl: "+str(self.best_sl) + " score: "+str(self.best_ret))
-        log("best sl: "+str(self.best_sl) + " score: "+str(self.best_ret))
+        self.log("best sl: "+str(self.best_sl) + " score: "+str(self.best_ret))

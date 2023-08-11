@@ -197,8 +197,10 @@ class MyScheduler():
             alerting=False
             alarming=False
             opportunity=False
+            if ratio is None:
+                print("ratio is None for "+action.symbol)
 
-            if self.check_stock_ex_open_from_action(action):
+            if self.check_stock_ex_open_from_action(action) and ratio is not None:
                 if (short and ratio>_settings["ALERT_THRESHOLD"]) or (not short and ratio < -_settings["ALERT_THRESHOLD"]):
                     alerting=True
                     if (short and ratio>_settings["ALARM_THRESHOLD"]) or (not short and ratio<-_settings["ALARM_THRESHOLD"]):

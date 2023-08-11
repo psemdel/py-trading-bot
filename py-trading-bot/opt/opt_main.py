@@ -38,23 +38,7 @@ vbt.settings['caching']=Config(
     use_cached_accessors=True
 )
 
-def log(
-        text: str,
-        filename: str="strat",
-        pr: bool=False
-        ):
-    '''
-    Write a log file
 
-    Arguments
-    ----------
-       text: text to be added to the log file
-    '''
-    with open(os.path.join(os.path.dirname(__file__), "output/"+ filename+".txt"), "a") as f:
-        f.write("\n"+str(text))  
-        
-    if pr:
-        print(text)
 
 class OptMain():
     def __init__(
@@ -77,6 +61,7 @@ class OptMain():
             a_bull: list=None,
             a_bear: list=None,
             a_uncertain: list=None,
+            filename: str="main",
             ):
         '''
         Optimisation main class
@@ -105,9 +90,8 @@ class OptMain():
            a_bear: starting strategy array for bear direction
            a_uncertain: starting strategy array for uncertain direction
         '''
-
         for k in ["ratio_learn_train","split_learn_train", "indexes", "it_is_index","nb_macro_modes",
-                  "predefined", "fees", "sl", "tsl"]:
+                  "predefined", "fees", "sl", "tsl", "filename"]:
             setattr(self,k,locals()[k])
         #init
         for key in ["close","open","low","high","data"]:
@@ -139,7 +123,7 @@ class OptMain():
                 self.test_window_start=test_window_start_init
             self.test_window_end=self.test_window_start+test_len
             
-            log("random test start at index number " + ind + " for : "+str(self.test_window_start) +
+            self.log("random test start at index number " + ind + " for : "+str(self.test_window_start) +
                 ", "+str(self.close.index[self.test_window_start]) +", "+\
                 "until index number: "+str(self.test_window_end) + ", "+str(self.close.index[self.test_window_end])
                 )
@@ -209,6 +193,29 @@ class OptMain():
         
         self.shift=False
         print("init finished")
+        
+        
+    def log(
+            self,
+            text: str,
+            pr: bool=False
+            ):
+        '''
+        Write a log file
+
+        Arguments
+        ----------
+           text: text to be added to the log file
+           pr: print it in the console
+        '''
+        if not "filename" in self.__dir__():
+            self.filename="strat"
+
+        with open(os.path.join(os.path.dirname(__file__), "output/"+ self.filename+".txt"), "a") as f:
+            f.write("\n"+str(text))  
+            
+        if pr:
+            print(text)
 
     def init_best_arr(self):
         '''
@@ -230,7 +237,22 @@ class OptMain():
     def defi_i(self,key: str):
         '''
         Calculate the entries and exits for each strategy. Relatively slow, but must be performed only once.
-
+        
+        Array explanation:
+            index 0-21: entry
+            index 22-end: exit
+            
+        Index 0-6, same for entry and exit
+        0: moving average
+        1: stochastic oscillator
+        2: price smoothed with kama extrema (minimum -> entry, maximum -> exit)
+        3: supertrend
+        4: Bollinger bands (price crosses lower band -> entry, price crosses higher band -> exit)
+        5: RSI with threshold 20/80
+        6: RSI with threshold 30/70
+        
+        Index: 7-21, see BULL_PATTERNS in constants.py
+        Index: 29-end, see BEAR_PATTERNS in constants.py
         Arguments
         ----------
            key: total/learn/test
@@ -262,7 +284,7 @@ class OptMain():
             all_t_ent.append(t.lower_above(close))
             all_t_ex.append(t.upper_below(close))
 
-            t=vbt.RSI.run(close)
+            t=vbt.RSI.run(close,wtype='simple')
             all_t_ent.append(t.rsi_crossed_below(20))
             all_t_ex.append(t.rsi_crossed_above(80))
             
@@ -314,7 +336,7 @@ class OptMain():
 
         for ii in range(len(arr)):
             if arr[ii]:
-                log(l[ii],pr=True)   
+                self.log(l[ii],pr=True)   
       
     def defi_ent(self,key: str):
         '''
@@ -380,7 +402,7 @@ class OptMain():
                 if ent_or_ex=="ent":
                     self.ents[ind]=ent
                 else:
-                    if "test" not in key:
+                    if "learn" in key:
                         ent.iloc[self.test_window_start-1,:]=True #exit all before the gap due to the exit
                     self.exs[ind]=ent
                     
@@ -410,6 +432,9 @@ class OptMain():
                     self.ents_short[ind]=np.full(self.ents[ind].shape,False)
                     self.exs_short[ind]=np.full(self.ents[ind].shape,False)
             else:
+                self.ents_raw={}
+                self.exs_raw={}
+                
                 for ind in self.indexes: #CAC, DAX, NASDAQ
                     t=VBTMACROMODE.run(self.ents[ind],self.exs[ind], self.macro_trend[ind][key],\
                                        dir_bull=self.macro_trend_mode["bull"],
@@ -423,7 +448,6 @@ class OptMain():
         except Exception as msg:      
             print(msg)
             print(self.macro_trend.__dir__())  
-            
 
     def check_tested_arrs(
             self,
@@ -487,7 +511,7 @@ class OptMain():
     def variate(
             self, 
             best_arrs_ret:list,
-            dic:str="learn"
+            d:str="learn"
             ):
         '''
         Variates the array, if it is better, the new array is returned otherwise the original one
@@ -495,6 +519,7 @@ class OptMain():
         Arguments
         ----------
            best_arrs_ret: array of the best returns
+           d: key word to access learn data
         ''' 
         best_arrs_cand=[]
         best_ret_cand=self.init_threshold
@@ -509,7 +534,7 @@ class OptMain():
                     self.calc_arrs[nb_macro_mode][ii]=0
 
                 if np.sum(self.calc_arrs[nb_macro_mode][0:self.len_ent] )!=0 and np.sum(self.calc_arrs[nb_macro_mode][self.len_ent:self.len_ent+self.len_ex])!=0:
-                    best_arrs_cand_temp, best_ret_cand_temp=self.calculate_pf(best_arrs_cand, best_ret_cand, best_arrs_ret,dic=dic)
+                    best_arrs_cand_temp, best_ret_cand_temp=self.calculate_pf(best_arrs_cand, best_ret_cand, best_arrs_ret,dic=d)
                     ### To test confidence at each round --> turn out to exclude break the progresses
                     #if best_ret_cand_temp>best_ret_cand:
                     #    if self.test(verbose=0,**kwargs)>self.confidence_threshold:
@@ -528,12 +553,12 @@ class OptMain():
         
         Arguments
         ----------
-           dic: key word to access learn data
+           d: key word to access learn data
            dic_test: key word to access test data
         '''
         try:
             for jj in range(self.loops):
-                log("loop " + str(jj),pr=True)
+                self.log("loop " + str(jj),pr=True)
                 
                 #new start point
                 if not self.predefined:
@@ -561,8 +586,8 @@ class OptMain():
                         self.best_arrs[self.best_arrs_index,:,:]= best_arrs_cand
                         self.best_arrs_ret[self.best_arrs_index]=best_ret_cand
                         self.best_arrs_index+=1
-                        log("Overall perf, learning: "+str(best_ret_cand),pr=True)
-                        log(best_arrs_cand)
+                        self.log("Overall perf, learning: "+str(best_ret_cand),pr=True)
+                        self.log(best_arrs_cand)
                         #next step
                         self.arrs=best_arrs_cand
                         self.test(dic=dic,dic_test=dic_test,*kwargs)
@@ -582,25 +607,28 @@ class OptMain():
                 keys=["bull","bear","uncertain"]
             else:
                 keys=["bull"]
-            log("algorithm completed")
+            self.log("algorithm completed")
      
-            log("best of all")
-            log({'arr':self.best_all})
-            log("return : " + str(self.best_all_ret))
+            self.log("best of all")
+            self.log({'arr':self.best_all})
+            self.log("return : " + str(self.best_all_ret))
             
-            log("ent",pr=True)
+            self.log("ent",pr=True)
     
             for k in keys:
                 if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
-                    log(k,pr=True)
+                    self.log(k,pr=True)
                     self.interpret_ent(self.best_all[mode_to_int[k],:])
     
-            log("ex",pr=True)
+            self.log("ex",pr=True)
             for k in keys:
                 if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
-                    log(k,pr=True)
+                    self.log(k,pr=True)
                     self.interpret_ex(self.best_all[mode_to_int[k],:])
             self.test(verbose=2,**kwargs)
+            
+            self.summary_total("test")
+            self.summary_total()
         except Exception as e:
             import sys
             _, e_, exc_tb = sys.exc_info()
@@ -618,7 +646,6 @@ class OptMain():
         self.macro_mode(d)
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            self.tested_arrs=[] #reset after each loop
             pf_dic[ind]=vbt.Portfolio.from_signals(self.data_dic[ind][d],
                                           self.ents[ind],
                                           self.exs[ind],
@@ -647,7 +674,7 @@ class OptMain():
            verbose: how much verbose is needed
         ''' 
         if verbose>0:
-            log("Starting tests " + dic)
+            self.log("Starting tests " + dic)
         ret_arr={}
         stats={}
         ret_pf_arr={}
@@ -662,9 +689,10 @@ class OptMain():
                 stats[ind]={}
                 ret_arr[d][ind]= self.get_ret(pf_dic[ind],ind)
 
-            _, ret_pf_arr[d]=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=d)
+            _, ret_pf_arr[d]=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=d,bypass_tested_arrs=True)
         if verbose>0:
-            log("Overall perf, "+d+": " + str(ret_pf_arr[d]),pr=True)
+            self.log("Overall perf, "+d+": " + str(ret_pf_arr[d]),pr=True)
+            
         return self.compare_learn_test(ret_arr,verbose=verbose)
         
     def compare_learn_test(
@@ -689,21 +717,29 @@ class OptMain():
             for k in ret_arr[test_key][ind]:
                 delta=ret_arr[test_key][ind][k]-ret_arr[learn_key][ind][k]
 
-                t=str(k) + " delta: "+str(delta)
+                t=str(k) + " delta: "+str(round(delta,3))
                 if delta>0 or ret_arr[test_key][ind][k]>0: #test better than learning set or at least better than the benchmark
                     if verbose>1:
-                        log(t+" OK",pr=True)
+                        self.log(t+" OK",pr=True)
                     confidence+=1
                 else:
                     if verbose>1:
-                        log(t+" failed, learning ratio: " +  str(ret_arr[learn_key][ind][k]) +\
-                          " test ratio: " +  str(ret_arr[test_key][ind][k]),pr=True) 
+                        self.log(t+" failed, learning ratio: " +  str(round(ret_arr[learn_key][ind][k],3)) +\
+                          " test ratio: " +  str(round(ret_arr[test_key][ind][k],3)),pr=True) 
         
         if total_len!=0:
             confidence_ratio=100*round(confidence/total_len,2)
             if verbose>0:
-                log("confidence_ratio: "+str(confidence_ratio) + "%",pr=True)    
+                self.log("confidence_ratio: "+str(confidence_ratio) + "%",pr=True)    
         return confidence_ratio
+    
+    def summary_total(self, dic:str="total"):
+        self.defi_i(dic)
+        pf_dic=self.calculate_pf_sub(dic)
+
+        for ind in self.indexes:
+            self.log("Data set " + dic +", Index: "+ ind +", return: "+ str(round(np.mean(pf_dic[ind].get_total_return().values),3))+
+                ", benchmark return: "+ str(round(np.mean(pf_dic[ind].total_market_return.values),3)) )
 
     def filter_symbols(
             self,
@@ -727,7 +763,7 @@ class OptMain():
                         self.symbols[ind].append(s)
             else:
                self.symbols[ind]=self.close_dic[ind]["total"].columns 
-        log(symbols_to_keep)
+        self.log(symbols_to_keep)
          
     def split_in_part(
             self,
@@ -751,7 +787,7 @@ class OptMain():
         self.number_of_parts=number_of_parts
         self.selected_symbols=sorted_symbols
         target_l={}
-        
+
         if split is not None:
             for ind in self.indexes:
                 if split=="time":
@@ -768,57 +804,49 @@ class OptMain():
 
         for ind in self.indexes:
             target_l[ind]=int(math.floor(self.total_len[ind]/self.number_of_parts)) 
+            for ii in range(self.number_of_parts):
+                self.data_dic[ind][prefix+"part_"+str(ii)]=self.split_in_part_sub(self.data_dic[ind][origin_dic],ii,split,target_l,ind)
+                
+            for d in ["Close","Open","Low","High"]:
+                for ii in range(self.number_of_parts):
+                    getattr(self,d.lower()+"_dic")[ind][prefix+"part_"+str(ii)]=self.data_dic[ind][prefix+"part_"+str(ii)].get(d)    
             
             for ii in range(self.number_of_parts):
-                for d in ["close","open","low","high"]:
-                    o=getattr(self,d+"_dic")[ind][origin_dic]
-                    if split=="time": 
-                        if ii==(self.number_of_parts-1):
-                            t=o.iloc[ii*target_l[ind]:-1]
-                        else:
-                            t=o.iloc[ii*target_l[ind]:(ii+1)*target_l[ind]]
-                    else: #symbol
-                        if ii==(self.number_of_parts-1):
-                            if self.selected_symbols is not None:
-                                t=o[self.selected_symbols[ind][ii*target_l[ind]:-1]]
-                            else:
-                                t=o.iloc[:,ii*target_l[ind]:-1]
-                        else:
-                            if self.selected_symbols is not None:
-                                t=o[self.selected_symbols[ind][ii*target_l[ind]:(ii+1)*target_l[ind]]]
-                            else:
-                                t=o.iloc[:,ii*target_l[ind]:(ii+1)*target_l[ind]]
-                    getattr(self,d+"_dic")[ind][prefix+"part_"+str(ii)]=t
-                
-                o=self.macro_trend[ind][origin_dic]
-                if split=="time": 
-                    if ii==(self.number_of_parts-1):
-                        t=o.iloc[ii*target_l[ind]:-1]
-                    else:
-                        t=o.iloc[ii*target_l[ind]:(ii+1)*target_l[ind]]
+                self.macro_trend[ind][prefix+"part_"+str(ii)]=self.split_in_part_sub(self.macro_trend[ind][origin_dic],ii,split,target_l,ind)
+    
+    def split_in_part_sub(self,o,ii:int,split:str,target_l:dict,ind:str):
+        '''
+        Subfunction for split_in_part
+        '''
+        if split=="time": 
+            if ii==(self.number_of_parts-1):
+                t=o.iloc[ii*target_l[ind]:-1]
+            else:
+                t=o.iloc[ii*target_l[ind]:(ii+1)*target_l[ind]]
+        else: #symbol
+            if ii==(self.number_of_parts-1):
+                if self.selected_symbols is not None:
+                    t=o[self.selected_symbols[ind][ii*target_l[ind]:-1]]
                 else:
-                    if ii==(self.number_of_parts-1):
-                        if self.selected_symbols is not None:
-                            t=o[self.selected_symbols[ind][ii*target_l[ind]:-1]]
-                        else:
-                            t=o.iloc[:,ii*target_l[ind]:-1]
-                    else:
-                        if self.selected_symbols is not None:
-                            t=o[self.selected_symbols[ind][ii*target_l[ind]:(ii+1)*target_l[ind]]]
-                        else:
-                            t=o.iloc[:,ii*target_l[ind]:(ii+1)*target_l[ind]]
-                self.macro_trend[ind][prefix+"part_"+str(ii)]=t
-                
+                    t=o.iloc[:,ii*target_l[ind]:-1]
+            else:
+                if self.selected_symbols is not None:
+                    t=o[self.selected_symbols[ind][ii*target_l[ind]:(ii+1)*target_l[ind]]]
+                else:
+                    t=o.iloc[:,ii*target_l[ind]:(ii+1)*target_l[ind]]
+        return t
+        
     def test_by_part(self):
         '''
         Test a set previously divided by part       
         '''  
         self.split_learn_train="time"
-        self.split_in_part()
+        self.split_in_part(None)
         
         self.filter_symbols()
         #filter input for next loop
         ret_arr={}
+        ret_dic={}
         stats={}
         
         for ii in range(self.number_of_parts):
@@ -841,7 +869,9 @@ class OptMain():
                                               sl_stop=self.sl,
                                               ) 
 
-                ret_arr[ind]= self.get_ret(pf,ind)
+                ret_dic[ind]= self.get_ret(pf,ind)
+                ret_arr[ind]=[v for k, v in ret_dic[ind].items()] #we don't need the key
+                
                 stats[(ii, ind)]["mean"]=np.mean(ret_arr[ind])
                 stats[(ii, ind)]["min"]=np.min(ret_arr[ind])
                 stats[(ii, ind)]["argmin"]=np.argmin(ret_arr[ind])
@@ -867,7 +897,7 @@ class OptMain():
             df.loc["max",(ii,"all")]=np.min(df.loc["max",(ii,slice(None))])     
         
         pd.set_option('display.max_columns', None)     
-        log(df)
+        self.log(df)
         
     def get_ret_sub(self,rb, rr):
         '''

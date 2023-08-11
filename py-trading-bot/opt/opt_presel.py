@@ -5,7 +5,7 @@ import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
 
-from opt.opt_main import OptMain, log
+from opt.opt_main import OptMain
 
 '''
 Script to optimize the underlying combination of patterns/signals used for a given preselection strategy
@@ -35,8 +35,9 @@ class Opt(OptMain):
             self,
             class_name: str,
             period: str,
+            filename:str="presel",
             **kwargs):
-        super().__init__(period,**kwargs)
+        super().__init__(period,filename=filename,**kwargs)
         self.pr={}
 
         for ind in self.indexes:

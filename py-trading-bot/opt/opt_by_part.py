@@ -18,6 +18,7 @@ class Opt(OptStrat):
             no_reinit: bool=False,
             number_of_parts:int=10,
             starting_part: int=0,
+            filename:str="by_part",
             **kwargs):
         '''
         Try to optimize the strategy depending on the performance of the different symbols on a predefined strategy
@@ -30,7 +31,7 @@ class Opt(OptStrat):
            starting_part: index of the part with which the process should start
         '''
         if not no_reinit:
-            super().__init__(period,split_learn_train="time",**kwargs)
+            super().__init__(period,split_learn_train="time",filename=filename,**kwargs)
             
         self.number_of_parts=number_of_parts
         self.starting_part=starting_part #to resume interrupted calc
@@ -73,10 +74,10 @@ class Opt(OptStrat):
         Method to perform the optimization, within it, perf is called several times
         '''
         for ii in range(self.starting_part,self.number_of_parts):
-            log("Outer loop: "+str(ii),pr=True)
+            self.log("Outer loop: "+str(ii),pr=True)
 
             for ind in self.indexes:
-                log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
+                self.log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
 
             self.defi_i("learn_part_"+str(ii))
             self.init_best_arr() #reinit

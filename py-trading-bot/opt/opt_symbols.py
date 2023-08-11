@@ -17,6 +17,7 @@ class Opt(OptCorr):
             period:str,
             indexes:list,
             symbols:list,
+            filename:str="symbols",
             **kwargs): #all symbols should be from same index
         '''
         Gather the symbols together depending on their correlation and optimize the strategy for the formed clusters
@@ -28,7 +29,7 @@ class Opt(OptCorr):
            indexes: main indexes used to download local data
            symbols: list of YF tickers to be selected
         '''
-        OptMain.__init__(self,period,split_learn_train="time",indexes=[indexes],**kwargs)
+        OptMain.__init__(self,period,split_learn_train="time",indexes=[indexes],filename=filename,**kwargs)
         #calculate the correlation for each ind
         self.number_of_parts=0
         corr_arrs={

@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 from opt.opt_strat import Opt as OptStrat
 import numpy as np
-from opt.opt_main import log
 import vectorbtpro as vbt
 
 import pandas as pd
@@ -37,10 +36,10 @@ class Opt(OptStrat):
         Method to perform the optimization, within it, perf is called several times
         '''
         for ii in range(self.number_of_parts):
-            log("Outer loop: "+str(ii),pr=True)
+            self.log("Outer loop: "+str(ii),pr=True)
 
             for ind in self.indexes:
-                log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
+                self.log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
 
             self.defi_i("learn_part_"+str(ii))
             self.init_best_arr() #reinit
