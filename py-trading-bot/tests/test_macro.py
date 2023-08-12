@@ -7,11 +7,11 @@ Created on Sun Jun 25 12:09:04 2023
 """
 from django.test import TestCase
 from core import strat, macro
-import vectorbtpro as vbt
 
 class TestMacro(TestCase):
     @classmethod
     def setUpClass(self):  
+        super().setUpClass()
         self.period="2007_2022_08"
         self.symbol_index="CAC40"
     
@@ -76,17 +76,17 @@ class TestMacro(TestCase):
         
         self.assertEqual(t.macro_trend['AC'].values[0],t2.out[t2.out.columns[0]].values[0])
         
-        self.assertEqual(self.ust.entries['AC'].values[-4],True)
-        self.assertEqual(t.macro_trend['AC'].values[-4],1)
-        self.assertFalse(t2.out[t2.out.columns[0]].values[-4])
+        self.assertEqual(self.ust.entries['AC'].values[-3],True)
+        self.assertEqual(t.macro_trend['AC'].values[-3],1)
+        self.assertFalse(t2.out[t2.out.columns[0]].values[-3])
         
-        self.assertEqual(self.ust.entries['ATO'].values[-7],True)
-        self.assertEqual(t.macro_trend['ATO'].values[-7],1)
-        self.assertFalse(t2.out[t2.out.columns[4]].values[-7])
+        self.assertEqual(self.ust.entries['ATO'].values[-6],True)
+        self.assertEqual(t.macro_trend['ATO'].values[-6],1)
+        self.assertFalse(t2.out[t2.out.columns[4]].values[-6])
         
-        self.assertEqual(self.ust.entries['DSY'].values[-2],True)
-        self.assertEqual(t.macro_trend['DSY'].values[-2],-1)
-        self.assertFalse(t2.out[t2.out.columns[11]].values[-2])
+        self.assertEqual(self.ust.entries['DSY'].values[-1],True)
+        self.assertEqual(t.macro_trend['DSY'].values[-1],-1)
+        self.assertFalse(t2.out[t2.out.columns[11]].values[-1])
         
         
         

@@ -12,6 +12,7 @@ from opt import opt_strat
 class TestOptStrat(TestCase):
     @classmethod
     def setUpClass(self):  
+        super().setUpClass()
         self.a_bull=[0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,
         0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]  
@@ -24,7 +25,8 @@ class TestOptStrat(TestCase):
         
     def test_check_tested_arrs(self):
         self.o=opt_strat.Opt("2007_2022_08",
-                         loops=1)
+                         loops=1,
+                         testing=True)
         
         self.o.calc_arrs=[self.a_bull,self.a_bear,self.a_uncertain]
         self.assertTrue(self.o.check_tested_arrs(just_test=True))
@@ -44,13 +46,15 @@ class TestOptStrat(TestCase):
     def test1(self):
         self.o=opt_strat.Opt("2007_2022_08",
                          loops=1,
-                         nb_macro_modes=1)        
+                         nb_macro_modes=1,
+                         testing=True)        
         self.o.perf()            
 
     def test2(self):
         self.o=opt_strat.Opt("2007_2022_08",
                          loops=1,
-                         nb_macro_modes=3)        
+                         nb_macro_modes=3,
+                         testing=True)        
         self.o.perf()          
         
     def test3(self):              
@@ -61,7 +65,7 @@ class TestOptStrat(TestCase):
        a_uncertain= [1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1,
        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]
 
-       self.o=opt_strat.Opt("2007_2023",
+       self.o=opt_strat.Opt("2007_2022_08",
               loops=1,
               predefined=True,
               a_bull=a_bull,
@@ -70,6 +74,7 @@ class TestOptStrat(TestCase):
               dir_bull="long", 
               dir_uncertain="long",
               dir_bear="long",
+              testing=True
               )
        self.o.perf()
     

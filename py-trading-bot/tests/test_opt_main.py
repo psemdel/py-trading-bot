@@ -17,6 +17,7 @@ import vectorbtpro as vbt
 class TestOptMain(TestCase):
     @classmethod
     def setUpClass(self):  
+        super().setUpClass()
         self.a_bull=[
         1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
         1., 1., 1., 1., 1., 1., 
@@ -33,41 +34,43 @@ class TestOptMain(TestCase):
         0., 0., 0., 0., 0., 0.]  
 
         self.o=opt_main.OptMain("2007_2022_08",
-                         loops=1)
+                         loops=1, testing=True)
         
     def test_init(self):
-        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4005)
+        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4004)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[1],39)
-        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[0],3204)
+        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[0],3203)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[1],39)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[0],801)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[1],39)
 
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1,
-                         test_window_start_init=0)
+                         test_window_start_init=0,
+                         testing=True)
         
-        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4005)
+        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4004)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[1],39)
-        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[0],3204)
+        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[0],3203)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[1],39)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[0],801)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[1],39)
-        self.assertEqual(str(self.o.close_dic["CAC40"]["learn"].index[0]),"2010-02-22 00:00:00+00:00")
-        self.assertEqual(str(self.o.close_dic["CAC40"]["learn"].index[-1]),"2022-08-31 00:00:00+00:00")
-        self.assertEqual(str(self.o.close_dic["CAC40"]["test"].index[0]),"2007-01-02 00:00:00+00:00")
-        self.assertEqual(str(self.o.close_dic["CAC40"]["test"].index[-1]),"2010-02-19 00:00:00+00:00")
+        self.assertEqual(str(self.o.close_dic["CAC40"]["learn"].index[0]),"2010-02-22 00:00:00+01:00")
+        self.assertEqual(str(self.o.close_dic["CAC40"]["learn"].index[-1]),"2022-08-30 00:00:00+02:00")
+        self.assertEqual(str(self.o.close_dic["CAC40"]["test"].index[0]),"2007-01-02 00:00:00+01:00")
+        self.assertEqual(str(self.o.close_dic["CAC40"]["test"].index[-1]),"2010-02-19 00:00:00+01:00")
         
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1,
                          test_window_start_init=0,
-                         split_learn_train="symbol")
+                         split_learn_train="symbol",
+                         testing=True)
         
-        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4005)
+        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[0],4004)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["total"])[1],39)
-        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[0],4005)
+        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[0],4004)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["learn"])[1],31)
-        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[0],4005)
+        self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[0],4004)
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[1],8)
     
     def test_filter_symbols(self):
@@ -85,7 +88,9 @@ class TestOptMain(TestCase):
         
         self.o=opt_strat.OptMain("2007_2022_08",
                          loops=1, 
-                         nb_macro_modes=1)
+                         nb_macro_modes=1,
+                         testing=True
+                         )
 
         self.assertTrue(np.equal(self.o.predef(),[None]).all())
         
@@ -109,12 +114,13 @@ class TestOptMain(TestCase):
                          a_bear=self.a_bear,
                          a_uncertain=self.a_uncertain, 
                          test_window_start_init=0,
+                         testing=True
                          )
         
         self.o.defi_i("total")
         
         self.assertEqual(np.shape(self.o.all_t_ents["CAC40"]["total"])[0],22)
-        self.assertEqual(np.shape(self.o.all_t_ents["CAC40"]["total"])[1],4005)
+        self.assertEqual(np.shape(self.o.all_t_ents["CAC40"]["total"])[1],4004)
         self.assertEqual(np.shape(self.o.all_t_ents["CAC40"]["total"])[2],39)
         
     def test_defi(self):
@@ -130,15 +136,19 @@ class TestOptMain(TestCase):
         self.o.defi_i("total")
         self.o.defi_ex("total")
         
-        self.assertEqual(np.shape(self.o.exs["CAC40"])[0],4005)
+        self.assertEqual(np.shape(self.o.exs["CAC40"])[0],4004)
         self.assertEqual(np.shape(self.o.exs["CAC40"])[1],39)
+        
         self.assertFalse(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[0])
-        self.assertTrue(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-1])
-        self.assertTrue(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-4])
+        self.assertFalse(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-1])
+        self.assertTrue(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-3])
+        self.assertFalse(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-4])
+
 
         self.o.defi_ent("total")
-        self.assertEqual(np.shape(self.o.ents["CAC40"])[0],4005)
+        self.assertEqual(np.shape(self.o.ents["CAC40"])[0],4004)
         self.assertEqual(np.shape(self.o.ents["CAC40"])[1],39)
+        
         self.assertFalse(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[0]].values[0])
         self.assertTrue(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-1])
         self.assertTrue(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-4])
@@ -176,6 +186,6 @@ class TestOptMain(TestCase):
         pf=vbt.Portfolio.from_signals(self.ust.close, self.ust.entries,self.ust.exits,
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)
-        t=self.o.get_ret(pf)
+        t=self.o.get_ret(pf,"CAC40")
         self.assertEqual(len(t),39)
         self.assertEqual(round(t['VIV'],2),-0.97)

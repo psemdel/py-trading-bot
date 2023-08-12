@@ -85,7 +85,7 @@ class TestSSManager(TestCase):
         etf2=m.Action.objects.create(
             symbol='KER.PA',
             #ib_ticker='AC',
-            name="kers",
+            name="KER",
             stock_ex=self.e,
             currency=c,
             category=cat3,
@@ -105,7 +105,7 @@ class TestSSManager(TestCase):
         self.a6=m.Action.objects.create(
             symbol='MC.PA',
             #ib_ticker='AC',
-            name="Airbus",
+            name="LVMH",
             stock_ex=self.e,
             currency=c,
             category=cat,
@@ -137,7 +137,7 @@ class TestSSManager(TestCase):
         self.ss_m=ss_manager.StockStatusManager(self.r,"Paris")
             
     def test_init(self):
-        self.assertEqual(len(m.StockStatus.objects.all()),7)    
+        self.assertEqual(len(m.StockStatus.objects.all()),8)    
         self.assertTrue(np.equal(self.ss_m.target_ss_by_st.columns,["category_id","none","retard_keep","strat2"]).all())
         self.assertTrue(np.equal(self.ss_m.present_ss.columns,["quantity","strategy_id","order_in_ib","etf_long_id","etf_short_id"]).all())
         self.assertEqual(self.ss_m.present_ss.loc["AC.PA","quantity"],0)

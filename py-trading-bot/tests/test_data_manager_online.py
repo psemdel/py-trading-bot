@@ -167,8 +167,6 @@ class TestDatamanagerOnline(TestCase):
         self.assertEqual(np.shape(self.high)[1],3)
         self.assertTrue(np.shape(self.high)[0]>200)
         
-    @unittest.skipIf("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true", \
-    reason="This test requires a running instance of IB running in parallel, which is impossible in Travis")
     def test_retrieve_ib(self):
         _settings["USED_API"]["reporting"]="IB"
         symbols=retrieve_data_online(self,self.actions,"1y") 

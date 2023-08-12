@@ -44,6 +44,7 @@ class Opt(VBTfunc):
             it_is_index:bool=False,
             loops:int=3,
             filename:str="macro",
+            testing: bool=False,
             ):
         '''
         Arguments
@@ -51,7 +52,7 @@ class Opt(VBTfunc):
            period: period of time in year for which we shall retrieve the data
            it_is_index: if True, it will select only the index to make the optimization
            loops: maximum number of loops to be performed (to limit the total computing time before having a result)
-          
+           testing: set to True to perform unittest on the function
         '''
         self.filename=filename
         for key in ["close","open","low","high","data"]:

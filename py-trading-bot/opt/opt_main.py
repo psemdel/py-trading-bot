@@ -62,6 +62,7 @@ class OptMain():
             a_bear: list=None,
             a_uncertain: list=None,
             filename: str="main",
+            testing: bool=False,
             ):
         '''
         Optimisation main class
@@ -89,9 +90,10 @@ class OptMain():
            a_bull: starting strategy array for bull direction
            a_bear: starting strategy array for bear direction
            a_uncertain: starting strategy array for uncertain direction
+           testing: set to True to perform unittest on the function
         '''
         for k in ["ratio_learn_train","split_learn_train", "indexes", "it_is_index","nb_macro_modes",
-                  "predefined", "fees", "sl", "tsl", "filename"]:
+                  "predefined", "fees", "sl", "tsl", "filename","testing"]:
             setattr(self,k,locals()[k])
         #init
         for key in ["close","open","low","high","data"]:
@@ -511,7 +513,7 @@ class OptMain():
     def variate(
             self, 
             best_arrs_ret:list,
-            d:str="learn"
+            dic:str="learn"
             ):
         '''
         Variates the array, if it is better, the new array is returned otherwise the original one
@@ -534,7 +536,7 @@ class OptMain():
                     self.calc_arrs[nb_macro_mode][ii]=0
 
                 if np.sum(self.calc_arrs[nb_macro_mode][0:self.len_ent] )!=0 and np.sum(self.calc_arrs[nb_macro_mode][self.len_ent:self.len_ent+self.len_ex])!=0:
-                    best_arrs_cand_temp, best_ret_cand_temp=self.calculate_pf(best_arrs_cand, best_ret_cand, best_arrs_ret,dic=d)
+                    best_arrs_cand_temp, best_ret_cand_temp=self.calculate_pf(best_arrs_cand, best_ret_cand, best_arrs_ret,dic=dic)
                     ### To test confidence at each round --> turn out to exclude break the progresses
                     #if best_ret_cand_temp>best_ret_cand:
                     #    if self.test(verbose=0,**kwargs)>self.confidence_threshold:
@@ -579,7 +581,8 @@ class OptMain():
                 
                 #start variations
                 calc=True
-                while calc:
+                kk=0
+                while calc and not (self.testing and kk>0): #for testing only one round
                     print("next calc")
                     best_arrs_cand, best_ret_cand=self.variate(best_ret_cand,dic=dic)
                     if best_ret_cand>self.init_threshold:
@@ -600,6 +603,7 @@ class OptMain():
                         if self.best_all_ret==self.init_threshold or self.best_arrs_ret[self.best_arrs_index-1]>self.best_all_ret:
                             self.best_all=self.best_arrs[self.best_arrs_index-1,:]
                             self.best_all_ret=self.best_arrs_ret[self.best_arrs_index-1]
+                    kk+=1
                     
                 gc.collect()     
            
@@ -618,13 +622,18 @@ class OptMain():
             for k in keys:
                 if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
                     self.log(k,pr=True)
-                    self.interpret_ent(self.best_all[mode_to_int[k],:])
-    
+                    try:
+                        self.interpret_ent(self.best_all[mode_to_int[k],:])
+                    except:    
+                        self.interpret_ent(self.best_all[mode_to_int[k]])
             self.log("ex",pr=True)
             for k in keys:
                 if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
                     self.log(k,pr=True)
-                    self.interpret_ex(self.best_all[mode_to_int[k],:])
+                    try:
+                        self.interpret_ex(self.best_all[mode_to_int[k],:])
+                    except:
+                        self.interpret_ex(self.best_all[mode_to_int[k]])
             self.test(verbose=2,**kwargs)
             
             self.summary_total("test")

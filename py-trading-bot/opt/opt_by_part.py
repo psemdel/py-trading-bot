@@ -8,7 +8,6 @@ Created on Thu May 11 21:37:29 2023
 
 from opt.opt_strat import Opt as OptStrat
 import numpy as np
-from opt.opt_main import log
 import vectorbtpro as vbt
 
 class Opt(OptStrat):

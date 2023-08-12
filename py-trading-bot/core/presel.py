@@ -368,12 +368,7 @@ class Presel():
                 for ii in range(len(self.close.index)):
                     self.presub(ii)
                     self.out=self.sub(ii,**kwargs)
-                    t=self.calculate(ii,**kwargs)
-                    if t=="abc":
-                        print("len close")
-                        print(len(self.close.index))
-                        print(len(self.ust.close.index))
-                        return
+                    self.calculate(ii,**kwargs)
             
         except Exception as e:
               import sys
@@ -646,8 +641,6 @@ class PreselRetardMacro(PreselRetard):
     Like retard, but the long/short is decided in function of the macro trend
     '''
     def __init__(self,period: str,**kwargs):
-        print("retard macro called")
-
         super().__init__(period,**kwargs)
         if self.macro_trend_select is None:
             self.macro_trend_select="ind_mod"

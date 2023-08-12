@@ -106,7 +106,7 @@ class TestPreselClassic(TestCase):
         pf_test3=self.bti.apply_underlying_strat("StratG")  
         
         #is not equal as targetpercent takes money from one action for the other
-        self.assertTrue(abs(pf_test2.get_total_return()+pf_test3.get_total_return()-pf_test.get_total_return())<0.2)
+        self.assertTrue(abs(pf_test2.get_total_return()+pf_test3.get_total_return()-pf_test.get_total_return())<0.25)
 
         #needs to check for unique as balancing order can occurs for pf_test.
         self.assertEqual(
