@@ -32,6 +32,7 @@ class TestIB(TestCase):
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
         c=m.Currency.objects.create(name="euro",symbol="EUR")
+        self.c=c
         c2=m.Currency.objects.create(name="dollar",symbol="USD")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
@@ -171,7 +172,16 @@ class TestIB(TestCase):
         
     def test_get_last_price(self):
         _settings["USED_API"]["alerting"]="YF"
-        ib.get_last_price(self.a4)       
+        t=ib.get_last_price(self.a4)     
+        
+        self.assertFalse(np.isnan(t))
+        self.assertTrue(t!=0)
+
+        _settings["USED_API"]["alerting"]="IB"
+        t=ib.get_last_price(self.a4)    
+        
+        self.assertFalse(np.isnan(t))
+        self.assertTrue(t!=0)
         
     def test_cash_balance(self):
         _settings["USED_API"]["orders"]="IB"
@@ -319,11 +329,11 @@ class TestIB(TestCase):
         self.assertFalse(op.buy_order_sub())
         
     def test_buy_order2(self):    
-        op=ib.OrderPerformer("AC.PA",self.strategy.id,1,testing=True)
+        op=ib.OrderPerformer("AC.PA",self.strategy.id,100,testing=True) #order size must be < the money you have, but also > 1 stock price
         _settings["USED_API"]["orders"]="IB"
         #expected enough cash
         self.assertTrue(op.buy_order_sub())
-        self.assertEqual(op.new_order.entering_price,1.0)  
+        self.assertEqual(op.new_order.entering_price,1.0)
 
     def test_sell_order(self):
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000,testing=True)
@@ -346,11 +356,11 @@ class TestIB(TestCase):
         ibData=ib.IBData()
         
         c=ibData.get_tradable_contract(self.a2,False)
-        c2=ib.IBData.get_contract("AI","SBF",False)
+        c2=ib.IBData.get_contract("AI","SBF",False,currency=self.c.symbol)
         self.assertEqual(c,c2)
         
         from ib_insync import Stock
-        c3=Stock("AI","SBF")
+        c3=Stock("AI","SBF","EUR")
         self.assertEqual(c,c3)
         
         #to see the contract details

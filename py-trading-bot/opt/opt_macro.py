@@ -196,7 +196,9 @@ class Opt(VBTfunc):
             self,
             best_arrs_cand,
             best_ret_cand,
-            best_arrs_ret):
+            best_arrs_ret,
+            **kwargs
+            ):
         '''
         To calculate a portfolio from strategy arrays
         

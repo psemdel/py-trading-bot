@@ -582,10 +582,10 @@ class OptMain():
                 #start variations
                 calc=True
                 kk=0
-                while calc and not (self.testing and kk>0): #for testing only one round
+                while calc: #for testing only one round
                     print("next calc")
                     best_arrs_cand, best_ret_cand=self.variate(best_ret_cand,dic=dic)
-                    if best_ret_cand>self.init_threshold:
+                    if best_ret_cand>self.init_threshold and not (self.testing and kk>0):
                         self.best_arrs[self.best_arrs_index,:,:]= best_arrs_cand
                         self.best_arrs_ret[self.best_arrs_index]=best_ret_cand
                         self.best_arrs_index+=1
@@ -622,18 +622,12 @@ class OptMain():
             for k in keys:
                 if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
                     self.log(k,pr=True)
-                    try:
-                        self.interpret_ent(self.best_all[mode_to_int[k],:])
-                    except:    
-                        self.interpret_ent(self.best_all[mode_to_int[k]])
+                    self.interpret_ent(self.best_all[mode_to_int[k],:])
             self.log("ex",pr=True)
             for k in keys:
                 if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
                     self.log(k,pr=True)
-                    try:
-                        self.interpret_ex(self.best_all[mode_to_int[k],:])
-                    except:
-                        self.interpret_ex(self.best_all[mode_to_int[k]])
+                    self.interpret_ex(self.best_all[mode_to_int[k],:])
             self.test(verbose=2,**kwargs)
             
             self.summary_total("test")
@@ -648,14 +642,14 @@ class OptMain():
         print("calculate_pf not defined at OptMain, see child")
         pass
     
-    def calculate_pf_sub(self,d):
+    def calculate_pf_sub(self,dic):
         pf_dic={}   
-        self.defi_ent(d)
-        self.defi_ex(d)
-        self.macro_mode(d)
+        self.defi_ent(dic)
+        self.defi_ex(dic)
+        self.macro_mode(dic)
 
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            pf_dic[ind]=vbt.Portfolio.from_signals(self.data_dic[ind][d],
+            pf_dic[ind]=vbt.Portfolio.from_signals(self.data_dic[ind][dic],
                                           self.ents[ind],
                                           self.exs[ind],
                                           short_entries=self.ents_short[ind],
@@ -747,8 +741,12 @@ class OptMain():
         pf_dic=self.calculate_pf_sub(dic)
 
         for ind in self.indexes:
-            self.log("Data set " + dic +", Index: "+ ind +", return: "+ str(round(np.mean(pf_dic[ind].get_total_return().values),3))+
-                ", benchmark return: "+ str(round(np.mean(pf_dic[ind].total_market_return.values),3)) )
+            if type(pf_dic[ind].total_market_return)!=pd.core.series.Series:
+                self.log("Data set " + dic +", Index: "+ ind +", return: "+ str(round(np.mean(pf_dic[ind].get_total_return()),3))+
+                    ", benchmark return: "+ str(round(np.mean(pf_dic[ind].total_market_return),3)) )                
+            else:
+                self.log("Data set " + dic +", Index: "+ ind +", return: "+ str(round(np.mean(pf_dic[ind].get_total_return()),3))+
+                    ", benchmark return: "+ str(round(np.mean(pf_dic[ind].total_market_return.values),3)) )
 
     def filter_symbols(
             self,
@@ -776,7 +774,7 @@ class OptMain():
          
     def split_in_part(
             self,
-            sorted_symbols:list,
+            sorted_symbols:dict,
             number_of_parts:int=10,
             origin_dic: str="total",
             split:str=None,
@@ -786,7 +784,7 @@ class OptMain():
         
         Arguments
         ----------
-           sorted_symbols: YF tickers sorted in a certain ways
+           sorted_symbols: YF tickers sorted in a certain ways with the indexes as key
            number_of_parts: Number of parts in which the total set must be divided
            origin_dic: which set must be divided
            split: if time, the learning and testing set will be splited according to time. So 2007-2008: learning, 2009: testing
@@ -835,12 +833,20 @@ class OptMain():
         else: #symbol
             if ii==(self.number_of_parts-1):
                 if self.selected_symbols is not None:
-                    t=o[self.selected_symbols[ind][ii*target_l[ind]:-1]]
+                    r=self.selected_symbols[ind][ii*target_l[ind]:-1]
+                    if type(o)==pd.DataFrame:
+                        t=o[r]
+                    else: #data
+                        t=o.select(r)
                 else:
                     t=o.iloc[:,ii*target_l[ind]:-1]
             else:
                 if self.selected_symbols is not None:
-                    t=o[self.selected_symbols[ind][ii*target_l[ind]:(ii+1)*target_l[ind]]]
+                    r=self.selected_symbols[ind][ii*target_l[ind]:(ii+1)*target_l[ind]]
+                    if type(o)==pd.DataFrame:
+                        t=o[r]
+                    else: #data
+                        t=o.select(r)
                 else:
                     t=o.iloc[:,ii*target_l[ind]:(ii+1)*target_l[ind]]
         return t

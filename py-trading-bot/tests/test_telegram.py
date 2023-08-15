@@ -33,10 +33,11 @@ class TestTelegram(TestCase):
                                   opening_time=time(9,0),
                                   closing_time=time(17,30)
                                   )
-        c=Currency.objects.create(name="euro")
+        c=Currency.objects.create(name="euro",symbol="EUR")
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         cat2=ActionCategory.objects.create(name="actions",short="ETFLONG")
         cat3=ActionCategory.objects.create(name="actions",short="ETFSHORT")
+        cat4=ActionCategory.objects.create(name="index",short="IND") #other check_index will crash
         
         strategy=Strategy.objects.create(name="none")
         s=ActionSector.objects.create(name="sec")

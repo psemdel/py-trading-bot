@@ -74,7 +74,7 @@ class Opt(OptMain):
            best_ret_cand: table containing the return of the best candidate by the strategy array presently tested
            best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
            dic: key of the dictionnary to be called: "learning", "test", "total"...
-           #bypass_tested_arrs: should the function tested_arrs be bypassed
+           bypass_tested_arrs: should the function tested_arrs be bypassed
         '''
         try:
             if (not self.check_tested_arrs()) and not "test" in dic and not bypass_tested_arrs:

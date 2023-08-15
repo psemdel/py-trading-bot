@@ -99,6 +99,7 @@ class Opt(OptMain):
             best_arrs_ret,
             dic: str="learn",
             verbose: bool=False,
+            bypass_tested_arrs: bool=False
             )-> (list, list):
         '''
         To calculate a portfolio from strategy arrays
@@ -109,7 +110,7 @@ class Opt(OptMain):
            best_ret_cand: table containing the return of the best candidate by the strategy array presently tested
            best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
         '''
-        if not self.check_tested_arrs():
+        if not self.check_tested_arrs() and not "test" in dic and not bypass_tested_arrs:
             print("return tested _arrs")
             return best_arrs_cand, best_ret_cand
         

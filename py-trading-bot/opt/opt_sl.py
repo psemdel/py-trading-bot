@@ -17,6 +17,7 @@ class Opt(OptStrat):
     def calculate_pf(
             self, 
             sl: numbers.Number=None,
+            **kwargs
             ):
         self.defi_ent("learn")
         self.defi_ex("learn")

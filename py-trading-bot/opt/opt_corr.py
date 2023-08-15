@@ -55,11 +55,14 @@ class Opt(OptStrat):
            ind: index
         '''
         for ii, arr in enumerate(corr_arrs[ind]):
-            for d in ["close","open","low","high"]:
+            for d in ["close","open","low","high","data"]:
                 for dic in ["learn","test"]:
                     prefix=dic+"_"
-                    getattr(self,d+"_dic")[ind][prefix+"part_"+str(self.number_of_parts+ii)]=getattr(self,d+"_dic")[ind][dic][arr]
-                    self.macro_trend[ind][prefix+"part_"+str(self.number_of_parts+ii)]=self.macro_trend[ind][dic][arr]
+                    if d=="data":
+                        getattr(self,d+"_dic")[ind][prefix+"part_"+str(self.number_of_parts+ii)]=getattr(self,d+"_dic")[ind][dic].select(arr)
+                        self.macro_trend[ind][prefix+"part_"+str(self.number_of_parts+ii)]=self.macro_trend[ind][dic][arr]
+                    else:    
+                        getattr(self,d+"_dic")[ind][prefix+"part_"+str(self.number_of_parts+ii)]=getattr(self,d+"_dic")[ind][dic][arr]
 
 def cluster_corr(corr_array, inplace=False):
     """
