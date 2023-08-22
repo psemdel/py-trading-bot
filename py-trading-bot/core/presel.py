@@ -57,7 +57,6 @@ def name_to_ust_or_presel(
                 else:
                     PR=getattr(sys.modules[__name__],ust_or_presel_name)
                     pr=PR(period,st=st,**kwargs)
-                    
                 pr.run()
                 return pr
             else:
@@ -447,16 +446,17 @@ class Presel():
 
                 ##only_exit_substrat
                 if len(pf)>0:
-                    r.concat("symbols in "+self.st.name+" strategy: " +str(pf) + " direction: "+ str(short))
+                    r.concat("symbols in "+self.st.name+" strategy: " +str(pf) + " direction: "+ short_to_str[short])
                     for symbol in self.ust.symbols:
                         if self.ust.symbols_to_YF[symbol] in pf: 
                             o=self.get_order(symbol, self.st.name)
                             symbol_complex_ex=self.ust.symbols_simple_to_complex(symbol,"ex")  
                             symbol_complex_ent=self.ust.symbols_simple_to_complex(symbol,"ent")  
-                            target_order=self.get_last_exit(o.entering_date, symbol_complex_ent, symbol_complex_ex, short)
-                            if target_order==0: #exit
-                                r.ss_m.add_target_quantity(symbol,self.st.name, target_order)     
-
+                            if o is not None:
+                                target_order=self.get_last_exit(o.entering_date, symbol_complex_ent, symbol_complex_ex, short)
+                                if target_order==0: #exit
+                                    r.ss_m.add_target_quantity(symbol,self.st.name, target_order)   
+    
 class PreselMacro(Presel):
     '''
     Parent class for preselection relying on trends
@@ -670,7 +670,6 @@ class PreselRetardKeep(Presel):
     def perform(self,r):
         #entry is handled by retard
         self.perform_only_exit(r)
-        
 
 class PreselDivergence(Presel):
     '''

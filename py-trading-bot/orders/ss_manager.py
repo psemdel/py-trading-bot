@@ -16,7 +16,6 @@ from orders.ib import OrderPerformer
 from trading_bot.settings import _settings
 
 import logging
-from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 '''
@@ -114,10 +113,10 @@ class StockStatusManager():
                             self.target_ss.loc[i,"norm_quantity"]=df.loc[i,c]
                             
                             if self.present_ss.loc[i,"quantity"]==0 or np.isnan(float(self.present_ss.loc[i,"quantity"])): #float required for decimals
-                                present_norm_quantity=Decimal(0)
+                                present_norm_quantity=0
                             else:
                                 present_norm_quantity=self.present_ss.loc[i,"quantity"]/abs(self.present_ss.loc[i,"quantity"])
-                            self.target_ss.loc[i,"norm_delta_quantity"]=Decimal(float(self.target_ss.loc[i,"norm_quantity"]))-present_norm_quantity
+                            self.target_ss.loc[i,"norm_delta_quantity"]=float(self.target_ss.loc[i,"norm_quantity"])-present_norm_quantity
     
                 if it_is_index:
                     #If index, we have to move the order from the index to the etf
@@ -135,7 +134,7 @@ class StockStatusManager():
                         self.target_ss.loc[etf,"priority"]=self.target_ss.loc[i,"priority"]
                         
                         if self.present_ss.loc[etf,"quantity"]==0 or np.isnan(float(self.present_ss.loc[etf,"quantity"])): #float required for decimals
-                            present_norm_quantity=Decimal(0)
+                            present_norm_quantity=0
                         else:
                             present_norm_quantity=self.present_ss.loc[etf,"quantity"]/abs(self.present_ss.loc[etf,"quantity"])
                         self.target_ss.loc[etf,"norm_delta_quantity"]=self.target_ss.loc[i,"norm_quantity"]-present_norm_quantity
@@ -207,7 +206,7 @@ class StockStatusManager():
                     op= OrderPerformer(
                         symbol,
                         row["strategy_id"],
-                        Decimal(row["norm_quantity"])*st.target_order_size,
+                        row["norm_quantity"]*st.target_order_size,
                         testing=testing
                         )
                     out=op.sell_order()
@@ -223,7 +222,7 @@ class StockStatusManager():
                     op= OrderPerformer(
                         symbol,
                         row["strategy_id"],
-                        Decimal(row["norm_quantity"])*st.target_order_size,
+                        row["norm_quantity"]*st.target_order_size,
                         testing=testing
                         )
                     out=op.buy_order()

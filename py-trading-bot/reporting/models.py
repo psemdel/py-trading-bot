@@ -421,6 +421,8 @@ class Report(models.Model):
             _, e_, exc_tb = sys.exc_info()
             print(e)
             print("line " + str(exc_tb.tb_lineno))
+            import traceback
+            print(traceback.format_exc())
             logger.error("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
             logger.error(e, stack_info=True, exc_info=True)
             self.concat("daily_report, exchange: "+str(exchange) + " crashed, check the logs")
@@ -463,20 +465,20 @@ class ActionReport(models.Model):
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
     action=models.ForeignKey('orders.Action',on_delete=models.CASCADE, null=True,default=None)
     #for Trend
-    vol=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
-    bbands_bandwidth=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
-    trend=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
-    macro_trend=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
+    vol=models.FloatField(default=0.0)
+    bbands_bandwidth=models.FloatField( default=0.0)
+    trend=models.FloatField( default=0.0)
+    macro_trend=models.FloatField( default=0.0)
     
-    kama_dir=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
+    kama_dir=models.FloatField( default=0.0)
     
-    three_mo_evol=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
-    three_mo_evol_sm=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
-    one_mo_evol=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
-    one_mo_evol_sm=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
+    three_mo_evol=models.FloatField( default=0.0)
+    three_mo_evol_sm=models.FloatField( default=0.0)
+    one_mo_evol=models.FloatField( default=0.0)
+    one_mo_evol_sm=models.FloatField( default=0.0)
     
     #for Decision
-    stoch=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
+    stoch=models.FloatField(default=0.0)
     pattern_ent=models.BooleanField(blank=False,default=False) #not used
     pattern_ex=models.BooleanField(blank=False,default=False) #not used
     pattern_light_ent=models.BooleanField(blank=False,default=False)
