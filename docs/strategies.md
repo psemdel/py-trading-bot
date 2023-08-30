@@ -16,9 +16,12 @@ Following inputs can be defined:
 - priority: figure to rank the strategies by priority. Lower figure has higher priority. Concretely, if the report calculated lead to the performance of 2 orders but you have money for only one, it will define which one to execute.
 - target_order_size: which order size in the base currency should be performed. For instance 1000, with base currency EUR, will perform order of 1000 euros
 - minimum_order_size: if the target_order_size cannot be reached (not enough money), what is minimum size of the trade which should lead to a trade execution
-- maximum_money_engaged: maximum total money that can be engaged in this strategy. To avoid having all the money invested in one strategy.
+- maximum_money_engaged: maximum total money that can be engaged in this strategy / stock exchange. To avoid having all the money invested in one strategy.
 - sl_threshold: stop loss threshold for orders performed with this strategy
 - daily_sl_threshold: daily stop loss threshold for orders performed with this strategy
+- option_share_per: percentage of the order that should be performed with options instead of stocks
+- option_min_days_distance: minimum time in day between now and option expiration
+- option_max_strike_distance_per: maximum difference between present stock price and option strike price
 
 ## Algorithm introduction
 Fundamentally the bot differentiate two types of strategies:
@@ -78,9 +81,6 @@ This indicator will create an entry when fast_ma crosses above slow_ma, and an e
 ### Strategy array
 Simple strategies are easy to understand, but they can be quite limited. Combination of different indicators can provide better results, without much more complexity. The bot provides the possibility to optimise combination of signals for certain stocks (see the [documentation about optimization](https://github.com/psemdel/py-trading-bot/blob/main/docs/optimization.md). The combination is always using OR, so signal1 or signal2 or ... A combination is represented by an array, as following:
 
-    index 0-21: entry
-    index 22-end: exit
-        
     Index 0-6, same for entry and exit
     0: moving average
     1: stochastic oscillator
@@ -90,8 +90,8 @@ Simple strategies are easy to understand, but they can be quite limited. Combina
     5: RSI with threshold 20/80
     6: RSI with threshold 30/70
     
-    Index: 7-21, see BULL_PATTERNS in constants.py
-    Index: 29-end, see BEAR_PATTERNS in constants.py
+    Index for ent: 7-21, see BULL_PATTERNS in constants.py
+    Index for ex: 7-21, see BEAR_PATTERNS in constants.py
     
 For instance:
 
@@ -102,11 +102,14 @@ For instance:
         def __init__(self,
                      period: numbers.Number,
                      **kwargs):
-            a=[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-           0., 0., 0., 0., 0., 
-               0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 
-           0., 0., 0., 0., 0.]
-            super().__init__(period,strat_arr_simple=a,**kwargs )    
+
+            a={"simple":
+               {"ent":[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                "ex": [0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+               }
+              }
+
+            super().__init__(period,strat_arr=a,**kwargs )
 
 Uses RSI with threshold 20/80 for the entries and exits. It is perfectly equivalent to StratRSI presented above.
 
@@ -118,30 +121,31 @@ The trend calculation is explained in the corresponding documentation. It sorts 
     class StratG(UnderlyingStrat):    
         '''
         Strategy optimized to have the best yield used alone on stocks
-    
+        
         In long/both/both, Optimized on 2007-2023, CAC40 7.58 (3.13 bench), DAX 2.31 (1.68), NASDAQ 19.88 (12.1), IT 15.69 (8.44)
         '''
         def __init__(self,
                      period: numbers.Number,
                      **kwargs):
-            a_bull=[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1.,
-                    1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                    0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
-            a_bear= [0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
-             1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
-             1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-            a_uncertain=  [0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 0.,
-             1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-             0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
-        
+            
+            a={"bull":
+               {"ent":[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1., 1., 1., 0., 0., 0., 1.],
+                "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
+               },
+              "bear":
+                 {"ent":[0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1., 1., 0., 1., 0., 1., 0.],
+                  "ex": [0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+                 },
+              "uncertain":
+                 {"ent":[0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 0., 1., 0., 1., 0., 1., 1.],
+                  "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
+                 },             
+              }        
+            
             super().__init__(
                 period,
-                strat_arr_bull=a_bull,
-                strat_arr_bear=a_bear,
-                strat_arr_uncertain=a_uncertain,
-                **kwargs ) 
-
-The strategy array a_bull is used for bull, a_bear for bear and a_uncertain for uncertain trends.
+                strat_arr=a,
+                **kwargs )   
 
 Concerning the direction, by default the following is configured:
 
@@ -160,9 +164,7 @@ To change this, just change the super().__init__ function presented above:
 
     super().__init__(
                 period,
-                strat_arr_bull=a_bull,
-                strat_arr_bear=a_bear,
-                strat_arr_uncertain=a_uncertain,
+                strat_arr=a,
                 dir_bull="long",
                 dir_bear="short",
                 dir_uncertain="long",

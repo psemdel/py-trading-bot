@@ -65,27 +65,22 @@ def daily_report(
        request: incoming http request
        exchange: name of the stock exchange
     '''  
-    try:
-        s_ex=StockEx.objects.get(name=exchange)
-        a="strategies_in_use"
-        print("writting daily report "+s_ex.name)
-        if s_ex.presel_at_sector_level:
-            for sec in ActionSector.objects.all():
-                strats=getattr(sec,a).all()
-                if len(strats)!=0: #some strategy is activated for this sector
-                    print("starting report " + sec)
-                    daily_report_sub(s_ex.name,sec=sec)
-        else:
-            strats=getattr(s_ex,a).all()
-            if len(strats)!=0: 
-                daily_report_sub(s_ex.name)
+    s_ex=StockEx.objects.get(name=exchange)
+    a="strategies_in_use"
+    print("writting daily report "+s_ex.name)
+    if s_ex.presel_at_sector_level:
+        for sec in ActionSector.objects.all():
+            strats=getattr(sec,a).all()
+            if len(strats)!=0: #some strategy is activated for this sector
+                print("starting report " + sec)
+                daily_report_sub(s_ex.name,sec=sec)
+    else:
+        strats=getattr(s_ex,a).all()
+        if len(strats)!=0: 
+            daily_report_sub(s_ex.name)
 
-        daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
-        return render(request, 'reporting/success_report.html')
-
-    except Exception as e:
-        print(e)
-        pass
+    daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
+    return render(request, 'reporting/success_report.html')
 
 def send_order_test(report):
     '''

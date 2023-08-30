@@ -12,28 +12,32 @@ class TestOptByPart(TestCase):
     def test_by_part(self):
         self.o=opt_by_part.Opt("2007_2022_08",
                          loops=1,
-                         testing=True)
+                         testing=True,
+                         filename="test")
         self.o.outer_perf()   
 
 class TestOptPressel(TestCase):
     def test_pressel(self):
         self.o=opt_presel.Opt("PreselHistVol","2007_2022_08",
                          loops=1,
-                         testing=True)
+                         testing=True,
+                         filename="test")
         self.o.perf()
 
 class TestOptMacro(TestCase):
     def test_macro(self):
         self.o=opt_macro.Opt("2007_2022_08",
                          loops=1,
-                         testing=True)
+                         testing=True,
+                         filename="test")
         self.o.perf()        
 
 class TestOptDiv(TestCase):
     def test_div(self):
         self.o=opt_presel.Opt("PreselDivergence","2007_2022_08",
                          loops=1,
-                         testing=True)
+                         testing=True,
+                         filename="test")
         self.o.perf()
         
 class TestOptCorr(TestCase):
@@ -42,7 +46,8 @@ class TestOptCorr(TestCase):
                          indexes="CAC40",
                          loops=1,
                          nb_macro_modes=3,
-                         testing=True)
+                         testing=True,
+                         filename="test")
         self.o.outer_perf()           
  
 class TestOptSymbols(TestCase):
@@ -52,7 +57,11 @@ class TestOptSymbols(TestCase):
                          ['AC', 'ATO', 'RNO'],
                          loops=1,
                          nb_macro_modes=3,
-                         testing=True)
+                         testing=True,
+                         filename="test")
         self.o.outer_perf()  
+        
+        
+#+keep
 
         

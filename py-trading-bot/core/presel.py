@@ -162,9 +162,13 @@ class Presel():
         self.symbols_simple=self.close.columns.values
         
         self.candidates={
-            "long":[[] for ii in range(len(self.close))],
-            "short":[[] for ii in range(len(self.close))]
+            "long":{},
+            "short":{}
             }
+        
+        for i in self.close.index:
+            self.candidates["long"][i]=[]
+            self.candidates["short"][i]=[]
         
         self.excluded=[]
         self.hold_dur=0#{}
@@ -193,9 +197,20 @@ class Presel():
             setattr(self,k,pd.DataFrame.vbt.empty_like(self.close, fill_value=False))   
         
     def get_candidates(self):
-        return self.candidates["long"][-1], self.candidates["short"][-1]   
+        '''
+        Return the last candidates
+        '''
+        return self.candidates["long"][self.close.index[-1]] , self.candidates["short"][self.close.index[-1]] 
         
     def symbols_simple_to_complex(self,symbol_simple,ent_or_ex):
+        '''
+        Transform simple symbol for instance MSFT in the title of the corresponding column in ust for instance (True, False, 'MSFT')
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            ent_or_ex: entry or exit
+        '''
         if "entries" not in self.ust.__dir__():
             self.ust.run()
 
@@ -204,7 +219,7 @@ class Presel():
             
     def calculate(
             self,
-            ii,
+            i,
             short:bool=False,
             ): #day basis
         '''
@@ -217,35 +232,35 @@ class Presel():
         
         Arguments
         ----------
-            ii: index
+            i: index
             short: order direction
         '''
         #all presel strat are monodirectionel
-        #So if the trends reverse, the opposite direction should be empty
+        #So if the trends reverse, the opposite direction should be emptied
         #clean at the same time the excluded
         
         try:
             if short:
                 for symbol_simple in self.pf["long"]:
-                    self.exits[symbol_simple].iloc[ii]=True
+                    self.exits.loc[i,symbol_simple]=True
                     self.capital+=self.order_size
                     self.pf["long"].remove(symbol_simple)
                     self.hold_dur=0
                 for symbol_simple in self.pf["short"]:
                     if symbol_simple in self.excluded:
-                        self.exits_short[symbol_simple].iloc[ii]=True
+                        self.exits_short.loc[i,symbol_simple]=True
                         self.capital+=self.order_size
                         self.pf["short"].remove(symbol_simple)
                         self.hold_dur=0
             else:
                 for symbol_simple in self.pf["short"]:
-                    self.exits_short[symbol_simple].iloc[ii]=True
+                    self.exits_short.loc[i,symbol_simple]=True
                     self.capital+=self.order_size
                     self.pf["short"].remove(symbol_simple)
                     self.hold_dur=0
                 for symbol_simple in self.pf["long"]:
                     if symbol_simple in self.excluded:
-                        self.exits[symbol_simple].iloc[ii]=True  
+                        self.exits.loc[i,symbol_simple]=True  
                         self.capital+=self.order_size
                         self.pf["long"].remove(symbol_simple)
                         self.hold_dur=0
@@ -255,58 +270,66 @@ class Presel():
             for symbol_simple in self.pf[short_to_str[short]]:
                 symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ex")
     
-                if ((not self.no_ust and not short and self.ust.exits[symbol_complex].values[ii]) or  #not short and 
-                   (not self.no_ust and short and self.ust.exits_short[symbol_complex].values[ii]) or
-                    (self.no_ust and symbol_simple not in self.candidates[short_to_str[short]][ii])):
+                if ((not self.no_ust and not short and self.ust.exits.loc[i, symbol_complex]) or  #not short and 
+                   (not self.no_ust and short and self.ust.exits_short.loc[i, symbol_complex]) or
+                    (self.no_ust and symbol_simple not in self.candidates[short_to_str[short]][i])):
        
                     self.pf[short_to_str[short]].remove(symbol_simple)
                     self.capital+=self.order_size
                     
                     if short:
-                        self.exits_short[symbol_simple].iloc[ii]=True 
+                        self.exits_short.loc[i,symbol_simple]=True 
                     else:
-                        self.exits[symbol_simple].iloc[ii]=True
+                        self.exits.loc[i,symbol_simple]=True
     
                     self.hold_dur=0 
                 else:
                     self.hold_dur+=1
     
             #entry
-            for symbol_simple in self.candidates[short_to_str[short]][ii]:
+            for symbol_simple in self.candidates[short_to_str[short]][i]:
                 symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
     
                 if (self.capital>=self.order_size and
                     ((self.no_ust or self.only_exit_ust) or
-                    (not short and self.ust.entries[symbol_complex].values[ii]) or
-                    (short and self.ust.entries_short[symbol_complex].values[ii])) and
+                    (not short and self.ust.entries.loc[i,symbol_complex]) or
+                    (short and self.ust.entries_short.loc[i,symbol_complex])) and
                     symbol_simple not in self.excluded):
     
                     self.pf[short_to_str[short]].append(symbol_simple)
                     self.capital-=self.order_size
                     
                     if short:
-                        self.entries_short[symbol_simple].iloc[ii]=True
+                        self.entries_short.loc[i,symbol_simple]=True
                     else:
-                        self.entries[symbol_simple].iloc[ii]=True
+                        self.entries.loc[i,symbol_simple]=True
         
         except Exception as e:
-              _, e_, exc_tb = sys.exc_info()
-              print(e)
-              print("line " + str(exc_tb.tb_lineno))     
+              logger.error(e, stack_info=True, exc_info=True)     
                      
-    def presub(self,ii:int):
+    def presub(self,i:str):
         '''
         Used in run to add a function there if needed
+        
+        Arguments
+        ----------
+            i: index
         '''
         pass
     
-    def sorting(self, ii:int, **kwargs):
+    def sorting(self, i:str, **kwargs):
         print("sorting function is not defined at parent level")
         pass
     
-    def supplementary_criterium(self,symbol_simple: str,ii: int,v,**kwargs)-> bool:
+    def supplementary_criterium(self,symbol_simple: str,i: str,v,**kwargs)-> bool:
         '''
         Add a supplementary test to be checked before adding a candidate
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
         '''
         return True
     
@@ -319,6 +342,10 @@ class Presel():
     def underlying_creator(self,f_name: str):
         '''
         Wrapper around underlying
+        
+        Arguments
+        ----------
+            f_name: name of the underlying strategy to be called
         '''
         f=getattr(strat,f_name)
         if self.prd:
@@ -330,45 +357,54 @@ class Presel():
 
     def sub(
             self, 
-            ii:int,
+            i:int,
             short=False
             ) -> list:
         '''
         Function called at every step of the calculation, handle the filling of candidates array
+        
+        Arguments
+        ----------
+            i: index
+            short: order direction        
         '''
-        self.candidates[short_to_str[short]][ii]=[]
-        self.sorting(ii, short=short)
+        self.sorting(i, short=short)
 
         for e in self.sorted:
             symbol_simple=e[0]
-    
-            if (len(self.candidates[short_to_str[short]][ii])<self.max_candidates_nb and
+
+            if (len(self.candidates[short_to_str[short]][i])<self.max_candidates_nb and
                symbol_simple not in self.excluded and
-               self.supplementary_criterium(symbol_simple, ii, e[1], short=short)
+               self.supplementary_criterium(symbol_simple, i, e[1], short=short)
                ) :
                if ((not self.blocked and not self.blocked_im) or 
                    ((self.blocked or self.blocked_im) and not short)):
 
-                   self.candidates[short_to_str[short]][ii].append(symbol_simple)
+                   self.candidates[short_to_str[short]][i].append(symbol_simple)
 
         return self.sorted #for display
     
     def run(self,skip_underlying:bool=False,**kwargs):
         '''
         Main function for presel
+        
+        Arguments
+        ----------        
+            skip_underlying: Don't run the underlying function when optimizing it, as it was already calculated separately
         '''
         try:
             if not skip_underlying:
                 self.underlying()
+                
             if self.prd and not self.calc_all:
-                ii=len(self.close)-1
-                self.presub(ii)
-                self.out=self.sub(ii,**kwargs)
+                i=self.close.index[-1]
+                self.presub(i)
+                self.out=self.sub(i,**kwargs)
             else:
-                for ii in range(len(self.close.index)):
-                    self.presub(ii)
-                    self.out=self.sub(ii,**kwargs)
-                    self.calculate(ii,**kwargs)
+                for i in self.close.index:
+                    self.presub(i)
+                    self.out=self.sub(i,**kwargs)
+                    self.calculate(i,**kwargs)
             
         except Exception as e:
               import sys
@@ -377,9 +413,15 @@ class Presel():
               print("line " + str(exc_tb.tb_lineno))
               
     def perform_cand_entry(self,r):
+        """
+        Function to transform a candidate in an entry order. Interface with ss_m.
+        
+        Arguments
+        ----------
+            r: report
+        """
         candidates, _=self.get_candidates()
         r.ss_m.cand_to_quantity_entry(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.st.name, False)
-    
   
     def get_order(self,symbol: str, strategy:str):
         from django.db.models import Q
@@ -389,7 +431,8 @@ class Presel():
         
         Arguments
         ----------
-        buy: should the order buy or sell the stock
+            symbol: YF ticker of the stock           
+            strategy: name of the strategy
         """
         action=Action.objects.get(symbol=symbol)
         c1 = Q(action=action)
@@ -438,6 +481,13 @@ class Presel():
             return 1
               
     def perform_only_exit(self,r):
+        """
+        Decide to exit for strategy, where the underlying strategy is only used for exiting orders
+        
+        Arguments
+        ----------
+            r: report
+        """
         from orders.models import get_pf
         
         if not r.it_is_index and self.ust.exchange is not None: #index
@@ -471,28 +521,28 @@ class PreselMacro(Presel):
         self.underlying()
         
         if self.prd and not self.calc_all:
-            ii=len(self.close)-1
+            i=self.close.index[-1]
             
             if self.macro_trend_select=="ind_mod":
-                short=(self.macro_trend_ind_mod.values[ii]==1)
+                short=(self.macro_trend_ind_mod.loc[i]==1)
             else:
-                short=(self.macro_trend_ind.values[ii]==1)
+                short=(self.macro_trend_ind.loc[i]==1)
                 
-            self.presub(ii)
-            self.out=self.sub(ii,short=short,**kwargs)
-        for ii in range(len(self.close.index)):
+            self.presub(i)
+            self.out=self.sub(i,short=short,**kwargs)
+        for i in self.close.index:
             if self.macro_trend_select=="ind_mod":
-                short=(self.macro_trend_ind_mod.values[ii]==1)
+                short=(self.macro_trend_ind_mod.loc[i]==1)
             else:
-                short=(self.macro_trend_ind.values[ii]==1)
+                short=(self.macro_trend_ind.loc[i]==1)
             
-            self.presub(ii)
-            self.out=self.sub(ii,short=short,**kwargs)
+            self.presub(i)
+            self.out=self.sub(i,short=short,**kwargs)
             
             if self.blocked:
-                self.calculate(ii,short=False,**kwargs)
+                self.calculate(i,short=False,**kwargs)
             else: #self.blocked_im
-                self.calculate(ii,short=short,**kwargs)
+                self.calculate(i,short=short,**kwargs)
         return short #to be removed later
 
 class PreselVol(Presel):
@@ -508,10 +558,10 @@ class PreselVol(Presel):
     def underlying(self):
         self.underlying_creator("StratKamaStochMatrendBbands")
         
-    def sorting(self,ii: int,**kwargs):
+    def sorting(self,i: str,**kwargs):
         v={}
         for symbol in self.close.columns.values:
-            v[symbol]=self.vol[symbol].values[ii]
+            v[symbol]=self.vol[symbol].loc[i]
         self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
 
 class PreselMacdVol(PreselVol):
@@ -525,8 +575,17 @@ class PreselMacdVol(PreselVol):
             self.macd_tot=vbt.MACD.run(self.close, macd_wtype='simple',signal_wtype='simple')
         self.max_candidates_nb=_settings["MACD_VOL_MAX_CANDIDATES_NB"]
         
-    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
-        return self.macd_tot.macd[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0 
+    def supplementary_criterium(self,symbol_simple, i,v, short=False):
+        '''
+        Add a supplementary test to be checked before adding a candidate
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
+        '''        
+        return self.macd_tot.macd[('simple','simple',symbol_simple)].loc[i]*short_to_sign[short]>0 
     
     def perform(self, r):
         candidates, candidates_short=self.get_candidates()
@@ -571,8 +630,17 @@ class PreselHistVol(PreselMacdVol):
     def underlying(self):
         self.underlying_creator("StratF")           
     
-    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
-        return self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0
+    def supplementary_criterium(self,symbol_simple, i,v, short=False):
+        '''
+        Add a supplementary test to be checked before adding a candidate
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
+        '''
+        return self.macd_tot.hist[('simple','simple',symbol_simple)].loc[i]*short_to_sign[short]>0
 
 class PreselMacdVolMacro(PreselMacdVol):
     def __init__(self,period: str,**kwargs):
@@ -602,21 +670,20 @@ class PreselRetard(Presel):
 
     def sorting(
             self,
-            ii: int, 
+            i: str, 
             short: bool=False,
             **kwargs
             ):
         
         v={}   
         for symbol in self.close.columns.values:
-            v[symbol]=self.dur[symbol].values[ii]
+            v[symbol]=self.dur.loc[i,symbol]
             if symbol in self.excluded: #if exclude take the next
                 if v[symbol]==0: #trend change
                     self.excluded.remove(symbol)
-   
         self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=not short)
                       
-    def presub(self,ii:int):
+    def presub(self,i:int):
         for key in ["long","short"]:
             for s in self.pf[key]:
                 if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
@@ -659,7 +726,7 @@ class PreselRetardKeep(Presel):
         self.strategy="retard_keep"
         
     def underlying(self):
-        self.underlying_creator("StratG")    
+        self.underlying_creator("StratKeep")    
     
     def run(self,**kwargs):
         '''
@@ -671,6 +738,22 @@ class PreselRetardKeep(Presel):
         #entry is handled by retard
         self.perform_only_exit(r)
         
+
+class PreselRetardKeepBT(PreselRetardMacro):
+    '''
+    Only for backtesting purpose
+    '''
+    def underlying(self):
+        self.underlying_creator("StratKeep")    
+        
+    def run(self,**kwargs):
+        super().run(**kwargs)
+        self.underlying()
+
+        self.entries=self.exits
+        self.exits=self.ust.exits
+        self.entries_short=ic.VBTFALSE.run(self.close).out #self.exits_short 
+        self.exits_short=ic.VBTFALSE.run(self.close).out #self.ust.exits_short
 
 class PreselDivergence(Presel):
     '''
@@ -695,18 +778,27 @@ class PreselDivergence(Presel):
         
     def sorting(
             self,
-            ii: int, 
+            i: str, 
             short: bool=False,
             **kwargs
             ):
         
         v={}   
         for symbol in self.close.columns.values:
-            v[symbol]=self.divergence[symbol].values[ii]
-   
+            v[symbol]=self.divergence.loc[i,symbol]
+    
         self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=short)
+
+    def supplementary_criterium(self,symbol_simple, i, v, short=False):
+        '''
+        Add a supplementary test to be checked before adding a candidate
         
-    def supplementary_criterium(self,symbol_simple, ii, v, short=False):
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
+        '''
         if short:
             return v> self.threshold
         else:
@@ -715,7 +807,6 @@ class PreselDivergence(Presel):
     def calc(self,**kwargs):
         #only exit
         self.calculate(only_exit_ust=True,**kwargs)
-        
         
     def perform(self, r):
         self.perform_only_exit(r)
@@ -770,28 +861,28 @@ class PreselSlow(Presel):
         
         self.underlying()
         if not self.prd:
-            for ii in range(len(self.close.index)):
+            for ii, i in enumerate(self.close.index):
                 if ii%self.frequency==0: #every 10 days
-                    self.sorting(ii)
+                    self.sorting(i)
                     
                     if self.blocked:
                         if self.macro_trend_select=="ind_mod":
-                            short=(self.macro_trend_ind_mod.values[ii]==1)
+                            short=(self.macro_trend_ind_mod.loc[i]==1)
                         else:
-                            short=(self.macro_trend_ind.values[ii]==1)
+                            short=(self.macro_trend_ind.loc[i]==1)
 
                     for e in self.sorted:
                         symbol_simple=e[0]
-                        
-                        if (len(self.candidates[short_to_str[short]][ii])<self.max_candidates_nb and
-                           self.supplementary_criterium(symbol_simple, ii, e[1], short=short)
+
+                        if (len(self.candidates[short_to_str[short]][i])<self.max_candidates_nb and
+                           self.supplementary_criterium(symbol_simple, i, e[1], short=short)
                            ):
                             if not self.blocked or (self.blocked and not short):
-                                self.candidates[short_to_str[short]][ii].append(symbol_simple)
+                                self.candidates[short_to_str[short]][i].append(symbol_simple)
                 else:
                     if not self.blocked or (self.blocked and not short):
-                        self.candidates[short_to_str[short]][ii]=self.candidates[short_to_str[short]][ii-1]
-                self.calculate(ii,**kwargs)   
+                        self.candidates[short_to_str[short]][i]=self.candidates[short_to_str[short]][self.close.index[ii-1]]
+                self.calculate(i,**kwargs)   
                 
     def perform_entry(self,r):
         from orders.models import get_candidates #from the DB not this calculation
@@ -826,8 +917,8 @@ class PreselVolSlow(PreselSlow):
     def underlying(self):
         self.underlying_creator("StratF")
         
-    def sorting(self,ii: int,**kwargs):
-        PreselVol.sorting(self,ii)
+    def sorting(self,i: str,**kwargs):
+        PreselVol.sorting(self,i)
    
 class PreselMacdVolSlow(PreselVolSlow):
     def __init__(self,period,**kwargs):
@@ -840,8 +931,17 @@ class PreselMacdVolSlow(PreselVolSlow):
     def underlying(self):
         self.underlying_creator("StratKamaStochMatrendBbands")
         
-    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
-        return self.macd_tot.macd[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0 
+    def supplementary_criterium(self,symbol_simple, i,v, short=False):
+        '''
+        Add a supplementary test to be checked before adding a candidate
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
+        '''
+        return self.macd_tot.macd[('simple','simple',symbol_simple)].loc[i]*short_to_sign[short]>0 
         
 class PreselHistVolSlow(PreselMacdVolSlow):
     def __init__(self,period,**kwargs):
@@ -852,8 +952,17 @@ class PreselHistVolSlow(PreselMacdVolSlow):
     def underlying(self):
         self.underlying_creator("StratE")
          
-    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
-        return self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0 
+    def supplementary_criterium(self,symbol_simple, i,v, short=False):
+        '''
+        Add a supplementary test to be checked before adding a candidate
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
+        '''
+        return self.macd_tot.hist[('simple','simple',symbol_simple)].loc[i]*short_to_sign[short]>0 
     
     def actualize(self):
         '''
@@ -861,13 +970,13 @@ class PreselHistVolSlow(PreselMacdVolSlow):
         '''
         cand=super().actualize("hist_slow")
         short=False
-        ii=-1
-        
-        self.sorting(ii)
+
+        i=self.close.index[-1]
+        self.sorting(i)
         for e in self.sorted:
             symbol_simple=e[0]
             if (len(cand.retrieve())<self.max_candidates_nb and
-               self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0):
+               self.macd_tot.hist[('simple','simple',symbol_simple)].loc[i]*short_to_sign[short]>0):
                     cand.append(symbol_simple)   
 
 class PreselRealMadrid(PreselSlow):
@@ -888,14 +997,14 @@ class PreselRealMadrid(PreselSlow):
 
     def sorting(
             self,
-            ii: int, 
+            i: str, 
             short: bool=False,
             **kwargs
             ):
         
         v={}   
         for symbol in self.close.columns.values:
-            v[symbol]=self.grow[(self.distance,True,symbol)].values[ii]
+            v[symbol]=self.grow[(self.distance,True,symbol)].loc[i]
    
         self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=True)   
         
@@ -910,10 +1019,8 @@ class PreselRealMadrid(PreselSlow):
             self.excluded=Excluded.objects.get(name="realmadrid").retrieve()
         except:
             self.excluded=[]
-            
-        ii=-1
-        
-        self.sorting(ii)    
+
+        self.sorting(self.close.index[-1])    
         for e in self.sorted:
             symbol_simple=e[0]
             if (len(cand.retrieve())<self.max_candidates_nb and
@@ -956,14 +1063,14 @@ class PreselWQ(Presel):
         
     def sub(
             self, 
-            ii:int,
+            i:int,
             ) -> list:
         '''
         Function called at every step of the calculation, handle the filling of candidates array
         '''
-        if not np.isnan(self.wb_out.iloc[ii].values).all():
-            ind_max=np.nanargmax(self.wb_out.iloc[ii].values)
-            self.candidates["long"][ii]=[self.wb_out.columns[ind_max]]
+        if not np.isnan(self.wb_out.loc[i].values).all():
+            ind_max=np.nanargmax(self.wb_out.loc[i].values)
+            self.candidates["long"][i]=[self.wb_out.columns[ind_max]]
 
     def underlying(self):
         pass
@@ -984,7 +1091,7 @@ class PreselWQ(Presel):
         strats=Strategy.objects.filter(name=strategy) #normally there should be only one
         if len(strats)>0 and strats[0] in stock_ex.strategies_in_use.all():
             self.run()
-            candidates=self.candidates["long"][-1]
+            candidates=self.candidates["long"][self.close.index[-1]] 
             
             r.ss_m.order_nosubstrat(
                 candidates_to_YF(self.ust.symbols_to_YF,candidates), 

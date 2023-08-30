@@ -1,5 +1,5 @@
 ### Setting of the trading bot ###
-import os
+import os, sys
 
 _settings={
       
@@ -193,7 +193,7 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb'),
+        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb2023'),
         'USER': DB_USER,
         'PASSWORD': DB_SECRET_KEY,
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
@@ -307,16 +307,22 @@ LOGGING = {
                 'class': 'logging.FileHandler',
                 'filename': 'logs/trade.log',
                  'formatter': 'trade_format',
-            },       
+            },  
+       'console': {
+               'level': 'INFO',
+               'class': 'logging.StreamHandler',
+               'stream': sys.stdout,
+               'formatter': 'default',
+               },
     },
     'loggers': {
         '': {
-            'handlers': ['info_file', 'warning_file'],
+            'handlers': ['info_file', 'warning_file', 'console'],
             'level': 'INFO',
             'propagate': True,
         },
        'trade': {
-           'handlers': ['trade_file'],
+           'handlers': ['trade_file', 'console'],
            'level': 'INFO',
            'propagate': True,
        }, 

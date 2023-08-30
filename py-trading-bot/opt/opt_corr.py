@@ -27,6 +27,7 @@ class Opt(OptStrat):
         self.number_of_parts=0
         corr_arrs={}
         for ind in self.indexes: #CAC, DAX, NASDAQ
+            
             _, corr_arrs[ind]=cluster_corr(self.close_dic[ind]["learn"].corr())
             self.split_in_part(corr_arrs,ind)
             self.number_of_parts+=len(corr_arrs[ind])
@@ -54,6 +55,7 @@ class Opt(OptStrat):
            corr_arrs: array where the symbols are gathered together depending on their correlation
            ind: index
         '''
+        self.defi_macro_trend("learn")
         for ii, arr in enumerate(corr_arrs[ind]):
             for d in ["close","open","low","high","data"]:
                 for dic in ["learn","test"]:

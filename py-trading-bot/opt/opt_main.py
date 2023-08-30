@@ -8,7 +8,7 @@ from vectorbtpro.utils.config import Config
 import numpy as np
 import gc
 import copy
-from core.constants import BEAR_PATTERNS, BULL_PATTERNS, mode_to_int
+from core.constants import BEAR_PATTERNS, BULL_PATTERNS, COL_DIC, bull_bear_to_int
 from core.common import remove_multi
 import itertools
 import pandas as pd
@@ -38,8 +38,6 @@ vbt.settings['caching']=Config(
     use_cached_accessors=True
 )
 
-
-
 class OptMain():
     def __init__(
             self,
@@ -49,7 +47,6 @@ class OptMain():
             indexes: list=["CAC40", "DAX", "NASDAQ","IT"],
             it_is_index: bool=False,
             nb_macro_modes:int=3,
-            predefined: bool=False, #to start from a predefined point
             loops:int=3,
             fees: numbers.Number=0.0005,
             dir_bull: str="long",
@@ -58,9 +55,7 @@ class OptMain():
             test_window_start_init: int=None,
             sl: numbers.Number=None,
             tsl: numbers.Number=None,
-            a_bull: list=None,
-            a_bear: list=None,
-            a_uncertain: list=None,
+            strat_arr: dict=None,
             filename: str="main",
             testing: bool=False,
             ):
@@ -78,7 +73,6 @@ class OptMain():
            indexes: main indexes used to download local data
            it_is_index: if True, it will select only the index to make the optimization
            nb_macro_modes: if set to 1, no trend is considered, normally 3 (bull/bear/uncertain)
-           predefined: set to true to use a_bull, a_bear and a_uncertain to start the optimization process. Otherwise a random array is generated
            loops: maximum number of loops to be performed (to limit the total computing time before having a result)
            fees: fees in pu
            dir_bull: direction to use during bull trend
@@ -87,13 +81,11 @@ class OptMain():
            test_window_start_init: index where the test window should start, random otherwise
            sl: stop loss threshold
            tsl: daily stop loss threshold
-           a_bull: starting strategy array for bull direction
-           a_bear: starting strategy array for bear direction
-           a_uncertain: starting strategy array for uncertain direction
+           strat_arr: array of the strategy combination to use, if defined then the loop will start from this arr
            testing: set to True to perform unittest on the function
         '''
         for k in ["ratio_learn_train","split_learn_train", "indexes", "it_is_index","nb_macro_modes",
-                  "predefined", "fees", "sl", "tsl", "filename","testing"]:
+                  "strat_arr","fees", "sl", "tsl", "filename","testing"]:
             setattr(self,k,locals()[k])
         #init
         for key in ["close","open","low","high","data"]:
@@ -102,6 +94,22 @@ class OptMain():
             for ind in self.indexes:
                 getattr(self,key+"_dic")[ind]={}
 
+        ind_str=""
+        for ind in self.indexes:
+            ind_str+=ind+"_"
+
+        text_it_is_index=""
+        if it_is_index:
+           text_it_is_index="index_" 
+
+        self.test_arrs_path=os.path.join(os.path.dirname(__file__), "tested_arrs/"+ind_str+ period+"_"+ 
+                                         text_it_is_index+ self.filename+".csv")
+        try:
+            self.test_arrs=pd.read_csv(self.test_arrs_path,index_col=0)
+        except:
+            self.test_arrs=None
+
+        self.row={}
         self.total_len={}
 
         for ind in self.indexes:
@@ -149,54 +157,46 @@ class OptMain():
         self.init_threshold=-1000 
         self.confidence_threshold=60
         self.non_pattern_len=7
-        self.len_ent=self.non_pattern_len+len(BULL_PATTERNS)
-        self.len_ex=self.non_pattern_len+len(BEAR_PATTERNS)
+
         
-        self.a_init={}
-        for key in ["bull","bear","uncertain"]:
-            self.a_init[key]=locals()["a_"+key]
+        #self.a_init={}
+        #for key in ["bull","bear","uncertain"]:
+        #    self.a_init[key]=locals()["a_"+key]
            
-        if self.predefined:
-            self.arrs=self.predef()
-            self.calc_arrs=copy.deepcopy(self.arrs)
+        if self.strat_arr is not None:
+            self.predef=True
+            self.arr=self.strat_arr
             self.loops=1
+            self.nb_macro_modes=len(self.strat_arr)
         else:
-            self.arrs=[] #arr of the last step, variation are performed afterwards
-            self.calc_arr=[] #for calculation in pf
+            self.predef=False
             self.loops=loops
-
-        self.init_best_arr()
-        
+            self.calc_arr=None
+            if self.nb_macro_modes==3:
+                self.arr={"bull":{"ent":[],"ex":[]},"bear":{"ent":[],"ex":[]},"uncertain":{"ent":[],"ex":[]}}
+            else:
+                self.arr={"simple":{"ent":[],"ex":[]}}
+        self.calc_arr=copy.deepcopy(self.arr)
         #append used only once
-        self.all_t_ents={}
-        self.all_t_exs={}
-        for ind in self.indexes:
-            self.all_t_ents[ind]={}
-            self.all_t_exs[ind]={}
-        
+        self.all_t={}
         self.macro_trend={}
-        self.macro_trend_mode={}
-        #self.macro_trend_dir={}
-        
-        
-        if self.nb_macro_modes==3:
-            for key in ["bull","bear","uncertain"]:
-                #self.macro_trend_dir[key]={}
-                self.macro_trend_mode[key]=locals()['dir_'+key]
+        for ind in self.indexes:
+            self.all_t[ind]={}
+            self.macro_trend[ind]={}
 
-            for ind in self.indexes:
-                self.macro_trend[ind]={}
-                for k in ["total","learn","test"]:
-                    self.macro_trend[ind][k]=VBTMACROTREND.run(self.close_dic[ind][k]).macro_trend
+        self.macro_trend_mode={}
+        if self.nb_macro_modes==3:
+            for key in self.arr:
+                self.macro_trend_mode[key]=locals()['dir_'+key]
 
         #all entries and exits for all patterns and signals are calculated once and for all here
         self.threshold=1
         self.defi_i("learn")
+        self.defi_macro_trend("learn")
         
         self.shift=False
         print("init finished")
-        
-        
+       
     def log(
             self,
             text: str,
@@ -219,30 +219,11 @@ class OptMain():
         if pr:
             print(text)
 
-    def init_best_arr(self):
-        '''
-        Reinit best array between two calculations
-        '''  
-        self.tested_arrs=[]
-        
-        self.best_arrs=np.zeros((self.loops*1000,self.nb_macro_modes,self.len_ent+self.len_ex))
-        self.best_arrs_ret=np.zeros(self.loops*1000)
-        self.best_arrs_index=0
-        
-        self.best_end_arrs=np.zeros((self.loops*100,self.nb_macro_modes,self.len_ent+self.len_ex)) #final results
-        self.best_end_arrs_ret=np.zeros(self.loops*100)
-        self.best_end_arrs_index=0
-        
-        self.best_all=np.zeros(1)
-        self.best_all_ret=self.init_threshold    
-        
-    def defi_i(self,key: str):
+    def defi_i_total(self):
         '''
         Calculate the entries and exits for each strategy. Relatively slow, but must be performed only once.
         
         Array explanation:
-            index 0-21: entry
-            index 22-end: exit
             
         Index 0-6, same for entry and exit
         0: moving average
@@ -253,69 +234,90 @@ class OptMain():
         5: RSI with threshold 20/80
         6: RSI with threshold 30/70
         
-        Index: 7-21, see BULL_PATTERNS in constants.py
-        Index: 29-end, see BEAR_PATTERNS in constants.py
+        Index for ent: 7-21, see BULL_PATTERNS in constants.py
+        Index for ex: 7-21, see BEAR_PATTERNS in constants.py
         Arguments
         ----------
            key: total/learn/test
         '''
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            all_t_ent=[]
-            all_t_ex=[]
-            open_=self.open_dic[ind][key]
-            high=self.high_dic[ind][key]
-            low=self.low_dic[ind][key]
-            close=self.close_dic[ind][key]
+            all_t={'ent':[], 'ex':[]}
+            #to be calculated with total otherwise the result test+learn is different from the total. 
+            #Some functions returns NaN for the first indexes for instance            
+            open_=self.open_dic[ind]["total"]
+            high=self.high_dic[ind]["total"]
+            low=self.low_dic[ind]["total"]
+            close=self.close_dic[ind]["total"]
             
             t=ic.VBTMA.run(close)
-            all_t_ent.append(t.entries)
-            all_t_ex.append(t.exits)
+            all_t['ent'].append(t.entries)
+            all_t['ex'].append(t.exits)
             
             t=ic.VBTSTOCHKAMA.run(high,low,close)
-            all_t_ent.append(t.entries_stoch)
-            all_t_ex.append(t.exits_stoch)    
+            all_t['ent'].append(t.entries_stoch)
+            all_t['ex'].append(t.exits_stoch)    
 
-            all_t_ent.append(t.entries_kama)
-            all_t_ex.append(t.exits_kama)   
+            all_t['ent'].append(t.entries_kama)
+            all_t['ex'].append(t.exits_kama)   
 
             t=ic.VBTSUPERTREND.run(high,low,close)
-            all_t_ent.append(t.entries)
-            all_t_ex.append(t.exits)
+            all_t['ent'].append(t.entries)
+            all_t['ex'].append(t.exits)
                             
             t=vbt.BBANDS.run(close)
-            all_t_ent.append(t.lower_above(close))
-            all_t_ex.append(t.upper_below(close))
+            all_t['ent'].append(t.lower_above(close))
+            all_t['ex'].append(t.upper_below(close))
 
             t=vbt.RSI.run(close,wtype='simple')
-            all_t_ent.append(t.rsi_crossed_below(20))
-            all_t_ex.append(t.rsi_crossed_above(80))
+            all_t['ent'].append(t.rsi_crossed_below(20))
+            all_t['ex'].append(t.rsi_crossed_above(80))
             
-            all_t_ent.append(t.rsi_crossed_below(30))
-            all_t_ex.append(t.rsi_crossed_above(70))
+            all_t['ent'].append(t.rsi_crossed_below(30))
+            all_t['ex'].append(t.rsi_crossed_above(70))
 
             for func_name in BULL_PATTERNS:
                 t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ent").out
-                all_t_ent.append(t)
+                all_t['ent'].append(t)
                 
             for func_name in BEAR_PATTERNS:
                 t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ex").out
-                all_t_ex.append(t)  
+                all_t['ex'].append(t)  
 
-            self.all_t_ents[ind][key]=all_t_ent
-            self.all_t_exs[ind][key]=all_t_ex
+            self.all_t[ind]["total"]={}
+            self.all_t[ind]["total"]['ent']=all_t['ent']
+            self.all_t[ind]["total"]['ex']=all_t['ex']
             
         del t
-        gc.collect()   
+        gc.collect() 
 
-    def interpret_ent(self,arr_input: list):
+    def defi_i(self,key: str):
         '''
-        See interpret
+        See defi_i_total
         '''
-        self.interpret(arr_input, "ent")
- 
-    def interpret_ex(self,arr_input: list):
+        if "total" not in self.all_t[self.indexes[0]]:
+            self.defi_i_total()
+
+        if key not in self.all_t[self.indexes[0]]:
+            for ind in self.indexes:
+                i=self.open_dic[ind][key].index
+                self.all_t[ind][key]={"ent":[],"ex":[]}
+
+                for ent_or_ex in ["ent","ex"]:
+                    for df in self.all_t[ind]["total"][ent_or_ex]:
+                        self.all_t[ind][key][ent_or_ex].append(df.loc[i])
+
+    def defi_macro_trend_total(self):
+        for ind in self.indexes:
+            self.macro_trend[ind]["total"]=VBTMACROTREND.run(self.close_dic[ind]["total"]).macro_trend
+     
+    def defi_macro_trend(self, key:str):
+        if "total" not in self.macro_trend[self.indexes[0]]:
+            self.defi_macro_trend_total()
         
-        self.interpret(arr_input, "ex")
+        if key not in self.macro_trend[self.indexes[0]]:
+            for ind in self.indexes:
+                i=self.open_dic[ind][key].index
+                self.macro_trend[ind][key]=self.macro_trend[ind]["total"].loc[i]
 
     def interpret(self,arr_input: list,ent_or_ex: str):
         '''
@@ -325,20 +327,9 @@ class OptMain():
         ----------
            arr_input: strategy array to be displayed
         '''
-        if ent_or_ex=="ent":
-            arr=arr_input[0:self.len_ent] 
-            patterns=BULL_PATTERNS
-        else:
-            arr=arr_input[self.len_ent:self.len_ent+self.len_ex]  
-            patterns=BEAR_PATTERNS
-        
-        l=["MA","STOCH","KAMA","SUPERTREND","BBANDS","RSI20","RSI30"]
-        for _, k in enumerate(patterns):
-            l.append(k)
-
-        for ii in range(len(arr)):
-            if arr[ii]:
-                self.log(l[ii],pr=True)   
+        for ii, e in enumerate(arr_input[ent_or_ex]):
+            if e:
+                self.log(COL_DIC[ent_or_ex][ii])
       
     def defi_ent(self,key: str):
         '''
@@ -364,59 +355,42 @@ class OptMain():
         ----------
            key: total/learn/test
         '''  
-        try:
-            for ind in self.indexes: #CAC, DAX, NASDAQ
-                for nb_macro_mode in range(self.nb_macro_modes): #bull, bear, uncertain
-                    ents_raw=None 
-                    calc_arr=self.calc_arrs[nb_macro_mode]
-                    
-                    if ent_or_ex=="ent":
-                        arr=calc_arr[0:self.len_ent] 
-                    else:
-                        arr=calc_arr[self.len_ent:self.len_ent+self.len_ex]  
-                
-                    s=np.full(np.shape(self.all_t_ents[ind][key][0]),0.0)
-                    
-                    for ii in range(len(arr)):
-                        if ent_or_ex=="ent":
-                            t=self.all_t_ents[ind][key][ii]
-                        else:
-                            t=self.all_t_exs[ind][key][ii]
-                        
-                        t2=ic.VBTSUM.run(t,k=arr[ii]).out #equivalent to if arr[ii]: then consider self.all_t_ents[ind][key][ii]
-                        t2=remove_multi(t2)
-                        s+=t2
+        if key not in self.all_t[self.indexes[0]]:
+            self.defi_i(key)
+        if key not in self.macro_trend[self.indexes[0]]:     
+            self.defi_macro_trend(key)
 
-                    ents_raw=(s>=self.threshold)
-                       
-                    if self.nb_macro_modes==1:
+        for ind in self.indexes: #CAC, DAX, NASDAQ
+            ent=None
+            for k, v in self.calc_arr.items():
+                arr=v[ent_or_ex]
+                ents_raw=None 
+               
+                s=np.full(np.shape(self.all_t[ind][key][ent_or_ex][0]),0.0)
+                
+                for ii in range(len(arr)):
+                    t=self.all_t[ind][key][ent_or_ex][ii]
+                    t2=ic.VBTSUM.run(t,k=arr[ii]).out #equivalent to if arr[ii]: then consider self.all_t_ents[ind][key][ii]
+                    t2=remove_multi(t2)
+                    s+=t2
+
+                ents_raw=(s>=self.threshold)
+                   
+                if self.nb_macro_modes==1:
+                    ent=ents_raw
+                else:
+                    ents_raw=VBTMACROFILTER.run(ents_raw,self.macro_trend[ind][key],bull_bear_to_int[k]).out
+                    if ent is None:
                         ent=ents_raw
                     else:
-                        if nb_macro_mode==0:
-                            ent=VBTMACROFILTER.run(ents_raw,self.macro_trend[ind][key],-1).out
-                        elif nb_macro_mode==1:
-                            ents_raw=VBTMACROFILTER.run(ents_raw,self.macro_trend[ind][key],1).out
-                            ent=ic.VBTOR.run(ent, ents_raw).out
-                        else:
-                            ents_raw=VBTMACROFILTER.run(ents_raw,self.macro_trend[ind][key],0).out
-                            ent=ic.VBTOR.run(ent, ents_raw).out   
-                
-                if ent_or_ex=="ent":
-                    self.ents[ind]=ent
-                else:
-                    if "learn" in key:
-                        ent.iloc[self.test_window_start-1,:]=True #exit all before the gap due to the exit
-                    self.exs[ind]=ent
-                    
-            del t, arr
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)
-            print(ent)
-        except ValueError:
-            print("ents_raw was zero!")
+                        ent=ic.VBTOR.run(ent, ents_raw).out
+            
+            if ent_or_ex=="ent":
+                self.ents[ind]=ent
+            else:
+                if "learn" in key and self.test_window_start!=0:
+                    ent.iloc[self.test_window_start-1,:]=True #exit all before the gap due to the exit
+                self.exs[ind]=ent
             
     def macro_mode(self,key:str):
         '''
@@ -426,66 +400,112 @@ class OptMain():
         ----------
            key: total/learn/test
         '''  
-        try:
-            if (self.nb_macro_modes ==1 or
-               self.macro_trend_mode["bull"]=='long' and self.macro_trend_mode["bear"]=='long' 
-               and self.macro_trend_mode["uncertain"]=='long'):
-                for ind in self.indexes: 
-                    self.ents_short[ind]=np.full(self.ents[ind].shape,False)
-                    self.exs_short[ind]=np.full(self.ents[ind].shape,False)
-            else:
-                self.ents_raw={}
-                self.exs_raw={}
-                
-                for ind in self.indexes: #CAC, DAX, NASDAQ
-                    t=VBTMACROMODE.run(self.ents[ind],self.exs[ind], self.macro_trend[ind][key],\
-                                       dir_bull=self.macro_trend_mode["bull"],
-                                       dir_bear=self.macro_trend_mode["bear"],
-                                       dir_uncertain=self.macro_trend_mode["uncertain"])
-                    self.ents[ind]=t.entries
-                    self.exs[ind]=t.exits
-                    self.ents_short[ind]=t.entries_short
-                    self.exs_short[ind]=t.exits_short 
-                    
-        except Exception as msg:      
-            print(msg)
-            print(self.macro_trend.__dir__())  
+        if (self.nb_macro_modes ==1 or
+           self.macro_trend_mode["bull"]=='long' and self.macro_trend_mode["bear"]=='long' 
+           and self.macro_trend_mode["uncertain"]=='long'):
+            for ind in self.indexes: 
+                self.ents_short[ind]=np.full(self.ents[ind].shape,False)
+                self.exs_short[ind]=np.full(self.ents[ind].shape,False)
+        else:
+            self.ents_raw={}
+            self.exs_raw={}
+            
+            for ind in self.indexes: #CAC, DAX, NASDAQ
+                t=VBTMACROMODE.run(self.ents[ind],self.exs[ind], self.macro_trend[ind][key],\
+                                   dir_bull=self.macro_trend_mode["bull"],
+                                   dir_bear=self.macro_trend_mode["bear"],
+                                   dir_uncertain=self.macro_trend_mode["uncertain"])
+                self.ents[ind]=t.entries
+                self.exs[ind]=t.exits
+                self.ents_short[ind]=t.entries_short
+                self.exs_short[ind]=t.exits_short 
 
+    def arr_to_key(self):
+        self.ind_k=""
+        for k, v in self.calc_arr.items():
+            for ent_or_ex in ["ent","ex"]:
+                for e in v[ent_or_ex]:
+                    self.ind_k+=str(int(e)) 
+
+    def key_to_arr(self, ind_k):
+        self.arr={}
+        a=[int(e) for e in ind_k]
+        if self.nb_macro_modes==3:
+            self.arr["bull"]={}
+            self.arr["bear"]={}
+            self.arr["uncertain"]={}
+
+            self.arr["bull"]["ent"]=a[:len(COL_DIC["ent"])]
+            self.arr["bull"]["ex"]=a[len(COL_DIC["ent"]):int(len(ind_k)*1/3)]
+            self.arr["bear"]["ent"]=a[int(len(ind_k)*1/3):int(len(ind_k)*1/3)+len(COL_DIC["ent"])]
+            self.arr["bear"]["ex"]=a[int(len(ind_k)*1/3)+len(COL_DIC["ent"]):int(len(ind_k)*2/3)]                             
+            self.arr["uncertain"]["ent"]=a[int(len(ind_k)*2/3):int(len(ind_k)*2/3)+len(COL_DIC["ent"])]
+            self.arr["uncertain"]["ex"]=a[int(len(ind_k)*2/3)+len(COL_DIC["ent"]):]
+        else:
+            self.arr["simple"]={}
+            self.arr["simple"]["ent"]=a[:len(COL_DIC["ent"])]
+            self.arr["simple"]["ex"]=a[len(COL_DIC["ent"]):]
+            
     def check_tested_arrs(
             self,
-            just_test: bool=False
             )-> bool:
         '''
         Check if the strategy array has already been calculated. It saves time.
-        
-        Arguments
-        ----------
-           just_test: if True, will not append it to the tested_arrs, for instance to display results
+        Return True, if not already there
         ''' 
         #merge all list, it makes the rest more simple
-        if self.nb_macro_modes==3:
-            a=list(itertools.chain(self.calc_arrs[0],self.calc_arrs[1],self.calc_arrs[2]))
-        else:
-            a=list(self.calc_arrs[0])
-                    
-        if a in self.tested_arrs: #same combination
-            return False
-        else:
-            if not just_test:
-                self.tested_arrs.append(a)
-            return True
+        self.get_cols()
+        self.arr_to_key()
+
+        if self.test_arrs is None:
+            return True    
+        return not self.ind_k in self.test_arrs.index
+            
+    def get_cols_sub(self,name):
+        for ent_or_ex in ["ent","ex"]:
+            for ii, v in enumerate(self.calc_arr[name][ent_or_ex]):
+                if ent_or_ex=="ent":
+                    w="_entry_"
+                else:
+                    w="_exit_"
+                col_name="a_"+name+w+COL_DIC[ent_or_ex][ii]
+                self.row[col_name]=v
+                self.cols.append(col_name)  
+
+    def get_cols(self):
+        self.cols=[]
+        for k in self.calc_arr:
+            self.get_cols_sub(k)
         
-    def random(self)-> list:
+    def random(self, l:int)-> list:
         '''
         Generate a random strategy array
         ''' 
         #choose randomly 0 and 1. All zeros is not accepted. 90% chance 0, 10% chance 1
-        arr=np.random.choice(2,self.len_ent+self.len_ex, p=[0.9, 0.1]) 
-        
-        while np.sum(arr[0:self.len_ent] )==0 or np.sum(arr[self.len_ent:self.len_ent+self.len_ex])==0:#entries or exits must not be full 0
-            arr=np.random.choice(2,self.len_ent+self.len_ex, p=[0.9, 0.1]) 
+        s=0
+        while s==0:
+            arr=np.random.choice(2,l, p=[0.9, 0.1]) 
+            s=np.sum(arr)
         return arr
     
+    def assign_random(self):
+        b=True
+        while b:
+            r_ent=self.random(len(COL_DIC["ent"]))
+            r_ex=self.random(len(COL_DIC["ex"]))
+            
+            if self.nb_macro_modes==1:
+                self.calc_arr={"simple": {'ent':r_ent,'ex':r_ex}}
+            else:
+                self.calc_arr={"bull": {'ent':r_ent,'ex':r_ex},
+                          "bear": {'ent':r_ent,'ex':r_ex},
+                          "uncertain": {'ent':r_ent,'ex':r_ex},
+                          }
+            
+            b=not self.check_tested_arrs() #random until new one is found
+            
+        self.arr=copy.deepcopy(self.calc_arr)
+
     def summarize_eq_ret(self,ret_arr:list)-> numbers.Number:
         '''
         Method to calculate a general score for a strategy from an array of returns
@@ -499,20 +519,9 @@ class OptMain():
             ret_arr=np.delete(ret_arr,ii,0)
             
         return np.mean(ret_arr)
-    
-    def predef(self)-> list:
-        '''
-        Load the predefined strategy array
-        ''' 
-        d=self.a_init
-        if self.nb_macro_modes==1:
-            return [np.array(d["bull"])]
-        else:
-            return [np.array(d["bull"]), np.array(d["bear"]), np.array(d["uncertain"])]
 
     def variate(
             self, 
-            best_arrs_ret:list,
             dic:str="learn"
             ):
         '''
@@ -520,31 +529,44 @@ class OptMain():
         
         Arguments
         ----------
-           best_arrs_ret: array of the best returns
            d: key word to access learn data
         ''' 
-        best_arrs_cand=[]
-        best_ret_cand=self.init_threshold
-            
-        for nb_macro_mode in range(self.nb_macro_modes): 
-            for ii in range(len(self.arrs[nb_macro_mode])):
-                self.calc_arrs=copy.deepcopy(self.arrs)
+        if self.test_arrs is None:
+            self.variate_first_ind=None
+        else:
+            self.variate_first_ind=self.test_arrs.index[-1]
+        
+        nb_calc=0
+        for k, v in self.arr.items():
+            for ent_or_ex in ["ent","ex"]:
+                for ii in range(len(v[ent_or_ex])):
+                    self.calc_arr=copy.deepcopy(self.arr)
+                    if v[ent_or_ex][ii]==0:
+                        self.calc_arr[k][ent_or_ex][ii]=1
+                    else:
+                        self.calc_arr[k][ent_or_ex][ii]=0
+
+                    if np.sum(self.calc_arr[k][ent_or_ex] )!=0:
+                        nb_calc+=self.calculate_pf(dic=dic)
+
+        
+        if nb_calc==0:
+            self.progression=False
+        else:
+            if self.variate_first_ind is None:
+                sub_df=self.test_arrs
+            else:
+                sub_df=self.test_arrs.loc[self.variate_first_ind:]
                 
-                if self.arrs[nb_macro_mode][ii]==0:
-                    self.calc_arrs[nb_macro_mode][ii]=1
-                else:
-                    self.calc_arrs[nb_macro_mode][ii]=0
-
-                if np.sum(self.calc_arrs[nb_macro_mode][0:self.len_ent] )!=0 and np.sum(self.calc_arrs[nb_macro_mode][self.len_ent:self.len_ent+self.len_ex])!=0:
-                    best_arrs_cand_temp, best_ret_cand_temp=self.calculate_pf(best_arrs_cand, best_ret_cand, best_arrs_ret,dic=dic)
-                    ### To test confidence at each round --> turn out to exclude break the progresses
-                    #if best_ret_cand_temp>best_ret_cand:
-                    #    if self.test(verbose=0,**kwargs)>self.confidence_threshold:
-                    best_arrs_cand=best_arrs_cand_temp
-                    best_ret_cand=best_ret_cand_temp
-
-        return best_arrs_cand, best_ret_cand 
-               
+            if sub_df["opt_return"].max() > self.best_loop_ret and self.trades>50:
+                self.progression=True
+                self.best_loop_ret=sub_df["opt_return"].max()
+                self.log("Overall perf, "+dic+": " + str(self.best_loop_ret),pr=True)
+                self.key_to_arr(sub_df.index[ sub_df["opt_return"].argmax() ]) #set a new self.arr
+                self.calc_arr=self.arr
+            else:
+                self.progression=False
+             
     def perf(
             self,
             dic:str="learn",
@@ -558,85 +580,54 @@ class OptMain():
            d: key word to access learn data
            dic_test: key word to access test data
         '''
-        try:
-            for jj in range(self.loops):
-                self.log("loop " + str(jj),pr=True)
-                
-                #new start point
-                if not self.predefined:
-                    self.arrs=[]
-                    ok=False
-                    while not ok:
-                        arr=self.random()
-                        for nb_macro_mode in range(self.nb_macro_modes):
-                            self.arrs.append(arr.copy())
-                        self.calc_arrs=copy.deepcopy(self.arrs)
-                        ok=self.check_tested_arrs(just_test=True)
-                
-                best_arrs_cand, best_ret_cand=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=dic) #reset 
-                if best_ret_cand>self.init_threshold: #normally true
-                    self.best_arrs[self.best_arrs_index,:,:]= best_arrs_cand
-                    self.best_arrs_ret[self.best_arrs_index]=best_ret_cand
-                    self.best_arrs_index+=1
-                
-                #start variations
-                calc=True
-                kk=0
-                while calc: #for testing only one round
-                    print("next calc")
-                    best_arrs_cand, best_ret_cand=self.variate(best_ret_cand,dic=dic)
-                    if best_ret_cand>self.init_threshold and not (self.testing and kk>0):
-                        self.best_arrs[self.best_arrs_index,:,:]= best_arrs_cand
-                        self.best_arrs_ret[self.best_arrs_index]=best_ret_cand
-                        self.best_arrs_index+=1
-                        self.log("Overall perf, learning: "+str(best_ret_cand),pr=True)
-                        self.log(best_arrs_cand)
-                        #next step
-                        self.arrs=best_arrs_cand
-                        self.test(dic=dic,dic_test=dic_test,*kwargs)
-                    else:
-                        calc=False
-                        self.best_end_arrs[self.best_end_arrs_index,:]= self.best_arrs[self.best_arrs_index-1,:]
-                        self.best_end_arrs_ret[self.best_end_arrs_index]=self.best_arrs_ret[self.best_arrs_index-1]
-                        self.best_end_arrs_index+=1
-        
-                        if self.best_all_ret==self.init_threshold or self.best_arrs_ret[self.best_arrs_index-1]>self.best_all_ret:
-                            self.best_all=self.best_arrs[self.best_arrs_index-1,:]
-                            self.best_all_ret=self.best_arrs_ret[self.best_arrs_index-1]
-                    kk+=1
-                    
-                gc.collect()     
-           
-            if self.nb_macro_modes==3:
-                keys=["bull","bear","uncertain"]
+        for jj in range(self.loops):
+            self.log("loop " + str(jj),pr=True)
+            
+            #new start point
+            self.best_loop_ret=self.init_threshold
+            
+            if self.test_arrs is None:
+                self.loop_first_ind=None
             else:
-                keys=["bull"]
-            self.log("algorithm completed")
-     
-            self.log("best of all")
-            self.log({'arr':self.best_all})
-            self.log("return : " + str(self.best_all_ret))
+                self.loop_first_ind=self.test_arrs.index[-1]
             
-            self.log("ent",pr=True)
-    
-            for k in keys:
-                if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
-                    self.log(k,pr=True)
-                    self.interpret_ent(self.best_all[mode_to_int[k],:])
-            self.log("ex",pr=True)
-            for k in keys:
-                if (self.nb_macro_modes==3 and k=="bull") or k!="bull":
-                    self.log(k,pr=True)
-                    self.interpret_ex(self.best_all[mode_to_int[k],:])
-            self.test(verbose=2,**kwargs)
+            if not self.predef:  
+                self.assign_random()
             
-            self.summary_total("test")
-            self.summary_total()
-        except Exception as e:
-            import sys
-            _, e_, exc_tb = sys.exc_info()
-            print(e)
-            print("line " + str(exc_tb.tb_lineno))
+            self.calculate_pf(dic=dic) #reset 
+            self.progression=True
+            #start variations
+            kk=0
+            while self.progression and not (self.testing and kk>0): #for testing only one round
+                print("next calc")
+                self.variate(dic=dic)
+                self.test(dic=dic,dic_test=dic_test,*kwargs)
+                kk+=1
+                
+            self.save_test_arrs()
+
+        if self.loop_first_ind is None:
+            sub_df=self.test_arrs
+        else:
+            sub_df=self.test_arrs.loc[self.loop_first_ind:]
+            
+        self.best_all_ret=sub_df["opt_return"].max()
+        self.key_to_arr(sub_df.index[ sub_df["opt_return"].argmax() ]) #set a new self.arr
+        self.best_all=self.arr.copy()
+
+        self.log("algorithm completed")
+        self.log("best of all")
+        self.log('arr'+str(self.best_all))
+        self.log("return : " + str(self.best_all_ret))
+
+        for ent_or_ex in ["ent","ex"]:
+            self.log(ent_or_ex,pr=True)
+            for k in self.best_all:
+                self.interpret(self.best_all[k],"ent")
+        self.test(verbose=2,**kwargs)
+        
+        #self.summary_total("test")
+        #self.summary_total()
             
     def calculate_pf(self):
         print("calculate_pf not defined at OptMain, see child")
@@ -658,13 +649,13 @@ class OptMain():
                                           tsl_stop=self.tsl,
                                           sl_stop=self.sl,
                                           ) #stop_exit_price="close"
-            
         return pf_dic
 
     def test(
             self,
             dic:str="learn",
             dic_test:str="test",
+            dic_total:str="total",
             verbose:int=1,
             ):
         '''
@@ -679,25 +670,20 @@ class OptMain():
         if verbose>0:
             self.log("Starting tests " + dic)
         ret_arr={}
-        stats={}
-        ret_pf_arr={}
         
         #recalculate the returns
-        for d in [dic, dic_test]:
+        for d in [dic, dic_test, dic_total]:
             ret_arr[d]={}
-            self.defi_i(d)
+            #self.defi_i(d)
             pf_dic=self.calculate_pf_sub(d)
             
             for ind in self.indexes: #CAC, DAX, NASDAQ
-                stats[ind]={}
-                ret_arr[d][ind]= self.get_ret(pf_dic[ind],ind)
+                ret_arr[d][ind]= self.get_ret(pf_dic[ind],ind,d)
 
-            _, ret_pf_arr[d]=self.calculate_pf([],self.init_threshold,self.init_threshold,dic=d,bypass_tested_arrs=True)
-        if verbose>0:
-            self.log("Overall perf, "+d+": " + str(ret_pf_arr[d]),pr=True)
-            
+            self.calculate_pf(dic=d,bypass_tested_arrs=True)
+
         return self.compare_learn_test(ret_arr,verbose=verbose)
-        
+                  
     def compare_learn_test(
             self,
             ret_arr: list,
@@ -732,12 +718,14 @@ class OptMain():
         
         if total_len!=0:
             confidence_ratio=100*round(confidence/total_len,2)
+            self.row["confidence_ratio"]=confidence_ratio
+            
             if verbose>0:
                 self.log("confidence_ratio: "+str(confidence_ratio) + "%",pr=True)    
         return confidence_ratio
     
     def summary_total(self, dic:str="total"):
-        self.defi_i(dic)
+        #self.defi_i(dic)
         pf_dic=self.calculate_pf_sub(dic)
 
         for ind in self.indexes:
@@ -866,15 +854,15 @@ class OptMain():
         
         for ii in range(self.number_of_parts):
             self.tested_arrs=[]
-            
-            self.defi_i("part_"+str(ii))
-            self.defi_ent("part_"+str(ii))
-            self.defi_ex("part_"+str(ii))
-            self.macro_mode("part_"+str(ii))
+            dic="part_"+str(ii)
+            #self.defi_i(dic)
+            self.defi_ent(dic)
+            self.defi_ex(dic)
+            self.macro_mode(dic)
             
             for ind in self.indexes: #CAC, DAX, NASDAQ
                 stats[(ii, ind)]={}
-                pf=vbt.Portfolio.from_signals(self.data_dic[ind]["part_"+str(ii)],
+                pf=vbt.Portfolio.from_signals(self.data_dic[ind][dic],
                                               self.ents[ind],
                                               self.exs[ind],
                                               short_entries=self.ents_short[ind],
@@ -884,7 +872,7 @@ class OptMain():
                                               sl_stop=self.sl,
                                               ) 
 
-                ret_dic[ind]= self.get_ret(pf,ind)
+                ret_dic[ind]= self.get_ret(pf,ind,dic)
                 ret_arr[ind]=[v for k, v in ret_dic[ind].items()] #we don't need the key
                 
                 stats[(ii, ind)]["mean"]=np.mean(ret_arr[ind])
@@ -893,6 +881,11 @@ class OptMain():
                 stats[(ii, ind)]["max"]=np.max(ret_arr[ind])
                 stats[(ii, ind)]["argmax"]=np.argmax(ret_arr[ind])
                 stats[(ii, ind)]["std"]=np.std(ret_arr[ind])
+                
+                self.row["surperf_factor_mean_"+ind+"_"+dic]=np.mean(ret_arr[ind])
+                self.row["surperf_factor_min_"+ind+"_"+dic]=np.min(ret_arr[ind])
+                self.row["surperf_factor_max_"+ind+"_"+dic]=np.max(ret_arr[ind])
+                self.row["surperf_factor_std_"+ind+"_"+dic]=np.std(ret_arr[ind])
 
         df=pd.DataFrame(stats)
         
@@ -902,15 +895,27 @@ class OptMain():
         df.loc["max_mean",("all","all")] =np.max(df.loc["mean",:])
         df.loc["std_mean",("all","all")] =np.std(df.loc["mean",:])
         
+        self.row["surperf_factor_min_all_indexes_total"]=df.loc["min",("all","all")]
+        self.row["surperf_factor_max_all_indexes_total"]=df.loc["max",("all","all")]
+        self.row["surperf_factor_min_mean_all_indexes_total"]=df.loc["min_mean",("all","all")]
+        self.row["surperf_factor_max_mean_all_indexes_total"]=df.loc["max_mean",("all","all")]
+        self.row["surperf_factor_std_mean_all_indexes_total"]=df.loc["std_mean",("all","all")]
+        
         for k in ["mean","std"]:
             df.loc[k,("all","all")]=np.mean(df.loc[k,:])
+            self.row["surperf_factor_"+k+"_all_indexes_"+dic]=df.loc[k,("all","all")]
         
         for ii in range(self.number_of_parts):
             for k in ["mean","std"]:
                 df.loc[k,(ii,"all")]=np.mean(df.loc[k,(ii,slice(None))])
+                self.row["surperf_factor_"+k+"_all_indexes_part"+str(ii)]=df.loc[k,(ii,"all")]
+
             df.loc["min",(ii,"all")]=np.min(df.loc["min",(ii,slice(None))]) 
-            df.loc["max",(ii,"all")]=np.min(df.loc["max",(ii,slice(None))])     
+            self.row["surperf_factor_min_all_indexes_part"+str(ii)]=df.loc["min",(ii,"all")]
+            df.loc["max",(ii,"all")]=np.max(df.loc["max",(ii,slice(None))])     
+            self.row["surperf_factor_max_all_indexes_part"+str(ii)]=df.loc["max",(ii,"all")]
         
+        self.append_row()
         pd.set_option('display.max_columns', None)     
         self.log(df)
         
@@ -931,7 +936,7 @@ class OptMain():
             p=(rr- rb )/ abs(rb)
         return p
         
-    def get_ret(self,pf,ind)-> list:
+    def get_ret(self,pf,ind,dic)-> list:
         '''
         Calculate an equivalent score for each product in a portfolio  
         
@@ -944,6 +949,8 @@ class OptMain():
             rb=pf.total_market_return
             rr=pf.get_total_return()  
             out[ind]=self.get_ret_sub(rb,rr) #seems a bit silly to repeat ind twice as key in a row, but makes compare_learn_test simpler
+            self.row["return_"+ind+"_"+dic]=rr
+            self.row["surperf_factor_"+ind+"_"+dic]=out[ind]
         else:
             rb=pf.total_market_return.values
             rr=pf.get_total_return().values
@@ -951,10 +958,34 @@ class OptMain():
                 if type(s)==tuple:
                     s=s[-1]
                 out[s]=self.get_ret_sub(rb[ii],rr[ii])
-        
-        return out           
+                self.row["return_"+s+"_"+dic]=rr[ii]
+                self.row["surperf_factor_"+s+"_"+dic]=out[s]
+
+        return out  
+
+    def append_row(self):
+        df_row=pd.DataFrame(self.row,index=[self.ind_k])
+        if self.test_arrs is None:
+            self.test_arrs=df_row
+        else:
+            if self.ind_k in self.test_arrs.index: #update
+                #to avoid a perf warning, by looping on the keys
+                common_cols=[]
+                not_common_cols=[]
+                for c in df_row.columns:
+                    if c in self.test_arrs.columns:
+                        common_cols.append(c)
+                    else:
+                        not_common_cols.append(c)
+                self.test_arrs.loc[self.ind_k, common_cols]=df_row.loc[self.ind_k, common_cols]
+                self.test_arrs.loc[self.ind_k, not_common_cols]=df_row.loc[self.ind_k, not_common_cols]
+            else: #append
+                self.test_arrs=pd.concat([self.test_arrs.loc[:],df_row])   
+
+    def save_test_arrs(self):
+        self.test_arrs.to_csv(self.test_arrs_path)
     
-    def calculate_eq_ret(self,pf)-> numbers.Number:
+    def calculate_eq_ret(self,pf,ind:str)-> numbers.Number:
         '''
         Calculate an equivalent score for a portfolio  
         
@@ -968,8 +999,11 @@ class OptMain():
         else:
             rb=pf.total_market_return.values
             rr=pf.get_total_return().values
-            
+       
+        self.row["mean_return_"+ind+"_raw"]=np.mean(rr)
         delta=rr-rb
+        self.row["mean_delta_"+ind+"_raw"]=np.mean(delta)
+        
         #check that there is no extrem value that bias the whole result
         #if it the case, this value is not considered in the calculation of the score
         while np.std(delta)>10:
@@ -980,10 +1014,13 @@ class OptMain():
         
         m_rb=np.mean(rb)
         m_rr=np.mean(rr)
-
+        self.row["mean_return_"+ind+"_corrected"]=m_rr
+        self.row["mean_delta_"+ind+"_corrected"]=np.mean(delta)
+        
         if abs(m_rb)<0.1: #avoid division by zero
             p=(m_rr)/ 0.1*np.sign(m_rb)   
         else:
             p=(m_rr- m_rb )/ abs(m_rb)
+        self.row["mean_surperf_factor_"+ind+"_corrected"]=p
 
         return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed        

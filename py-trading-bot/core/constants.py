@@ -5,8 +5,6 @@ Created on Sun Dec 12 11:27:07 2021
 
 @author: maxime
 """
-
-
 '''
 List of patterns and the expected value that indicate a bear behavior, so a sell signal
 '''
@@ -49,6 +47,19 @@ BULL_PATTERNS={
     "CDLKICKING_INV":100,
     }
 
+entry_cols=["MA","STOCH","KAMA","SUPERTREND","BBANDS","RSI20","RSI30"]
+for _, k in enumerate(BULL_PATTERNS):
+    entry_cols.append(k)
+    
+exit_cols=["MA","STOCH","KAMA","SUPERTREND","BBANDS","RSI80","RSI70"]
+for _, k in enumerate(BEAR_PATTERNS):
+    exit_cols.append(k)
+    
+COL_DIC={
+    "ent":entry_cols,
+    "ex":exit_cols
+    }    
+    
 '''
 Sub-selection of BEAR_PATTERNS, purely arbitrary, put whatever you want
 '''
@@ -922,14 +933,9 @@ RAW=["BZ=F", #brent
 '''
 Conversion between a trend and a number in the strategy array
 '''
-mode_to_int={
-    "bull":0,
-    "bear":1,
-    "uncertain":2
-    }
-
 short_to_str={True: "short", False: "long"}
 short_to_sign={True:-1, False:1}
+bull_bear_to_int={"bull":-1,"bear":1,"uncertain":0}
 
 
 

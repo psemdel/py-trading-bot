@@ -16,7 +16,6 @@ from orders.ib import OrderPerformer
 from trading_bot.settings import _settings
 
 import logging
-from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 '''
@@ -92,60 +91,54 @@ class StockStatusManager():
            df: subset of self.target_ss_by_st to summarize
            it_is_index: Is it indexes or stocks?
         '''
-        try:
-            r1=(self.present_ss["quantity"]!=0)
-            #init with present value, otherwise put 1000 and 0
-            self.target_ss.loc[r1,"strategy_id"]=self.present_ss.loc[r1,"strategy_id"]
-            self.target_ss.loc[r1,"priority"]=self.priority_st_lookup.loc[self.present_ss.loc[r1,"strategy_id"],"priority"].values
-            self.target_ss.loc[~r1,"priority"]=1000
-            self.target_ss.loc[r1,"norm_quantity"]=np.divide(self.present_ss.loc[r1,"quantity"], abs(self.present_ss.loc[r1,"quantity"]))
-            self.target_ss.loc[~r1,"norm_quantity"]=0
-    
-            for i in df.index:
-                #Replace with an order with more priority
-                for c in df.columns: #c is the strategy
-                    if c!="category_id" and not np.isnan(df.loc[i,c]):
-                        p=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].values[0] #normally only one
-                        p_id=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].index[0]
-    
-                        if p<self.target_ss.loc[i].priority and not np.isnan(float(df.loc[i,c])):
-                            self.target_ss.loc[i,"strategy_id"]=p_id
-                            self.target_ss.loc[i,"priority"]=p
-                            self.target_ss.loc[i,"norm_quantity"]=df.loc[i,c]
-                            
-                            if self.present_ss.loc[i,"quantity"]==0 or np.isnan(float(self.present_ss.loc[i,"quantity"])): #float required for decimals
-                                present_norm_quantity=Decimal(0)
-                            else:
-                                present_norm_quantity=self.present_ss.loc[i,"quantity"]/abs(self.present_ss.loc[i,"quantity"])
-                            self.target_ss.loc[i,"norm_delta_quantity"]=Decimal(float(self.target_ss.loc[i,"norm_quantity"]))-present_norm_quantity
-    
-                if it_is_index:
-                    #If index, we have to move the order from the index to the etf
-                    etf=None
-                    #Looking for the index of the corresponding etf
-                    if self.target_ss.loc[i,"norm_quantity"]>0:
-                        etf=self.present_ss.loc[i,"etf_long_id"]
-                    elif self.target_ss.loc[i,"norm_quantity"]<0:
-                        etf=self.present_ss.loc[i,"etf_short_id"]
-    
-                    #Copying the index self.target_ss to the etf self.target_ss
-                    if etf is not None:
-                        self.target_ss.loc[etf,"norm_quantity"]=self.target_ss.loc[i,"norm_quantity"]
-                        self.target_ss.loc[etf,"strategy_id"]=self.target_ss.loc[i,"strategy_id"]
-                        self.target_ss.loc[etf,"priority"]=self.target_ss.loc[i,"priority"]
+        r1=(self.present_ss["quantity"]!=0)
+        #init with present value, otherwise put 1000 and 0
+        self.target_ss.loc[r1,"strategy_id"]=self.present_ss.loc[r1,"strategy_id"]
+        self.target_ss.loc[r1,"priority"]=self.priority_st_lookup.loc[self.present_ss.loc[r1,"strategy_id"],"priority"].values
+        self.target_ss.loc[~r1,"priority"]=1000
+        self.target_ss.loc[r1,"norm_quantity"]=np.divide(self.present_ss.loc[r1,"quantity"], abs(self.present_ss.loc[r1,"quantity"]))
+        self.target_ss.loc[~r1,"norm_quantity"]=0
+
+        for i in df.index:
+            #Replace with an order with more priority
+            for c in df.columns: #c is the strategy
+                if c!="category_id" and not np.isnan(df.loc[i,c]):
+                    p=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].values[0] #normally only one
+                    p_id=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].index[0]
+
+                    if p<self.target_ss.loc[i].priority and not np.isnan(float(df.loc[i,c])):
+                        self.target_ss.loc[i,"strategy_id"]=p_id
+                        self.target_ss.loc[i,"priority"]=p
+                        self.target_ss.loc[i,"norm_quantity"]=df.loc[i,c]
                         
-                        if self.present_ss.loc[etf,"quantity"]==0 or np.isnan(float(self.present_ss.loc[etf,"quantity"])): #float required for decimals
-                            present_norm_quantity=Decimal(0)
+                        if self.present_ss.loc[i,"quantity"]==0 or np.isnan(float(self.present_ss.loc[i,"quantity"])): #float required for decimals
+                            present_norm_quantity=0
                         else:
-                            present_norm_quantity=self.present_ss.loc[etf,"quantity"]/abs(self.present_ss.loc[etf,"quantity"])
-                        self.target_ss.loc[etf,"norm_delta_quantity"]=self.target_ss.loc[i,"norm_quantity"]-present_norm_quantity
-                        self.target_ss.loc[i,"norm_quantity"]=0
-                        self.target_ss.loc[i,"norm_delta_quantity"]=0
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)    
+                            present_norm_quantity=self.present_ss.loc[i,"quantity"]/abs(self.present_ss.loc[i,"quantity"])
+                        self.target_ss.loc[i,"norm_delta_quantity"]=float(self.target_ss.loc[i,"norm_quantity"])-present_norm_quantity
+
+            if it_is_index:
+                #If index, we have to move the order from the index to the etf
+                etf=None
+                #Looking for the index of the corresponding etf
+                if self.target_ss.loc[i,"norm_quantity"]>0:
+                    etf=self.present_ss.loc[i,"etf_long_id"]
+                elif self.target_ss.loc[i,"norm_quantity"]<0:
+                    etf=self.present_ss.loc[i,"etf_short_id"]
+
+                #Copying the index self.target_ss to the etf self.target_ss
+                if etf is not None:
+                    self.target_ss.loc[etf,"norm_quantity"]=self.target_ss.loc[i,"norm_quantity"]
+                    self.target_ss.loc[etf,"strategy_id"]=self.target_ss.loc[i,"strategy_id"]
+                    self.target_ss.loc[etf,"priority"]=self.target_ss.loc[i,"priority"]
+                    
+                    if self.present_ss.loc[etf,"quantity"]==0 or np.isnan(float(self.present_ss.loc[etf,"quantity"])): #float required for decimals
+                        present_norm_quantity=0
+                    else:
+                        present_norm_quantity=self.present_ss.loc[etf,"quantity"]/abs(self.present_ss.loc[etf,"quantity"])
+                    self.target_ss.loc[etf,"norm_delta_quantity"]=self.target_ss.loc[i,"norm_quantity"]-present_norm_quantity
+                    self.target_ss.loc[i,"norm_quantity"]=0
+                    self.target_ss.loc[i,"norm_delta_quantity"]=0
             
     def determine_target(self):
         #start with index
@@ -194,46 +187,40 @@ class StockStatusManager():
         ----------
         testing: set to True to perform unittest on the function
         """
-        try:
-            if testing==False:
-                testing=self.testing
-            
-            if "norm_delta_quantity" in self.target_ss: #otherwise there is not order to perform
-                sell_df=self.target_ss[self.target_ss["norm_delta_quantity"]<0]
+        if testing==False:
+            testing=self.testing
         
-                for symbol, row in sell_df.iterrows():
-                    st=Strategy.objects.get(id=row["strategy_id"])
-                    
-                    op= OrderPerformer(
-                        symbol,
-                        row["strategy_id"],
-                        Decimal(row["norm_quantity"])*st.target_order_size,
-                        testing=testing
-                        )
-                    out=op.sell_order()
-                    if out:
-                        self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], False, st.name, reverse=op.reverse)
-        
-                buy_df=self.target_ss[self.target_ss["norm_delta_quantity"]>0].copy()
-                buy_df.sort_values(by=["priority"],inplace=True)
-        
-                #will stop when not enough cash
-                for symbol, row in buy_df.iterrows():
-                    st=Strategy.objects.get(id=row["strategy_id"])
-                    op= OrderPerformer(
-                        symbol,
-                        row["strategy_id"],
-                        Decimal(row["norm_quantity"])*st.target_order_size,
-                        testing=testing
-                        )
-                    out=op.buy_order()
-                    if out:
-                        self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], True, st.name, reverse=op.reverse)
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)
+        if "norm_delta_quantity" in self.target_ss: #otherwise there is not order to perform
+            sell_df=self.target_ss[self.target_ss["norm_delta_quantity"]<0]
+    
+            for symbol, row in sell_df.iterrows():
+                st=Strategy.objects.get(id=row["strategy_id"])
+                
+                op= OrderPerformer(
+                    symbol,
+                    row["strategy_id"],
+                    row["norm_quantity"]*st.target_order_size,
+                    testing=testing
+                    )
+                out=op.sell_order()
+                if out:
+                    self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], False, st.name, reverse=op.reverse)
+    
+            buy_df=self.target_ss[self.target_ss["norm_delta_quantity"]>0].copy()
+            buy_df.sort_values(by=["priority"],inplace=True)
+    
+            #will stop when not enough cash
+            for symbol, row in buy_df.iterrows():
+                st=Strategy.objects.get(id=row["strategy_id"])
+                op= OrderPerformer(
+                    symbol,
+                    row["strategy_id"],
+                    row["norm_quantity"]*st.target_order_size,
+                    testing=testing
+                    )
+                out=op.buy_order()
+                if out:
+                    self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], True, st.name, reverse=op.reverse)
 
     def resolve(self):
         self.determine_target()
@@ -346,7 +333,7 @@ class StockStatusManager():
         
         sold_symbols=self.cand_to_quantity(candidates, strategy, short)
         
-        if kwargs.get("keep",False):
+        if kwargs.get("keep",False) and not short: #no keep short
             for s, v in sold_symbols.items():
                 self.add_target_quantity(s, "retard_keep", v)
 

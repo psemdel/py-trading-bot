@@ -56,20 +56,24 @@ def check_ib_permission(symbols: list, verbose: bool=True):
         if v in ["CCXT","MT5","TS"]:
             _settings["USED_API"][k]=v
         elif v=="IB":
-            _settings["USED_API"][k]="IB"
-            for symbol in symbols:
-                if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
-                    if verbose:
-                        logger.info("symbol " + symbol + " has no permission for IB")
-                    _settings["USED_API"][k]="YF"
-                    break
-                
-                a=Action.objects.get(symbol=symbol)      
-                if a.stock_ex.ib_auth==False:
-                    if verbose:
-                        logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
-                    _settings["USED_API"][k]="YF"
-                    break
+            if symbols is None:
+                #then populate only if it is empty
+                if _settings["USED_API"][k]=="": 
+                    _settings["USED_API"][k]="IB"
+            else:
+                for symbol in symbols:
+                    if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
+                        if verbose:
+                            logger.info("symbol " + symbol + " has no permission for IB")
+                        _settings["USED_API"][k]="YF"
+                        break
+                    
+                    a=Action.objects.get(symbol=symbol)      
+                    if a.stock_ex.ib_auth==False:
+                        if verbose:
+                            logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
+                        _settings["USED_API"][k]="YF"
+                        break
         elif v=="YF":
             _settings["USED_API"][k]=v
     
@@ -253,7 +257,7 @@ class StockStatus(models.Model):
         on_delete=models.CASCADE,
         primary_key=True,
     )
-    quantity=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True,default=0) 
+    quantity=models.FloatField(blank=True,null=True,default=0) 
     strategy=models.ForeignKey('Strategy',on_delete=models.CASCADE,blank=True,null=True)
     order_in_ib=models.BooleanField(blank=False,default=True)
 
@@ -362,8 +366,8 @@ class Fees(models.Model):
     percent: percent fee to pay at each trade
     '''
     name=models.CharField(max_length=100, blank=False, default="fee")
-    fixed=models.DecimalField(max_digits=100, decimal_places=5)
-    percent=models.DecimalField(max_digits=100, decimal_places=5)
+    fixed=models.FloatField()
+    percent=models.FloatField()
     
     def __str__(self):
         return self.name  
@@ -382,19 +386,25 @@ class Strategy(models.Model):
                   order of 1000 euros
     minimum_order_size: if the target_order_size cannot be reached (not enough money), what is minimum size of the trade which should
                         lead to a trade execution
-    maximum_money_engaged: maximum total money that can be engaged in this strategy. To avoid having all the money invested in one strategy.
+    maximum_money_engaged: maximum total money that can be engaged in this strategy / stock exchange. To avoid having all the money invested in one strategy.
     sl_threshold: stop loss threshold for orders performed with this strategy
     daily_sl_threshold: daily stop loss threshold for orders performed with this strategy
+    option_share_per: percentage of the order that should be performed with options instead of stocks
+    option_min_days_distance: minimum time in day between now and option expiration
+    option_max_strike_distance_per: maximum difference between present stock price and option strike price
     '''
     name=models.CharField(max_length=100, blank=False)
     class_name=models.CharField(max_length=100, blank=False, null=True)
     perform_order=models.BooleanField(blank=False,default=False)
     priority=models.IntegerField(null=False, blank=False, default=1000)
-    target_order_size=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    minimum_order_size=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    maximum_money_engaged=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as price
-    daily_sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as pu
+    target_order_size=models.FloatField(blank=True,null=True)
+    minimum_order_size=models.FloatField(blank=True,null=True)
+    maximum_money_engaged=models.FloatField(blank=True,null=True)
+    sl_threshold=models.FloatField(blank=True,null=True) #as price
+    daily_sl_threshold=models.FloatField(blank=True,null=True) #as pu
+    option_share_per=models.FloatField(blank=True,null=True, default=0)
+    option_min_days_distance=models.IntegerField(null=False, blank=False, default=30)
+    option_max_strike_distance_per=models.FloatField(blank=True,null=True, default=10)
     
     class Meta:
         ordering = ["name"]
@@ -470,13 +480,13 @@ class Order(models.Model):
     short=models.BooleanField(blank=False,default=False)
     entering_date=models.DateTimeField(null=False, blank=False, auto_now_add=True)#default=timezone.now())
     exiting_date=models.DateTimeField(null=True, blank=True)
-    entering_price=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    exiting_price=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as price
-    daily_sl_threshold=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True) #as pu
-    profit=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    profit_percent=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
-    quantity=models.DecimalField(max_digits=100, decimal_places=5,blank=True,null=True)
+    entering_price=models.FloatField(blank=True,null=True)
+    exiting_price=models.FloatField(blank=True,null=True)
+    sl_threshold=models.FloatField(blank=True,null=True) #as price
+    daily_sl_threshold=models.FloatField(blank=True,null=True) #as pu
+    profit=models.FloatField(blank=True,null=True)
+    profit_percent=models.FloatField(blank=True,null=True)
+    quantity=models.FloatField(blank=True,null=True)
     
     def __str__(self):
         return self.action.name + " "+ str(self.entering_date)
@@ -485,6 +495,7 @@ def pf_retrieve_all(
         opening: bool=False,
         s_ex: StockEx=None,
         it_is_index:bool=False,
+        only_in_ib:bool=False
         )-> list:
     """
     Retrieve all stocks owned in long or short direction from the action status
@@ -493,19 +504,26 @@ def pf_retrieve_all(
    	----------
     opening: test at stock exchange opening (need to compare with the day before then)
     s_ex: stock exchange from which the stocks need to be returned
+    it_is_indexes: dict containing if the symbol is an index or not
+    only_in_ib: filter only actions in ib
     """
     c0=~Q(stockstatus__quantity=0)
     if it_is_index:
         cat=ActionCategory.objects.get(short="IND")
         c2=Q(category=cat)
     else:
-        c2=~Q(pk__in=[])
+        c2=~Q(pk__in=[]) #True
+        
+    if only_in_ib:
+        c3=Q(stockstatus__order_in_ib=True)
+    else:
+        c3=~Q(pk__in=[]) #True
     
     if opening and s_ex is not None:
         c1 = Q(stock_ex=s_ex)
-        actions=Action.objects.filter(c0&c1&c2)
+        actions=Action.objects.filter(c0&c1&c2&c3)
     else:
-        actions=Action.objects.filter(c0&c2) #filter(c1)
+        actions=Action.objects.filter(c0&c2&c3) #filter(c1)
 
     return list(set(actions)) #unique
 

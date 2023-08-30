@@ -83,6 +83,14 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.44)   
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.88)  
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.02)  
+
+    def test_stratE(self):
+        self.ust=strat.StratE(self.period, symbol_index=self.symbol_index)
+        self.ust.run()
+        
+        pf=vbt.Portfolio.from_signals(self.ust.close, self.ust.entries,self.ust.exits,
+                                      short_entries=self.ust.entries_short,
+                                      short_exits  =self.ust.exits_short)  
         
     def test_stratF(self):
         self.ust=strat.StratF(self.period, symbol_index=self.symbol_index)

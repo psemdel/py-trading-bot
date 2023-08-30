@@ -219,9 +219,9 @@ def macro_mode(
     for ii in range(len(temp_ent)):
         if macro_trend[ii]==-1:
             #handle the transition from one macro trend to another
-            if (temp!=0 and dir_bull not in ["both", "short"]):
+            if (temp!=0 and dir_bull not in ["both", "short"] and ii!=0):
                 exits_short[ii] = True
-            if (temp!=0 and dir_bull not in ["both", "long"]):
+            if (temp!=0 and dir_bull not in ["both", "long"] and ii!=0):
                 exits[ii] = True
 
             if dir_bull in ["both", "short"]:
@@ -235,9 +235,9 @@ def macro_mode(
 
         elif macro_trend[ii]==1:
             #handle the transition from one macro trend to another
-            if (temp!=1 and dir_bear not in ["both", "short"]):
+            if (temp!=1 and dir_bear not in ["both", "short"] and ii!=0):
                 exits_short[ii] = True
-            if (temp!=1 and dir_bear not in ["both", "long"]):
+            if (temp!=1 and dir_bear not in ["both", "long"] and ii!=0):
                 exits[ii] = True
 
             if dir_bear in ["both", "short"]:
@@ -251,9 +251,9 @@ def macro_mode(
 
         else:
             #handle the transition from one macro trend to another
-            if (temp!=2 and dir_uncertain not in ["both", "short"]):
+            if (temp!=2 and dir_uncertain not in ["both", "short"] and ii!=0):
                 exits_short[ii] = True
-            if (temp!=2 and dir_uncertain not in ["both", "long"]):
+            if (temp!=2 and dir_uncertain not in ["both", "long"] and ii!=0):
                 exits[ii] = True
 
             if dir_uncertain in ["both", "short"]:

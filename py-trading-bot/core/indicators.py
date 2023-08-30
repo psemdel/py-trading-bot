@@ -373,7 +373,7 @@ VBTFALSE = vbt.IF(
       class_name='VBTFalse',
       short_name='false',
       input_names=['close'],
-      output_names=["entries"]
+      output_names=["out"]
  ).with_apply_func(
       false_1d, 
       takes_1d=True,  

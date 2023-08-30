@@ -79,7 +79,6 @@ class Opt(OptStrat):
                 self.log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
 
             self.defi_i("learn_part_"+str(ii))
-            self.init_best_arr() #reinit
             self.perf(dic="learn_part_"+str(ii),dic_test="test_part_"+str(ii))
 
     def symbols_append(self,pf,ind:str):

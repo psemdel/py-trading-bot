@@ -15,15 +15,26 @@ import numbers
 import vectorbtpro as vbt
 from core.strat import UnderlyingStrat
 
-a_bull=[1., 0., 0., 1., 0., 1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1.,
-1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-a_bear=[0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 1., 1.,
-1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0.,
-1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-a_uncertain=[0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 0., 0., 0.,
-0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+a={"bull":
+   {"ent":[1., 0., 0., 1., 0., 1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1.,1., 0., 0., 0., 1., 1.],
+    "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,0., 0., 0., 0., 0., 0., 0., 0.]
+   },
+  "bear":
+     {"ent":[0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 1., 1., 1., 0., 1., 0., 1., 0.],
+      "ex": [0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+     },
+  "uncertain":
+     {"ent":[0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 0., 0., 0.,0., 0., 0., 1., 1., 1.],
+      "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+     },             
+  }   
+
+a_simple={"simple":
+   {"ent":[1., 0., 0., 1., 0., 1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1.,1., 0., 0., 0., 1., 1.],
+    "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,0., 0., 0., 0., 0., 0., 0., 0.]
+   }
+           
+  } 
 
 class StratT1(UnderlyingStrat):    
     def __init__(self,
@@ -32,7 +43,7 @@ class StratT1(UnderlyingStrat):
 
         super().__init__(
             period,
-            strat_arr_simple=a_bull,
+            strat_arr=a_simple,
             **kwargs ) 
         
 class StratT2(UnderlyingStrat):    
@@ -42,9 +53,7 @@ class StratT2(UnderlyingStrat):
 
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
+            strat_arr=a,
             **kwargs ) 
 
 
@@ -56,11 +65,9 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=1,
-                         predefined=True,
-                         a_bull=a_bull,
+                         strat_arr=a_simple,
                          )
         
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         
@@ -101,14 +108,10 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=3,
-                         predefined=True,
-                         a_bull=a_bull,
-                         a_bear=a_bear,
-                         a_uncertain=a_uncertain, 
+                         strat_arr=a,
                          test_window_start_init=0,
                          )
 
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         
@@ -149,11 +152,9 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=1,
-                         predefined=True,
-                         a_bull=a_bull,
+                         strat_arr=a_simple,
                          )
         
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         self.o.macro_mode("total")
@@ -200,17 +201,13 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=3,
-                         predefined=True,
-                         a_bull=a_bull,
-                         a_bear=a_bear,
-                         a_uncertain=a_uncertain, 
+                         strat_arr=a, 
                          test_window_start_init=0,
                          dir_bull="long", 
                          dir_uncertain="both",
                          dir_bear="both"
                          )
 
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         self.o.macro_mode("total")
