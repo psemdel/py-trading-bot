@@ -20,6 +20,7 @@ from trading_bot.settings import _settings
 
 import logging
 logger = logging.getLogger(__name__)
+
 """
 Strategies on one action, no preselection
 
@@ -143,16 +144,15 @@ def defi_i_fast(
     if u_core[0]:
         t=ic.VBTMA.run(close)
         all_t=defi_i_fast_sub(all_t,t.entries,t.exits, strat_arr, 0)
-     
+
     if u_core[1] or u_core[2]:
         t=ic.VBTSTOCHKAMA.run(high,low,close)
         all_t=defi_i_fast_sub(all_t,t.entries_stoch,t.exits_stoch, strat_arr, 1)
         all_t=defi_i_fast_sub(all_t,t.entries_kama,t.exits_kama, strat_arr, 2)
-     
     if u_core[3]:
         t=ic.VBTSUPERTREND.run(high,low,close)
         all_t=defi_i_fast_sub(all_t,t.entries,t.exits, strat_arr, 3)
-          
+       
     if u_core[4]:
         t=vbt.BBANDS.run(close)
         all_t=defi_i_fast_sub(all_t,t.lower_above(close),t.upper_below(close), strat_arr, 4)
@@ -294,7 +294,7 @@ def strat_wrapper_macro(open_: np.array,
         t=VBTMACROTRENDPRD.run(close)
     else:
         t=VBTMACROTREND.run(close)
-    
+
     #combine for the given array the signals and patterns
     tt=defi_i_fast( open_,
                        high,
@@ -302,6 +302,7 @@ def strat_wrapper_macro(open_: np.array,
                        close,
                        strat_arr,
                        macro_trend=t.macro_trend)
+    
     #put both/long/short
     t2=VBTMACROMODE.run(tt['ent'],tt['ex'], t.macro_trend,\
                        dir_bull=dir_bull,
@@ -373,7 +374,7 @@ class UnderlyingStrat():
                 retrieve_data_offline(self,self.symbol_index,self.period)
         
                 if it_is_index:
-                    for k in ["close","open","low","high"]:
+                    for k in ["data","close","open","low","high"]:
                         setattr(self,k,getattr(self,k+"_ind"))
                 else:
                     self.symbols_simple=self.close.columns.values
@@ -400,7 +401,6 @@ class UnderlyingStrat():
  
         self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
         self.actions=actions
-       
         
     def get_output(self,s):
         self.entries=s.entries
@@ -610,11 +610,16 @@ class StratDiv(UnderlyingStrat):
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a={"simple":
-           {"ent":[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
-            "ex": [0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1., 1., 0., 1., 0., 0., 0., 0., 1., 0., 0.]
-           }
-          }
+        a={'simple': 
+         {'ent': [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          'ex':  [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0]}}
+        
+        
+       # a={"simple":
+       #    {"ent":[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+       #     "ex": [0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1., 1., 0., 1., 0., 0., 0., 0., 1., 0., 0.]
+       #    }
+       #   }
         super().__init__(period,strat_arr=a,**kwargs )
 
 class StratTestSimple(UnderlyingStrat):    
@@ -672,6 +677,7 @@ class StratKeep(UnderlyingStrat):
            {'ent': [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
             'ex': [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0]}
            }
+
 
         super().__init__(
             period,
@@ -818,6 +824,91 @@ class StratIndex(UnderlyingStrat):
             **kwargs ) 
 
 class StratIndexB(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on index
+    
+    reoptimization with 2007-2023 FCHI 9.43 (0.15 for the benchmark), GDAXI 3.09 (0.7), IXIC 4.58 (3.31), DJI 1.5 (1.65)
+    '''   
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
+        
+        a={'bull': {'ent': [0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0],
+  'ex': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0]},
+ 'bear': {'ent': [0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0],
+  'ex': [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0]},
+ 'uncertain': {'ent': [0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0],
+  'ex': [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0]}}
+        
+        super().__init__(
+            period,
+            strat_arr=a,
+            **kwargs )     
+
+class StratIndexC(UnderlyingStrat):    
     '''
     Strategy optimized to have the best yield used alone on index
     

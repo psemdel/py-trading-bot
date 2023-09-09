@@ -244,7 +244,7 @@ class TestOptMain(TestCase):
         self.o=opt_strat.Opt("2007_2022_08",
                          loops=1,
                          testing=True,
-                         , filename="test")
+                         filename="test")
         self.o.test_arrs=None
         self.o.calc_arr=self.a
         self.assertTrue(self.o.check_tested_arrs())

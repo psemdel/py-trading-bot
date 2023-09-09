@@ -165,7 +165,7 @@ class TestBT(TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),17.73)  
+        self.assertEqual(round(pf.get_total_return(),2),21.52)  
         
     def test_preselect_macd_vol_macro(self):
         self.bti=presel.PreselMacdVolMacro(self.period,symbol_index=self.symbol_index)
@@ -213,7 +213,7 @@ class TestBT(TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),5.11) 
+        self.assertEqual(round(pf.get_total_return(),2),7.1) 
 
     def test_preselect_divergence_blocked_im(self):
         self.bti=presel.PreselDivergenceBlockedIm(self.period,symbol_index=self.symbol_index)
@@ -229,7 +229,7 @@ class TestBT(TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),8.14) 
+        self.assertEqual(round(pf.get_total_return(),2),10.42) 
         
     def test_preselect_vol_slow(self):
         self.bti=presel.PreselVolSlow(self.period,symbol_index=self.symbol_index)

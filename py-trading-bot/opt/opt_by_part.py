@@ -63,10 +63,8 @@ class Opt(OptStrat):
             perf_sorted[ind]=sorted(self.selected_symbols[ind].items(),key=lambda tup: tup[1],reverse=True)
             sorted_symbols[ind]=[s[0] for s in perf_sorted[ind]]
 
-        self.tested_arrs=[]
-        
-        self.split_in_part(sorted_symbols=sorted_symbols,split="symbol",origin_dic="learn",number_of_parts=number_of_parts)
-        self.split_in_part(sorted_symbols=sorted_symbols,split="symbol",origin_dic="test",number_of_parts=number_of_parts)
+        self.tested_arrs=[] #will not work so well now..
+        self.split_in_part(sorted_symbols=sorted_symbols,split="symbol",number_of_parts=number_of_parts)
         
     def outer_perf(self):
         '''

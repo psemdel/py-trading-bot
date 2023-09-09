@@ -77,29 +77,8 @@ _settings={
 
 "ETF_IB_auth":False, 
 "IB_BASE_CURRENCY":"EUR",
-
-"CCXT_EXCHANGE":"ace",
-"MT5_HOST":os.environ.get("MT5_HOST",0),
-"MT5_PORT":os.environ.get("MT5_PORT",0),
-"TD_API_KEY":os.environ.get("TD_API_KEY","YOUR_KEY")
 }
-
-### For other API ###
-## CCXT ##
-'''
-vbt.CCXTData.set_custom_settings(
-             exchanges=dict(
-                 binance=dict(
-                     exchange_config=dict(
-                         apiKey=os.environ.get("CCXT_KEY","YOUR_KEY"),
-                         secret=os.environ.get("CCXT_SECRET","YOUR_SECRET")
-                     )
-                 )
-             )
-        )
-''' 
-    
-    
+  
 """
 Django settings for trading_bot project.
 

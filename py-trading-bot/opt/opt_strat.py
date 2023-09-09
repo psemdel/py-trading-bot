@@ -72,52 +72,46 @@ class Opt(OptMain):
            dic: key of the dictionnary to be called: "learning", "test", "total"...
            bypass_tested_arrs: should the function tested_arrs be bypassed
         '''
-        try:
-            if (not self.check_tested_arrs()) and not "test" in dic and not bypass_tested_arrs:
-                return 0
+        if (not self.check_tested_arrs()) and not "test" in dic and not bypass_tested_arrs:
+            return 0
    
+        if self.it_is_index:
+            ret_arr=[]
+        else:
+            ret=0
+        
+        pf_dic=self.calculate_pf_sub(dic) 
+
+        for ind in self.indexes: #CAC, DAX, NASDAQ
+            t=self.calculate_eq_ret(pf_dic[ind],ind)
             if self.it_is_index:
-                ret_arr=[]
+                ret_arr.append(t)
             else:
-                ret=0
+                ret+=self.calculate_eq_ret(pf_dic[ind],ind)
+            self.row["trades_"+ind+"_"+dic]=len(pf_dic[ind].get_trades().records_arr)
+
+        if self.it_is_index:
+            self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_raw"]=np.mean(ret_arr)
+            while np.std(ret_arr)>10:
+                 ii=np.argmax(ret_arr)
+                 ret_arr=np.delete(ret_arr,ii,0)
+         
+            ret=np.mean(ret_arr)
+            self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_corrected"]=ret
+        else:
+            self.row["sum_surperf_factor_w_"+dic+"_all_indexes_corrected"]=ret
+
+        self.row["opt_return"]=ret    #used for the optimization
+
+        if "test" in dic:
+            self.log("Overall perf, "+dic+": " + str(ret),pr=True)
+        else:
+            self.trades=self.row["trades_"+ind+"_"+dic] #arbitrary last
             
-            pf_dic=self.calculate_pf_sub(dic) 
+        self.append_row()
+        del pf_dic
+        return 1
 
-            for ind in self.indexes: #CAC, DAX, NASDAQ
-                t=self.calculate_eq_ret(pf_dic[ind],ind)
-                if self.it_is_index:
-                    ret_arr.append(t)
-                else:
-                    ret+=self.calculate_eq_ret(pf_dic[ind],ind)
-                self.row["trades_"+ind+"_"+dic]=len(pf_dic[ind].get_trades().records_arr)
-    
-            if self.it_is_index:
-                self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_raw"]=np.mean(ret_arr)
-                while np.std(ret_arr)>10:
-                     ii=np.argmax(ret_arr)
-                     ret_arr=np.delete(ret_arr,ii,0)
-             
-                ret=np.mean(ret_arr)
-                self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_corrected"]=ret
-            else:
-                self.row["sum_surperf_factor_w_"+dic+"_all_indexes_corrected"]=ret
-
-            self.row["opt_return"]=ret    #used for the optimization
-
-            if "test" in dic:
-                self.log("Overall perf, "+dic+": " + str(ret),pr=True)
-            else:
-                self.trades=self.row["trades_"+ind+"_"+dic] #arbitrary last
-                
-            self.append_row()
-            del pf_dic
-            return 1
-
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)
             
 
      

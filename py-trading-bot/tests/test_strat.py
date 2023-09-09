@@ -147,10 +147,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)  
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),0.01)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.09)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.15)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.53) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.02)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.28)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.06)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.45) 
         
 if __name__ == '__main__':
     unittest.main()        

@@ -166,10 +166,6 @@ class Presel():
             "short":{}
             }
         
-        for i in self.close.index:
-            self.candidates["long"][i]=[]
-            self.candidates["short"][i]=[]
-        
         self.excluded=[]
         self.hold_dur=0#{}
         
@@ -193,8 +189,12 @@ class Presel():
             "long":[],
             "short":[],
             }
+        
         for k in ["entries","exits","exits_short","entries_short"]:
             setattr(self,k,pd.DataFrame.vbt.empty_like(self.close, fill_value=False))   
+        for i in self.close.index:
+            self.candidates["long"][i]=[]
+            self.candidates["short"][i]=[]
         
     def get_candidates(self):
         '''
@@ -264,7 +264,7 @@ class Presel():
                         self.capital+=self.order_size
                         self.pf["long"].remove(symbol_simple)
                         self.hold_dur=0
-                        
+         
             #perform orders
             #exit
             for symbol_simple in self.pf[short_to_str[short]]:
@@ -289,7 +289,7 @@ class Presel():
             #entry
             for symbol_simple in self.candidates[short_to_str[short]][i]:
                 symbol_complex=self.symbols_simple_to_complex(symbol_simple,"ent")
-    
+                    
                 if (self.capital>=self.order_size and
                     ((self.no_ust or self.only_exit_ust) or
                     (not short and self.ust.entries.loc[i,symbol_complex]) or
@@ -298,7 +298,7 @@ class Presel():
     
                     self.pf[short_to_str[short]].append(symbol_simple)
                     self.capital-=self.order_size
-                    
+
                     if short:
                         self.entries_short.loc[i,symbol_simple]=True
                     else:

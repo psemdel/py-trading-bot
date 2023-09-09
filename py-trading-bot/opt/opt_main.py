@@ -58,6 +58,7 @@ class OptMain():
             strat_arr: dict=None,
             filename: str="main",
             testing: bool=False,
+            opt_only_exit: bool=False,
             ):
         '''
         Optimisation main class
@@ -85,7 +86,7 @@ class OptMain():
            testing: set to True to perform unittest on the function
         '''
         for k in ["ratio_learn_train","split_learn_train", "indexes", "it_is_index","nb_macro_modes",
-                  "strat_arr","fees", "sl", "tsl", "filename","testing"]:
+                  "strat_arr","fees", "sl", "tsl", "filename","testing","opt_only_exit"]:
             setattr(self,k,locals()[k])
         #init
         for key in ["close","open","low","high","data"]:
@@ -300,11 +301,14 @@ class OptMain():
         if key not in self.all_t[self.indexes[0]]:
             for ind in self.indexes:
                 i=self.open_dic[ind][key].index
+                c=self.open_dic[ind][key].columns
+                
                 self.all_t[ind][key]={"ent":[],"ex":[]}
 
                 for ent_or_ex in ["ent","ex"]:
                     for df in self.all_t[ind]["total"][ent_or_ex]:
-                        self.all_t[ind][key][ent_or_ex].append(df.loc[i])
+                        df2=remove_multi(df)
+                        self.all_t[ind][key][ent_or_ex].append(df2.loc[i,c])
 
     def defi_macro_trend_total(self):
         for ind in self.indexes:
@@ -380,6 +384,7 @@ class OptMain():
                     ent=ents_raw
                 else:
                     ents_raw=VBTMACROFILTER.run(ents_raw,self.macro_trend[ind][key],bull_bear_to_int[k]).out
+                    
                     if ent is None:
                         ent=ents_raw
                     else:
@@ -389,9 +394,10 @@ class OptMain():
                 self.ents[ind]=ent
             else:
                 if "learn" in key and self.test_window_start!=0:
-                    ent.iloc[self.test_window_start-1,:]=True #exit all before the gap due to the exit
+                    ent.iloc[self.test_window_start-1]=True #exit all before the gap due to the exit
+                    #ent.iloc[self.test_window_start-1,:]
                 self.exs[ind]=ent
-            
+           
     def macro_mode(self,key:str):
         '''
         Adjust the entries and exits depending on the trend
@@ -430,7 +436,7 @@ class OptMain():
     def key_to_arr(self, ind_k):
         self.arr={}
         a=[int(e) for e in ind_k]
-        if self.nb_macro_modes==3:
+        if len(a)>(len(COL_DIC["ent"])+len(COL_DIC["ex"])):
             self.arr["bull"]={}
             self.arr["bear"]={}
             self.arr["uncertain"]={}
@@ -536,6 +542,10 @@ class OptMain():
         else:
             self.variate_first_ind=self.test_arrs.index[-1]
         
+        ent_or_exs=["ent"]
+        if not self.opt_only_exit:
+            ent_or_exs.append("ex")
+        
         nb_calc=0
         for k, v in self.arr.items():
             for ent_or_ex in ["ent","ex"]:
@@ -610,7 +620,7 @@ class OptMain():
             sub_df=self.test_arrs
         else:
             sub_df=self.test_arrs.loc[self.loop_first_ind:]
-            
+
         self.best_all_ret=sub_df["opt_return"].max()
         self.key_to_arr(sub_df.index[ sub_df["opt_return"].argmax() ]) #set a new self.arr
         self.best_all=self.arr.copy()
@@ -764,7 +774,6 @@ class OptMain():
             self,
             sorted_symbols:dict,
             number_of_parts:int=10,
-            origin_dic: str="total",
             split:str=None,
             ):
         '''
@@ -792,23 +801,29 @@ class OptMain():
         else:
             split=self.split_learn_train
         
-        if origin_dic!="total":
-            prefix=origin_dic+"_"
-        else:
-            prefix=""
-
-        for ind in self.indexes:
-            target_l[ind]=int(math.floor(self.total_len[ind]/self.number_of_parts)) 
-            for ii in range(self.number_of_parts):
-                self.data_dic[ind][prefix+"part_"+str(ii)]=self.split_in_part_sub(self.data_dic[ind][origin_dic],ii,split,target_l,ind)
-                
-            for d in ["Close","Open","Low","High"]:
-                for ii in range(self.number_of_parts):
-                    getattr(self,d.lower()+"_dic")[ind][prefix+"part_"+str(ii)]=self.data_dic[ind][prefix+"part_"+str(ii)].get(d)    
+        for origin_dic in ["total","learn","test"]:
+            if origin_dic not in self.all_t[self.indexes[0]]:
+                self.defi_i(origin_dic)
+            if origin_dic not in self.macro_trend[self.indexes[0]]:     
+                self.defi_macro_trend(origin_dic)
             
-            for ii in range(self.number_of_parts):
-                self.macro_trend[ind][prefix+"part_"+str(ii)]=self.split_in_part_sub(self.macro_trend[ind][origin_dic],ii,split,target_l,ind)
+            if origin_dic!="total":
+                prefix=origin_dic+"_"
+            else:
+                prefix=""
     
+            for ind in self.indexes:
+                target_l[ind]=int(math.floor(self.total_len[ind]/self.number_of_parts)) 
+                for ii in range(self.number_of_parts):
+                    self.data_dic[ind][prefix+"part_"+str(ii)]=self.split_in_part_sub(self.data_dic[ind][origin_dic],ii,split,target_l,ind)
+                    
+                for d in ["Close","Open","Low","High"]:
+                    for ii in range(self.number_of_parts):
+                        getattr(self,d.lower()+"_dic")[ind][prefix+"part_"+str(ii)]=self.data_dic[ind][prefix+"part_"+str(ii)].get(d)    
+                
+                for ii in range(self.number_of_parts):
+                    self.macro_trend[ind][prefix+"part_"+str(ii)]=self.split_in_part_sub(self.macro_trend[ind][origin_dic],ii,split,target_l,ind)
+        
     def split_in_part_sub(self,o,ii:int,split:str,target_l:dict,ind:str):
         '''
         Subfunction for split_in_part

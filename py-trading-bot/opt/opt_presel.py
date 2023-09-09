@@ -75,21 +75,24 @@ class Opt(OptMain):
     
     def calculate_pf_sub(self,dic):
         pf_dic={}
-
-        self.defi_ent(dic)
-        self.defi_ex(dic)
-        self.macro_mode(dic)
-
+        
+        #perform all call for total and later get other dics
+        self.defi_ent("total")
+        self.defi_ex("total")
+        self.macro_mode("total")
+        
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            #self.tested_arrs=[] #reset after each loop
-            
+            self.pr[ind].close=self.close_dic[ind]["total"]
+            self.pr[ind].reinit() #in case the function was called ealier
             self.pr[ind].ust.entries=self.ents[ind]
             self.pr[ind].ust.exits=self.exs[ind]
-            #restrain to size of total/learn/test
-            i=self.ents[ind].index
-            self.pr[ind].close=self.close_dic[ind][dic]
+            self.pr[ind].ust.entries_short=self.ents_short[ind]
+            self.pr[ind].ust.exits_short=self.exs_short[ind]
             self.pr[ind].run(skip_underlying=True)
-            
+
+        for ind in self.indexes: #CAC, DAX, NASDAQ
+            #restrain to size of total/learn/test
+            i=self.close_dic[ind][dic].index
             self.ents[ind]=self.pr[ind].entries.loc[i]
             self.exs[ind]=self.pr[ind].exits.loc[i]
             self.ents_short[ind]=self.pr[ind].entries_short.loc[i]
@@ -100,10 +103,12 @@ class Opt(OptMain):
                                           self.exs[ind],
                                           short_entries=self.ents_short[ind],
                                           short_exits=self.exs_short[ind],
-                                          freq="1d",fees=self.fees,
-                                          call_seq='auto',cash_sharing=True
+                                          freq="1d",
+                                          fees=self.fees,
+                                          call_seq='auto',
+                                          cash_sharing=True
                                           ) #stop_exit_price="close"
-            
+        
         return pf_dic
     
     def calculate_pf(

@@ -247,14 +247,15 @@ def ma(close: np.array)-> (np.array, np.array):
         
     entries =  fast_ma.ma_crossed_above(slow_ma)
     exits = fast_ma.ma_crossed_below(slow_ma)
+    fast_over_slow =  fast_ma.ma_above(slow_ma)
     
-    return entries, exits
+    return entries, exits, fast_over_slow
  
 VBTMA = vbt.IF( #just to keep everything the same shape... but useless here
      class_name='MA',
      short_name='ma',
      input_names=['close'],
-     output_names=['entries', 'exits']
+     output_names=['entries', 'exits','fast_over_slow']
 ).with_apply_func(
      ma, 
      takes_1d=True,  
@@ -461,7 +462,6 @@ def kama_trend_sub(kama: np.array)->(np.array, np.array):
                 duration[ii]=0
 
     return trend, duration
- 
 VBTKAMATREND = vbt.IF(
       class_name='VBTKamaTrend',
       short_name='kama_trend',
@@ -471,6 +471,49 @@ VBTKAMATREND = vbt.IF(
       kama_trend, 
       takes_1d=True,  
  )  
+    
+    
+'''
+Give rank array
+
+Arguments
+----------
+a: array to be sorted
+'''     
+     
+def rank_simple(vector):
+    return sorted(range(len(vector)), key=vector.__getitem__)
+
+def rankdata(a):
+    rank_arr =[]
+    for vector in a:
+        n = len(vector)
+        ivec=rank_simple(vector)
+        svec=[vector[rank] for rank in ivec]
+        sumranks = 0
+        dupcount = 0
+        t   = [0]*n
+        for i in range(n):
+            sumranks += i
+            dupcount += 1
+            if i==n-1 or svec[i] != svec[i+1]:
+                averank = sumranks / float(dupcount) + 1
+                for j in range(i-dupcount+1,i+1):
+                    t[ivec[j]] = averank
+                sumranks = 0
+                dupcount = 0
+        rank_arr.append(t)
+    return rank_arr  
+     
+VBTRANK = vbt.IF(
+      class_name='VBTRank',
+      short_name='rank',
+      input_names=['a'],
+      output_names=['rank_arr']
+ ).with_apply_func(
+      rankdata, 
+      #takes_1d=True,  
+ )     
      
 '''
 Calculate entry and exit signals based on candlelight patterns
@@ -855,7 +898,30 @@ VBTMORLET = vbt.IF(
       takes_1d=True,  
  )   
 
+@njit 
+def min_max_sub(
+        close: np.array,
+        distance: numbers.Number,
+        )-> np.array:
+    minimum=np.full(close.shape, 0.0)
+    maximum=np.full(close.shape, 0.0)
+    for ii in range(len(close)-1):
+        maximum[ii]=rel_dif(close[ii+1:ii+distance].max(),close[ii])*100
+        minimum[ii]=rel_dif(close[ii+1:ii+distance].min(),close[ii])*100
+        
+    return minimum, maximum
 
+VBTMINMAX = vbt.IF(
+      class_name='VBTMinMax',
+      short_name='vbt_min_max',
+      input_names=['close'],
+      param_names=['distance'],
+      output_names=["minimum","maximum"]
+ ).with_apply_func(
+      min_max_sub, 
+      distance=30,
+      takes_1d=True,  
+ ) 
 
 
 

@@ -384,17 +384,11 @@ class MyScheduler():
        	----------
            report: report for which the calculation happened
         '''   
-        for used_api in ["YF", "IB", "CCTX","MT5","TS"]:
-            for entry in [False, True]:
-                for buy in [False, True]:
-                    try:
-                        ent_ex_symbols=ListOfActions.objects.get(report=report,used_api=used_api,entry=entry,buy=buy)
-                        for a in ent_ex_symbols.actions.all():
-                            self.send_entry_exit_msg(a.symbol,None, buy,used_api) 
-                        self.telegram_bot.send_message_to_all(ent_ex_symbols.text)
-                    except:
-                        pass
-
+        loas=ListOfActions.objects.filter(report=report)
+        for loa in loas:
+            for a in loa.actions.all():
+                self.send_entry_exit_msg(a.symbol,loa.reverse, loa.buy,loa.used_api) 
+            self.telegram_bot.send_message_to_all(loa.text)
         if report.text:
              self.telegram_bot.send_message_to_all(report.text)       
     
