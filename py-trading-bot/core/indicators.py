@@ -171,7 +171,25 @@ VBTSUPERTREND = vbt.IF(
      faster_supertrend, 
      takes_1d=True,  
      multiplier=3)
-  
+
+def willr(
+        high: np.array, 
+        low: np.array, 
+        close: np.array,
+        window: int=7,
+        ):
+    return talib.WILLR(high,low, close, window)    
+    
+VBTWILLR = vbt.IF(
+      class_name='Willr',
+      short_name='willr',
+      input_names=['high', 'low', 'close'],
+      param_names=['window'],
+      output_names=['out']
+ ).with_apply_func(
+      willr, 
+      takes_1d=True,  
+      window=7)   
 '''
 Strategy that base on the crossing of the MA function and the supertrend
 
@@ -473,47 +491,7 @@ VBTKAMATREND = vbt.IF(
  )  
     
     
-'''
-Give rank array
-
-Arguments
-----------
-a: array to be sorted
-'''     
-     
-def rank_simple(vector):
-    return sorted(range(len(vector)), key=vector.__getitem__)
-
-def rankdata(a):
-    rank_arr =[]
-    for vector in a:
-        n = len(vector)
-        ivec=rank_simple(vector)
-        svec=[vector[rank] for rank in ivec]
-        sumranks = 0
-        dupcount = 0
-        t   = [0]*n
-        for i in range(n):
-            sumranks += i
-            dupcount += 1
-            if i==n-1 or svec[i] != svec[i+1]:
-                averank = sumranks / float(dupcount) + 1
-                for j in range(i-dupcount+1,i+1):
-                    t[ivec[j]] = averank
-                sumranks = 0
-                dupcount = 0
-        rank_arr.append(t)
-    return rank_arr  
-     
-VBTRANK = vbt.IF(
-      class_name='VBTRank',
-      short_name='rank',
-      input_names=['a'],
-      output_names=['rank_arr']
- ).with_apply_func(
-      rankdata, 
-      #takes_1d=True,  
- )     
+  
      
 '''
 Calculate entry and exit signals based on candlelight patterns
@@ -789,12 +767,15 @@ def grow_sub(
 def grow(
         close: np.array,
         distance: int=50,
-        ma: bool=False
+        ma: bool=False,
+        dema: bool=False
         )-> np.array:
     dis=min(distance,len(close)-1)
     
     if ma:
         close=talib.MA(close, timeperiod=30, matype=0)
+    elif dema:
+        close=talib.DEMA(close, timeperiod=30)
 
     return grow_sub(close,dis)
 
@@ -802,12 +783,13 @@ VBTGROW = vbt.IF(
       class_name='VBTGrow',
       short_name='vbt_grow',
       input_names=['close',],
-      param_names=['distance','ma'],
+      param_names=['distance','ma','dema'],
       output_names=["out"]
  ).with_apply_func(
       grow, 
       distance=50,
       ma=False,
+      dema=False,
       takes_1d=True,  
  ) 
 
@@ -881,22 +863,6 @@ VBTSUM = vbt.IF(
       sum_ent, 
       takes_1d=True,  
  )      
-
-def wavelet_transform(close, window_size):
-    wavelet = morlet(window_size, 5)
-    out = np.convolve(close, wavelet, mode='same')
-    return out
-
-VBTMORLET = vbt.IF(
-      class_name='VBTMORLET',
-      short_name='vbt_morlet',
-      input_names=['close'],
-      param_names=['window_size'],
-      output_names=["out"]
- ).with_apply_func(
-      wavelet_transform, 
-      takes_1d=True,  
- )   
 
 @njit 
 def min_max_sub(

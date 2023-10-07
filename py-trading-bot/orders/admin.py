@@ -11,9 +11,8 @@ admin.site.register(ActionSector)
 admin.site.register(Strategy)
 admin.site.register(Candidates)
 admin.site.register(Excluded)
-admin.site.register(StratCandidates)
 admin.site.register(Job)
-
+ 
 class OrderAdmin(admin.ModelAdmin):
     list_filter = ('active',)
 
@@ -38,4 +37,13 @@ class StockExAdmin(admin.ModelAdmin):
         return form
     
 admin.site.register(StockEx,StockExAdmin)
+
+class StratCandidatesAdmin(admin.ModelAdmin):
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(StratCandidatesAdmin, self).get_form(request, obj, **kwargs)
+        if "index" in self.instance.name:
+            ind=ActionCategory.objects.get(short="IND")
+            form.base_fields['actions'].queryset = Action.objects.filter(category=ind)
+
+admin.site.register(StratCandidates, StratCandidatesAdmin)        
 # Register your models here.

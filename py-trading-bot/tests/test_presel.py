@@ -8,6 +8,7 @@ Created on Fri Jun 24 19:45:34 2022
 
 from django.test import TestCase
 from core import presel
+from core.caller import name_to_ust_or_presel
 import vectorbtpro as vbt
 from orders import models as m
 from core import strat
@@ -44,19 +45,19 @@ class TestBT(TestCase):
             )
         
     def test_name_to_ust_or_presel(self):
-        pr=presel.name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index)
         self.assertEqual( type(pr),presel.PreselWQ)
-        pr=presel.name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index,it_is_index=True)
+        pr=name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index,it_is_index=True)
         self.assertEqual( pr,None)
-        pr=presel.name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index)
         self.assertEqual( type(pr),presel.PreselDivergence)
-        pr=presel.name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index,it_is_index=True)
+        pr=name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index,it_is_index=True)
         self.assertEqual( pr,None)        
-        pr=presel.name_to_ust_or_presel("abcd",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("abcd",self.period,symbol_index=self.symbol_index)
         self.assertEqual( pr,None)  
-        pr=presel.name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index)
         self.assertEqual( type(pr),strat.StratG)  
-        pr=presel.name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index,it_is_index=True) #gives some warnings
+        pr=name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index,it_is_index=True) #gives some warnings
         self.assertEqual( type(pr),strat.StratG)
         
     def test_get_order(self):

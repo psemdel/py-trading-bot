@@ -8,9 +8,8 @@ Created on Sat May 14 22:36:16 2022
 import vectorbtpro as vbt
 import pandas as pd
 import numpy as np
-import sys
 
-from core import strat, strat_legacy
+from core import strat
 from core.strat import StratHold
 from core.macro import VBTMACROTREND, VBTMACROTRENDPRD
 import core.indicators as ic
@@ -32,56 +31,7 @@ I just select one, two,... actions and put all my orders on them
 
 Those strategies are home made (even though quite similar to classic one). For classic ones look at presel_classic
 """
-def name_to_ust_or_presel(
-        ust_or_presel_name: str, 
-        period: str,
-        it_is_index:bool=False,
-        st=None,
-        **kwargs):
-    '''
-    Function to call class from strat or presel
-
-    Arguments
-    ----------
-        ust_or_presel_name: Name of the underlying strategy or preselection strategy to be called
-        period: period of time in year for which we shall retrieve the data
-        it_is_index: is it indexes that are provided 
-        st: strategy associated
-    '''
-    try:
-        if ust_or_presel_name[:6]=="Presel":
-            if not it_is_index: #Presel for index makes no sense
-                if ust_or_presel_name[6:8].lower()=="wq":
-                    nb=int(ust_or_presel_name[8:])
-                    pr=PreselWQ(period,nb=nb,st=st,**kwargs)
-                else:
-                    PR=getattr(sys.modules[__name__],ust_or_presel_name)
-                    pr=PR(period,st=st,**kwargs)
-                    
-                pr.run()
-                return pr
-            else:
-                return None
-        elif ust_or_presel_name[:5]=="Strat":
-            try:
-                UST=getattr(strat,ust_or_presel_name)
-            except:
-                try:
-                    UST=getattr(strat_legacy,ust_or_presel_name)
-                except:
-                    raise ValueError(ust_or_presel_name + " underlying strategy not found")
-            ust=UST(period,st=st,it_is_index=it_is_index,**kwargs)
-            ust.run()
-            return ust
-        else:
-            print("Class " +ust_or_presel_name + " does not respect the convention of starting with Presel or Strat")
-            return None
-        
-    except Exception as e:
-          _, e_, exc_tb = sys.exc_info()
-          print(e)
-          print("line " + str(exc_tb.tb_lineno))
-              
+             
 class Presel():
     def __init__(
             self,
@@ -587,7 +537,7 @@ class PreselMacdVol(PreselVol):
         '''        
         return self.macd_tot.macd[('simple','simple',symbol_simple)].loc[i]*short_to_sign[short]>0 
     
-    def perform(self, r):
+    def perform(self, r, **kwargs):
         candidates, candidates_short=self.get_candidates()
         
         if len(candidates)==0:
@@ -689,7 +639,7 @@ class PreselRetard(Presel):
                 if self.hold_dur > _settings["RETARD_MAX_HOLD_DURATION"]:
                     self.excluded.append(s)
      
-    def perform(self, r):
+    def perform(self, r, **kwargs):
         candidates, candidates_short=self.get_candidates()
         
         if self.last_short:
@@ -734,7 +684,7 @@ class PreselRetardKeep(Presel):
         '''
         self.underlying()
     
-    def perform(self,r):
+    def perform(self,r, **kwargs):
         #entry is handled by retard
         self.perform_only_exit(r)
         
@@ -808,7 +758,7 @@ class PreselDivergence(Presel):
         #only exit
         self.calculate(only_exit_ust=True,**kwargs)
         
-    def perform(self, r):
+    def perform(self, r, **kwargs):
         self.perform_only_exit(r)
         self.perform_cand_entry(r)
 
@@ -902,7 +852,7 @@ class PreselSlow(Presel):
                         self.st.name,
                         )    
                                     
-    def perform(self, r):
+    def perform(self, r, **kwargs):
         self.perform_only_exit(r)
         self.perform_entry(r)
         
@@ -1075,7 +1025,7 @@ class PreselWQ(Presel):
     def underlying(self):
         pass
     
-    def perform(self, r):
+    def perform(self, r, **kwargs):
         '''
         Preselected actions strategy, using 101 Formulaic Alphas
         

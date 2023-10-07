@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from reporting.telegram import start, send_entry_exit_txt, cleaning_sub
+from reporting.telegram import start, cleaning_sub
 # Create your views here.
-from reporting.models import Report, ActionReport, Alert, ListOfActions
+from reporting.models import Report, ActionReport, Alert, OrderExecutionMsg 
 from orders.models import Action, StockStatus, exchange_to_index_symbol, ActionSector, StockEx
 from orders.ib import actualize_ss
 
@@ -49,7 +49,12 @@ def daily_report_sub(
     else:
         report1=Report.objects.create()
     report1.daily_report(exchange=exchange,it_is_index=it_is_index,**kwargs)
-    send_order_test(report1)
+    
+    oems=OrderExecutionMsg.objects.filter(report=report1)
+    for oem in oems:
+        print(oem.text)
+    if report1.text:
+        print(report1.text)     
 
 def daily_report(
         request,
@@ -81,28 +86,6 @@ def daily_report(
 
     daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
     return render(request, 'reporting/success_report.html')
-
-def send_order_test(report):
-    '''
-    Send message if orders have been performed, test for the telegram function
-    
-    Arguments
-   	----------
-       report: report for which the calculation happened
-    '''   
-    for auto in [False, True]:
-        for entry in [False, True]:
-            for short in [False, True]:
-                try:
-                    ent_ex_symbols=ListOfActions.objects.get(report=report,auto=auto,entry=entry,short=short)
-                    for a in ent_ex_symbols.actions.all():
-                        #reverse, buy
-                        print(send_entry_exit_txt(a.symbol,entry,short, auto))
-                except:
-                    pass
-
-    if report.text:
-         print(report.text)      
 
 def cleaning(request):
     '''

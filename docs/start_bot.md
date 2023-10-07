@@ -37,8 +37,8 @@ It must be performed after the Celery server is launched, which itself requires 
 
 Note: Don't start several times the bot! Telegram does not support it. If it happens, close all instances of py-trading-bot before starting it again.
 
-##Kubernetes folger
-The Kubernetes manifests, in the folger with the same name, create the DB, Redis and Django servers and start them. The commands are the same as those described above.
+##Kubernetes folder
+The Kubernetes manifests, in the folder with the same name, create the DB, Redis and Django servers and start them. The commands are the same as those described above.
 
 ##Closing the bot
 To stop the bot, close the terminal where you opened it. If you started it in the background (not recommended), close the process.

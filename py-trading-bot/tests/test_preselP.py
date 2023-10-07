@@ -8,6 +8,7 @@ Created on Sun Jun 26 21:38:23 2022
 
 from django.test import TestCase
 from core import presel, strat
+from core.caller import name_to_ust_or_presel
 from orders.models import (Fees, StockEx, Action, ActionSector,
                           ActionCategory, Strategy, Currency, Candidates, Excluded,
                           get_exchange_actions, get_candidates)
@@ -143,7 +144,7 @@ class TestbtP(TestCase):
     def test_retard(self):
         st=Strategy.objects.create(name="retard", class_name="PreselRetard")
         
-        ust_or_pr=presel.name_to_ust_or_presel(
+        ust_or_pr=name_to_ust_or_presel(
             "PreselRetard",
             self.ust.period,
             input_ust=self.ust,
@@ -156,7 +157,7 @@ class TestbtP(TestCase):
     def test_divergence(self):
         st=Strategy.objects.create(name="divergence", class_name="PreselDivergence")
         
-        ust_or_pr=presel.name_to_ust_or_presel(
+        ust_or_pr=name_to_ust_or_presel(
             "PreselDivergence",
             self.ust.period,
             input_ust=self.ust,

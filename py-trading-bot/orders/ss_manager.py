@@ -204,7 +204,12 @@ class StockStatusManager():
                     )
                 out=op.sell_order()
                 if out:
-                    self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], False, st.name, reverse=op.reverse)
+                    self.report.handle_OrderExecutionMsg(
+                        op.action, 
+                        _settings["USED_API"]["orders"], 
+                        False, 
+                        st.name
+                        )
     
             buy_df=self.target_ss[self.target_ss["norm_delta_quantity"]>0].copy()
             buy_df.sort_values(by=["priority"],inplace=True)
@@ -220,7 +225,12 @@ class StockStatusManager():
                     )
                 out=op.buy_order()
                 if out:
-                    self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], True, st.name, reverse=op.reverse)
+                    self.report.handle_OrderExecutionMsg(
+                        op.action, 
+                        _settings["USED_API"]["orders"],
+                        True,
+                        st.name
+                        )
 
     def resolve(self):
         self.determine_target()

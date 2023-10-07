@@ -167,7 +167,6 @@ DAX=[
     "DB1.DE",
     "DBK.DE", #=DB
     "DHER.DE",
-    "DPW.DE",
     "DTE.DE", 
     "DTG.DE", 
     "ENR.DE", 

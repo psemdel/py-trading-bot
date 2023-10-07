@@ -4,7 +4,7 @@ import math
 
 from trading_bot.settings import _settings
 
-from core.presel import name_to_ust_or_presel
+from core.caller import name_to_ust_or_presel
 from core import indicators as ic
 import warnings
 import logging
@@ -15,8 +15,7 @@ from orders.models import Action, get_exchange_actions, StockEx,  ActionSector,\
                           check_ib_permission, filter_intro_action
 from orders.ss_manager import StockStatusManager
 
-      
-class ListOfActions(models.Model):
+class OrderExecutionMsg(models.Model):
     """
     Temporary storage for the telegram to message the orders at the end of the reporting.
     Difficulty is that the telegram bot is async, so it is not possible to just make send_msg() in the order execution function
@@ -24,26 +23,18 @@ class ListOfActions(models.Model):
     Attributes
    	----------
          report: Report that generated this list.
-         entry: was the order an entry or an exit?
-         buy: was the order a buy or a sell?
-         reverse: did the order when from the short direction to long or the opposite, or was it the same direction?
-         used_api: API that was used for the trade. Important to determine which message to display in Telegram (manual or auto)
-         actions: stocks traded
+         action: stock traded
          text: free text to be displayed in the Telegram message    
     """
     report=models.ForeignKey('Report',on_delete=models.CASCADE)
-    entry=models.BooleanField(blank=False,default=False) #otherwise exit
-    buy=models.BooleanField(blank=False,default=False)
-    reverse=models.BooleanField(blank=False,default=False,null=True) 
-    used_api=models.CharField(max_length=100, blank=False, default="YF")
-    actions=models.ManyToManyField(Action,blank=True,related_name="symbols") 
+    action=models.ForeignKey('orders.Action',on_delete=models.CASCADE)
     text=models.TextField(blank=True)
-    
+
     def concat(self,text):
         print(text)     
         self.text+=text +"\n"
         self.save() 
-
+        
 class Report(models.Model):
     """
     Periodically, a report is written. It performs calculation to decide if products need to be bought or sold.
@@ -99,14 +90,12 @@ class Report(models.Model):
         self.text+=text +"\n"
         self.save()
 
-    def handle_listOfActions(
+    def handle_OrderExecutionMsg(
             self, 
             action: Action, 
-            entry: bool, 
             used_api: str, 
             buy: bool, 
             strategy: str,
-            reverse: bool=None, 
             ):
         '''
         Create a list of action and edit it after an order
@@ -114,25 +103,23 @@ class Report(models.Model):
         Arguments
        	----------
            action: stock where an order was performed
-           ent: was the order an entry
-           reverse: was the order a reversion (from short to long or the other way around)
+           used_api: API used to perform the trade
            buy: was the order a buy order
            auto: was the order automatic or not
            strategy: name of the strategy which decided of this order        
         '''
         buy_sell_txt={True:"buying ", False: "selling "}
-        txt=buy_sell_txt[buy]+"Order executed, symbol: " +action.symbol +" strategy: " + strategy
+        if used_api!="YF":
+            txt=buy_sell_txt[buy]+"order executed, symbol: " +action.symbol +" strategy: " + strategy
+        else:
+            txt="Manual " + buy_sell_txt[buy].lower()+"order request, symbol: " +action.symbol +" strategy: " + strategy
         logger_trade.info(txt)
-        ent_ex_symbols, _=ListOfActions.objects.get_or_create(
+        OrderExecutionMsg.objects.create(
             report=self,
-            entry=entry,
-            reverse=reverse,
-            buy=buy,
-            used_api=used_api
+            action=action,
+            text=txt
             )
-        ent_ex_symbols.actions.add(action)
-        ent_ex_symbols.concat(txt)    
-            
+
 ### Preselected actions strategy    
     def perform_sub(
             self,
@@ -159,7 +146,7 @@ class Report(models.Model):
                         st=st
                         )  
                     if ust_or_pr is not None: #presel with it_is_index
-                        ust_or_pr.perform(self)
+                        ust_or_pr.perform(self, st_name=st.name)
                     
         except Exception as e:
               import sys

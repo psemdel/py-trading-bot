@@ -10,7 +10,8 @@ import vectorbtpro as vbt
 import numpy as np
 
 from core.common import remove_multi
-from core.presel import Presel, name_to_ust_or_presel
+from core.presel import Presel
+from core.caller import name_to_ust_or_presel
 from numba import njit
 
 import logging

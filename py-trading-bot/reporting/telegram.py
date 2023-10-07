@@ -25,12 +25,12 @@ if sys.version_info.minor>=9:
 else:
     from backports.zoneinfo import ZoneInfo
 
-from reporting.models import Report, Alert, ListOfActions
+from reporting.models import Report, Alert, OrderExecutionMsg 
 
 from orders.ib import actualize_ss, get_last_price, get_ratio
 from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
-                          get_exchange_actions, action_to_short, ActionSector 
+                          get_exchange_actions, action_to_short, ActionSector
                  
 from core import constants, presel
 
@@ -350,6 +350,10 @@ class MyScheduler():
                 today=timezone.now().strftime('%Y-%m-%d')
                 
                 if len(order)>0:
+                    if auto:
+                        txt="Sell order sent for "+action.symbol
+                    else:
+                        txt="Manual sell order requested for "+action.symbol
                     o=order[0]
                     e=o.entering_date.strftime('%Y-%m-%d')
                     if e<today: #avoid exiting order performed today
@@ -361,7 +365,7 @@ class MyScheduler():
                                 r=Report.objects.create()
                                 r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
                                 r.ss_m.resolve()
-                                self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="Stop loss")
+                                self.telegram_bot.send_message_to_all(txt+", stop loss")
                         
                         if o.daily_sl_threshold is not None:
                             ratio=get_ratio(action)
@@ -372,7 +376,7 @@ class MyScheduler():
                                 r=Report.objects.create()
                                 r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
                                 r.ss_m.resolve()
-                                self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="daily stop loss")                        
+                                self.telegram_bot.send_message_to_all(txt+", daily stop loss")
            
     def send_order(self,
                    report: Report
@@ -384,11 +388,9 @@ class MyScheduler():
        	----------
            report: report for which the calculation happened
         '''   
-        loas=ListOfActions.objects.filter(report=report)
-        for loa in loas:
-            for a in loa.actions.all():
-                self.send_entry_exit_msg(a.symbol,loa.reverse, loa.buy,loa.used_api) 
-            self.telegram_bot.send_message_to_all(loa.text)
+        oems=OrderExecutionMsg.objects.filter(report=report)
+        for oem in oems:
+            self.telegram_bot.send_message_to_all(oem.text)
         if report.text:
              self.telegram_bot.send_message_to_all(report.text)       
     
@@ -453,26 +455,6 @@ class MyScheduler():
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass
-        
-    def send_entry_exit_msg(self,
-                            symbol:str,
-                            reverse: bool,
-                            buy: bool, 
-                            used_api: str,
-                            suffix: str=""
-                            ):
-        '''
-        Define the message for the Telegram depending on the arguments
-        
-        Arguments
-       	----------
-           symbol: YF ticker of the product for which the order was performed
-           reverse: was the order a reversion (from short to long or the other way around)
-           buy: was the order a buy order
-           auto: was the order automatic or not
-           suffix: some text that can be chosen
-        '''  
-        self.telegram_bot.send_message_to_all(send_entry_exit_txt(symbol, reverse, buy, used_api, suffix=suffix))
 
     def heartbeat_f(self):
         '''
@@ -527,43 +509,6 @@ class MyScheduler():
         tz: name of the timezone
         '''
         return (datetime.combine(date(1,1,1),d)+timedelta(minutes=m)).time().replace(tzinfo=ZoneInfo(tz))
-       
-def send_entry_exit_txt(
-        symbol: str,
-        reverse: bool,
-        buy: bool, 
-        used_api: str,
-        suffix: str="",
-        )-> str:
-    '''
-    Define the message for the Telegram depending on the arguments
-    
-    Arguments
-   	----------
-       symbol: YF ticker of the product for which the order was performed
-       reverse: was the order a reversion (from short to long or the other way around)
-       buy: was the order a buy order
-       auto: was the order automatic or not
-       suffix: some text that can be chosen
-    '''  
-    if used_api!="YF":
-        part1=""
-        part2=""
-    else:
-        part1="Manual "
-        part2="requested for "
-    
-    if reverse:
-        part1+="reverse "
-    else:
-        part1+=""
-        
-    if buy:
-        part3=" buy order"
-    else:
-        part3=" sell order"
-        
-    return part1+part2+symbol + " "+ part3+" " +suffix
 
 def cleaning_sub():
     alerts=Alert.objects.filter(active=True)

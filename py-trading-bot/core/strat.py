@@ -471,8 +471,16 @@ class UnderlyingStrat():
         delta=pf.total_return().values[0]
         return delta
                 
-    def perform_StratCandidates(self, st_name, r):
-        from orders.models import Strategy, StratCandidates
+    def perform_StratCandidates(self, r, st_name):
+        '''
+        Perform during the report an underlying strategy on the candidates belonging to StratCandidates
+
+        Arguments
+        ----------
+            r: report
+            st_name: name of the strategy
+        '''
+        from orders.models import Strategy, StratCandidates #needs to be loaded here, as it will work only if Django is loaded
         st, _=Strategy.objects.get_or_create(name=st_name)
         st_actions, _=StratCandidates.objects.get_or_create(strategy=st)  #.id
         st_symbols=st_actions.retrieve()
@@ -488,10 +496,25 @@ class UnderlyingStrat():
                 
                 r.ss_m.add_target_quantity(symbol, st_name, target_order)
     
-    def perform(self, st_name, r): #default
-        self.perform_StratCandidates(st_name, r)        
+    def perform(self, r, st_name:str=None): #default
+        '''
+        See perform_StratCandidates
+        '''
+        if st_name is None:
+            raise ValueError("perform for underlying strategy should have an argument st_name")
+        self.perform_StratCandidates(r, st_name) 
+        
 ###production functions        
     def get_last_decision(self, symbol_complex_ent: str, symbol_complex_ex: str):
+        '''
+        Look for the last entry/exit for a stock
+        
+        Arguments
+        ----------
+            symbol_complex_ent: multiindex column for the symbol, for instance (True, 5, 'AC') in the entry dataframe
+            symbol_complex_ex: multiindex column for the symbol, for instance (True, 5, 'AC') in the exit dataframe
+        
+        '''
         for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):
             if (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]) and not\
             (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]):

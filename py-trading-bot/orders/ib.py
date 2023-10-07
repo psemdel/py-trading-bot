@@ -121,8 +121,8 @@ def check_enough_cash(
             out_order_size=convert_to_base(currency,base_cash,inverse=True)
             base_out_order_size=base_cash
         
-        if st.maximum_money_engaged is not None and (money_engaged+base_out_order_size>=st.maximum_money_engaged):
-            print("excess_money_engaged")
+        if st.maximum_money_engaged is not None and (money_engaged+base_out_order_size>st.maximum_money_engaged):
+            print("excess_money_engaged for strategy: "+st.name+" candidate: "+action.name)
             excess_money_engaged=True
             
     return enough_cash, out_order_size, excess_money_engaged
@@ -150,6 +150,7 @@ def get_money_engaged(
         action=Action.objects.get(symbol=symbol)
         ss=StockStatus.objects.get(action=action)
         price=get_last_price(action)
+
         if price is not None:
             price_base=convert_to_base(action.currency.symbol,price)
             total_money_engaged+=ss.quantity*price_base
@@ -182,9 +183,10 @@ def cash_balance(currency:str,**kwargs) -> numbers.Number:
 def actualize_ss():
     '''
     Synchronize ib and our bot, to know which stocks are owned (+direction)     
+    
+    Here we don't need to check really the permission, we just want to check the pf
     '''
-    check_ib_permission(None)
-    if _settings["USED_API"]["alerting"]=="IB":
+    if _settings["USED_API_DEFAULT"]["orders"]=="IB":
         ibData=IBData()
         ibData.actualize_ss()
 
@@ -669,7 +671,7 @@ class IBData(RemoteData):
             for pos in self.client.positions():
                 contract=pos.contract
                 if action.ib_ticker()==contract.localSymbol:
-                    return abs(pos.position), np.sign(pos.position), pos.position>0
+                    return abs(pos.position), np.sign(pos.position), pos.position<0
         return 0, 0, False  
         
     def get_tradable_contract(
