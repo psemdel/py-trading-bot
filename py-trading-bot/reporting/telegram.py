@@ -177,7 +177,8 @@ class MyScheduler():
                      ratio: numbers.Number, 
                      action: Action,
                      short: bool,
-                     opening: bool=False
+                     opening: bool=False,
+                     opportunity: bool=False
                      ):
         '''
         Check if the price variation for a product is within predefined borders
@@ -189,10 +190,9 @@ class MyScheduler():
            action: product concerned
            short: if the product is presently in a short direction
            opening: test at stock exchange opening (need to compare with the day before then)
+           opportunity: also alert when there is an opportunity
         '''
         try:
-            symbols_opportunity=constants.INDEXES+constants.RAW
-
             alerting_reco=False
             alerting=False
             alarming=False
@@ -210,7 +210,7 @@ class MyScheduler():
                     (not short and ratio > -(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])):
                     alerting_reco=True    
                     
-                if (action.symbol in symbols_opportunity and not short and ratio>_settings["ALERT_THRESHOLD"]):
+                if (opportunity and not short and ratio>_settings["ALERT_THRESHOLD"]):
                     alerting=True
                     opportunity=True
                     if ratio>_settings["ALARM_THRESHOLD"]:
@@ -298,9 +298,7 @@ class MyScheduler():
                 ratio=get_ratio(action)
                 short=action_to_short(action)
                 
-                self.check_change(ratio, action,short,opening=opening)
-                if both: #for index, we look also for opportunities. To be informed in case of great variation/events
-                    self.check_change(ratio, action,not short,opening=opening)
+                self.check_change(ratio, action,short,opening=opening, opportunity=both)
 
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)

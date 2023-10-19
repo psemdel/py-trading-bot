@@ -41,6 +41,7 @@ In the admin panel, the strategy field `Perform order` must be checked (=True).
 In the admin panel, the stock exchange field `Perform order` must be checked (=True).
 
 The strategies that you want to performed for each stock exchange must be selected there.
+Note: keep in mind that the index for a stock exchange may be listed in another stock exchange. For instance, the DAX is listed by EUREX and not by XETRA.
 
 ### Stock level
 Additionally, a black list of stocks can be configured in trading_bot/settings.py with IB_STOCK_NO_PERMISSION. It covers especially complex products, where permission is difficult to get.

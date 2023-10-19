@@ -272,7 +272,7 @@ def place(
     if _settings["USED_API"]["orders"]=="IB":
         #IB is a bit different
         ibData=IBData()
-        return ibData.place(buy,action,quantity=quantity,order_size=order_size,testing=testing)
+        return ibData.place(buy,action,quantity=abs(quantity),order_size=abs(order_size),testing=testing)
     else:
         if quantity==0:
             last_price=get_last_price(action)
@@ -748,7 +748,7 @@ class IBData(RemoteData):
         testing: set to True to perform unittest on the function
         """       
         if self.client and ib_global["connected"]:
-            contract =self.get_tradable_contract(action,short=buy) #to check if it is enough
+            contract =self.get_tradable_contract(action,short=not buy) #to check if it is enough
             
             if contract is None:
                 return 1.0, 0.0
@@ -1015,7 +1015,7 @@ class OrderPerformer():
                 if self.delta_size<0:
                     #if reverse but excluded then close without further conditions
                     if self.reverse and self.symbol not in self.excluded.retrieve():
-                        self.entry_place(False, order_size=self.delta_size,testing=self.testing)     
+                        self.entry_place(False, order_size=self.delta_size)     
                         self.order.exiting_price=self.new_order.entering_price
                     elif _settings["USED_API"]["orders"]=="IB":
                         if self.reverse:

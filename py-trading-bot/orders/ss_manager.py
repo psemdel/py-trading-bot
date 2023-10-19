@@ -416,7 +416,20 @@ class StockStatusManager():
         for s in df_to_be_cleaned.index:
             self.target_ss_by_st.loc[s,strategy]=0
 
-
+    def clean_excluded(
+            self, 
+            strategy: str, 
+            excluded: list):
+        """
+        Sell excluded symbols
+        
+        Arguments
+    	----------
+        strategy: strategy name following the trend, which could have experienced a reversal
+        excluded: list of excluded symbols
+        """
+        for s in excluded:
+            self.target_ss_by_st.loc[s,strategy]=0
 
         
         

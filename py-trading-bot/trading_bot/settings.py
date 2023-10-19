@@ -69,7 +69,7 @@ _settings={
 "FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
 
 "STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
-          "PreselDivergenceBlocked","PreselWQ7","PreselWQ31","PreselWQ53","PreselWQ54"],
+          "PreselDivergenceBlocked","PreselWQ7","PreselWQ19","PreselWQ21","PreselWQ31","PreselWQ53","PreselWQ54"],
 
 ## API configurations
 "IB_LOCALHOST":'127.0.0.1',

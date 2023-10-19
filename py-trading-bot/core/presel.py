@@ -50,6 +50,7 @@ class Presel():
             macro_trend_ind_mod=None,
             dur=None,
             divergence=None,
+            rsi=None,
             grow=None,
             exchange:str=None,
             st=None,
@@ -73,9 +74,10 @@ class Presel():
             macro_trend_ind: trend of the main index
             macro_trend_ind_mod: trend of the main index with modified threshold
             macro_trend_select: selection of the mod to use
-            
+            macro_trend: trend of all stocks separately
             dur: duration in a KAMA direction
             divergence: divergence signal
+            rsi: RSI signal
             exchange: stock exchange name
             st: strategy associated
         """
@@ -84,7 +86,7 @@ class Presel():
             self.suffix="_" + self.suffix
             
         for k in ["prd","symbol_index","period","vol","actions","symbols","macd_tot","macro_trend_ind","macro_trend_ind_mod",
-                  "macro_trend_select", "dur", "divergence", "grow","exchange","st"]:
+                  "macro_trend_select", "dur", "divergence", "rsi", "grow","exchange","st"]:
             setattr(self,k,locals()[k])
 
         if input_ust is not None:
@@ -612,6 +614,7 @@ class PreselRetard(Presel):
         super().__init__(period,**kwargs)
         if self.dur is None:
             self.dur=ic.VBTKAMATREND.run(self.close).duration
+            #self.dur=ic.VBTSUPERTREND.run(self.high,self.low,self.close).duration
         self.max_candidates_nb=1
         self.no_ust=True
         self.calc_all=True
@@ -651,6 +654,7 @@ class PreselRetard(Presel):
         r.concat(self.strategy.capitalize()+", " + "direction " + direction + ", stockex: " + self.ust.exchange +\
                     ", action duration: " +str(self.out))
   
+        r.ss_m.clean_excluded(self.strategy, self.excluded)
         r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.strategy, self.last_short)
               
 class PreselRetardMacro(PreselRetard):
@@ -705,7 +709,81 @@ class PreselRetardKeepBT(PreselRetardMacro):
         self.entries_short=ic.VBTFALSE.run(self.close).out #self.exits_short 
         self.exits_short=ic.VBTFALSE.run(self.close).out #self.ust.exits_short
 
-class PreselDivergence(Presel):
+class PreselOnlyExit(Presel):
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        self.only_exit_ust=True
+        self.max_candidates_nb=1
+        
+    def calc(self,**kwargs):
+        #only exit
+        self.calculate(only_exit_ust=True,**kwargs)
+        
+    def perform(self, r, **kwargs):
+        self.perform_only_exit(r)
+        self.perform_cand_entry(r)          
+
+class PreselMFI(PreselOnlyExit):
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        if self.rsi is None:
+            self.rsi=vbt.RSI.run(self.close,wtype='simple').rsi
+        
+        t=vbt.talib("MFI").run(self.high, self.low, self.close, self.volume)
+        self.mfi20=(t.real < 20)#_crossed_below(20)
+        
+    def underlying(self):
+        self.underlying_creator("StratDiv")
+
+    def sorting(self,i: str,**kwargs):
+        v={}
+        for symbol in self.close.columns.values:
+            v[symbol]=self.rsi[('simple',symbol)].loc[i]
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=False)
+
+    def supplementary_criterium(self,symbol_simple, i, v, short=False):
+        '''
+        Add a supplementary test to be checked before adding a candidate
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
+        '''
+        return self.mfi20.loc[i,symbol_simple]
+        
+class PreselInvertedHammer(PreselOnlyExit):
+    def __init__(self,period: str,**kwargs):
+        super().__init__(period,**kwargs)
+        if self.rsi is None:
+            self.rsi=vbt.RSI.run(self.close,wtype='simple').rsi
+        
+        t=vbt.talib("CDLINVERTEDHAMMER").run(self.open,self.high,self.low,self.close)
+        self.invertedhammer=(t.integer==100)
+     
+    def underlying(self):
+        self.underlying_creator("StratDiv")
+
+    def sorting(self,i: str,**kwargs):
+        v={}
+        for symbol in self.close.columns.values:
+            v[symbol]=self.rsi[('simple',symbol)].loc[i]
+        self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=False)
+
+    def supplementary_criterium(self,symbol_simple, i, v, short=False):
+        '''
+        Add a supplementary test to be checked before adding a candidate
+        
+        Arguments
+        ----------
+            symbol_simple: YF ticker of the stock
+            i: index
+            v: value
+        '''
+        return self.invertedhammer.loc[i,symbol_simple]
+    
+class PreselDivergence(PreselOnlyExit):
     '''
     This strategy measures the difference between the variation of each action smoothed price and 
     the variation of the corresponding smoothed price
@@ -717,11 +795,9 @@ class PreselDivergence(Presel):
     '''
     def __init__(self,period: str,**kwargs):
         super().__init__(period,**kwargs)
-        self.only_exit_ust=True
         if self.divergence is None:
             self.divergence=ic.VBTDIVERGENCE.run(self.close,self.close_ind).out
         self.threshold=_settings["DIVERGENCE_THRESHOLD"]
-        self.max_candidates_nb=1
         
     def underlying(self):
         self.underlying_creator("StratDiv")
@@ -753,14 +829,6 @@ class PreselDivergence(Presel):
             return v> self.threshold
         else:
             return v< -self.threshold
-        
-    def calc(self,**kwargs):
-        #only exit
-        self.calculate(only_exit_ust=True,**kwargs)
-        
-    def perform(self, r, **kwargs):
-        self.perform_only_exit(r)
-        self.perform_cand_entry(r)
 
 class PreselDivergenceBlocked(PreselDivergence):
     '''
