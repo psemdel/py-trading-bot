@@ -37,9 +37,11 @@ class Opt(OptMain):
             period: str,
             filename:str="presel",
             **kwargs):
-        super().__init__(period,filename=filename,**kwargs)
+        super().__init__(period,filename=filename,
+                         indexes=["CAC40","DAX","NASDAQ","FIN","HEALTHCARE","INDUSTRY"], #with only CAC40, DAX and Nasdaq it overfits
+                         **kwargs)
         self.pr={}
-
+        
         for ind in self.indexes:
             if class_name[6:8].lower()=="wq":
                 nb=int(class_name[8:])
@@ -141,6 +143,7 @@ class Opt(OptMain):
         ret=self.summarize_eq_ret(ret_arr)
 
         self.row["opt_return"]=ret
+
         self.trades=len(pf_dic[ind].get_trades().records_arr)
         del pf_dic
 

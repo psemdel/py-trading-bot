@@ -456,3 +456,15 @@ class TestSSManager(TestCase):
         out=self.ss_m.display_target_ss_by_st(it_is_index=True)
         expected="^FCHI\nstrat2 strat3 \n1.0    1.0    \r\n\n"
         self.assertEqual(out,expected)
+        
+    def test_clean_excluded(self):
+        self.ss_m.present_ss.loc["AC.PA","quantity"]=1
+        self.ss_m.present_ss.loc["AI.PA","quantity"]=1
+        self.ss_m.present_ss.loc["AIR.PA","quantity"]=1
+        
+        excluded=["AC.PA"]
+        self.ss_m.clean_excluded("none",excluded) #going to short, we clean long
+        
+        self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],0)
+        self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AI.PA","none"]))
+        self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))

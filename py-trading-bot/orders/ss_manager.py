@@ -41,19 +41,38 @@ class StockStatusManager():
             s_ex=StockEx.objects.get(name=exchange)
             self.present_ss= pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values(),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","etf_long_id","etf_short_id"),index="symbol")
+            #add etf which may be in other stock exchange
+            comp_etf=comp[(~comp["etf_long_id"].isnull()|~comp["etf_short_id"].isnull())]
+            etf_l=[e for e in comp_etf["etf_long_id"].values]
+            etf_l+=[e for e in comp_etf["etf_short_id"].values]
+            
+            etf_not_found=[]
+            for s in etf_l:
+                if s not in comp.index:
+                    etf_not_found.append(s)
+                    
+            if len(etf_not_found)>0:    
+                present_not_found= pd.DataFrame.from_records(StockStatus.objects.all().values(),index="action_id").loc[etf_not_found]
+                comp_not_found= pd.DataFrame.from_records(Action.objects.all().values("symbol","etf_long_id","etf_short_id"),index="symbol").loc[etf_not_found]
+                self.present_ss=pd.concat([self.present_ss,present_not_found],axis=0)
+                comp=pd.concat([ comp,comp_not_found],axis=0)
         else:
             self.present_ss= pd.DataFrame.from_records(StockStatus.objects.all().values(),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.all().values("symbol","etf_long_id","etf_short_id"),index="symbol")
+            
         self.present_ss=pd.concat([self.present_ss,comp], axis=1)
 
-        #condensated version
         self.target_ss=self.present_ss.copy()
         self.target_ss["priority"]=np.nan
 
         #will contain the target normalized quantity for each stock
         if exchange is not None:
-            self.target_ss_by_st=pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values("action_id"),index="action_id")
+            self.target_ss_by_st=self.present_ss.copy()
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","category_id"),index="symbol")
+            
+            if len(etf_not_found)>0:    
+                comp_not_found= pd.DataFrame.from_records(Action.objects.all().values("symbol","category_id"),index="symbol").loc[etf_not_found]
+                comp=pd.concat([ comp,comp_not_found],axis=0)
         else:
             self.target_ss_by_st=pd.DataFrame.from_records(StockStatus.objects.all().values("action_id"),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.all().values("symbol","category_id"),index="symbol")
@@ -142,8 +161,8 @@ class StockStatusManager():
             
     def determine_target(self):
         #start with index
-        self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]=="IND"],True) #move order from index to etf
-        self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]!="IND"],False)
+        self.determine_target_sub(self.target_ss_by_st[ (self.target_ss_by_st["category_id"]=="IND")],True) #move order from index to etf
+        self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]=="ACT"],False)
         
     def display_target_ss_by_st(self,it_is_index:bool=False):
         pd.set_option('display.max_columns', None)

@@ -1022,7 +1022,7 @@ class OptMain():
         #check that there is no extrem value that bias the whole result
         #if it the case, this value is not considered in the calculation of the score
         while np.std(delta)>10:
-            ii=np.argmax(delta)
+            ii=np.argmax(np.abs(delta))
             delta=np.delete(delta,ii,0)
             rb=np.delete(rb,ii,0)
             rr=np.delete(rr,ii,0)

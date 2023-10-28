@@ -272,7 +272,7 @@ def place(
     if _settings["USED_API"]["orders"]=="IB":
         #IB is a bit different
         ibData=IBData()
-        return ibData.place(buy,action,quantity=abs(quantity),order_size=abs(order_size),testing=testing)
+        return ibData.place(buy,action,quantity=quantity,order_size=order_size,testing=testing)
     else:
         if quantity==0:
             last_price=get_last_price(action)
@@ -642,7 +642,10 @@ class IBData(RemoteData):
                     
                     present_ss=StockStatus.objects.get(action=action)
                     if present_ss.quantity!=pos.position:
-                        logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + " update manually the strategy")
+                        if pos.position==0:
+                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + " update strategy set to none")
+                        else:
+                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + " update manually the strategy")
                         present_ss.quantity=pos.position
                         present_ss.strategy=Strategy.objects.get(name="none")
                         present_ss.order_in_ib=True
@@ -757,11 +760,17 @@ class IBData(RemoteData):
                 if quantity==0 or quantity is None:
                     last_price=self.get_last_price(action)
                     if last_price!=0:
-                        quantity=math.floor(order_size/last_price)
+                        if order_size is not None:
+                            quantity=math.floor(abs(order_size)/last_price)
+                        else:
+                            logger.error("quantity and order size for : " + action.symbol + " are None!")
+                            return 1.0, 0.0
                     else:
                         logger.error("last price for symbol: " + action.symbol + " is nan!")
                         return 1.0, 0.0
-                
+                else:
+                    quantity=abs(quantity)
+               
                 if not testing:
                     if buy:
                         order = MarketOrder('BUY', quantity)

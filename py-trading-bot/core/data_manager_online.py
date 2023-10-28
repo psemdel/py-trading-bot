@@ -21,6 +21,8 @@ logger_trade = logging.getLogger('trade')
 '''
 This file contains the logic to retrieve data online
 
+Note: this file is better separated from data_manager, as the bot needs to be loaded for online downloads.
+
 To save data, just run this script (see at the bottom). It will generate 2 files: actions.h5 and index.h5. In the first, all prices for the actions is listed, in 
 the second, the price of the main index (Nasdaq 100, Dow jones...) is listed. Their generation simulteneously ensures their alignment.
 The idea behind it, is to determine in some strategies the trend using the index, and adapting the strategy depending on this trend.
@@ -192,6 +194,7 @@ def retrieve_data_notIB(
         #look for anomaly
         if len(all_symbols)>2:
             data=f.fetch(all_symbols, period=period,missing_index='drop')
+            #we do the following supplementary download only on a sample of stocks as it is time consuming
             avg=np.average(
                 [len(f.fetch(all_symbols[0], period=period).get('Open')),
                 len(f.fetch(all_symbols[1], period=period).get('Open')),
@@ -203,7 +206,7 @@ def retrieve_data_notIB(
                 logger.info("Anomaly found by downloading the symbols, check that the symbol with most nan is not delisted or if its introduction date is correct")
                 res_nodrop=f.fetch(all_symbols, period=period)
                 nb_nan={}
-                for c in data.get('Open').columns:
+                for c in res_nodrop.get('Open').columns:
                     nb_nan[c]=np.count_nonzero(np.isnan(res_nodrop.get('Open')[c]))
 
                 nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
