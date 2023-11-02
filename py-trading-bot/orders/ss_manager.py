@@ -42,9 +42,10 @@ class StockStatusManager():
             self.present_ss= pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values(),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","etf_long_id","etf_short_id"),index="symbol")
             #add etf which may be in other stock exchange
-            comp_etf=comp[(~comp["etf_long_id"].isnull()|~comp["etf_short_id"].isnull())]
-            etf_l=[e for e in comp_etf["etf_long_id"].values]
-            etf_l+=[e for e in comp_etf["etf_short_id"].values]
+            comp_etf1=comp[~comp["etf_long_id"].isnull()]
+            etf_l=[e for e in comp_etf1["etf_long_id"].values]
+            comp_etf2=comp[~comp["etf_short_id"].isnull()]
+            etf_l+=[e for e in comp_etf2["etf_short_id"].values]
             
             etf_not_found=[]
             for s in etf_l:
@@ -61,13 +62,13 @@ class StockStatusManager():
             comp= pd.DataFrame.from_records(Action.objects.all().values("symbol","etf_long_id","etf_short_id"),index="symbol")
             
         self.present_ss=pd.concat([self.present_ss,comp], axis=1)
-
+        
         self.target_ss=self.present_ss.copy()
         self.target_ss["priority"]=np.nan
-
+        
         #will contain the target normalized quantity for each stock
         if exchange is not None:
-            self.target_ss_by_st=self.present_ss.copy()
+            self.target_ss_by_st=pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values("action_id"),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","category_id"),index="symbol")
             
             if len(etf_not_found)>0:    
@@ -85,7 +86,7 @@ class StockStatusManager():
         
         self.priority_st_lookup=pd.DataFrame.from_records(Strategy.objects.all().values("id","name", "priority"),index="id")
         self.priority_st_lookup.loc[np.nan]={"name":"not found","priority":1000}
-
+        
         self.report=report
         self.testing=testing
     
@@ -147,7 +148,7 @@ class StockStatusManager():
 
                 #Copying the index self.target_ss to the etf self.target_ss
                 if etf is not None:
-                    self.target_ss.loc[etf,"norm_quantity"]=self.target_ss.loc[i,"norm_quantity"]
+                    self.target_ss.loc[etf,"norm_quantity"]=abs(self.target_ss.loc[i,"norm_quantity"]) #etf cannot be in short
                     self.target_ss.loc[etf,"strategy_id"]=self.target_ss.loc[i,"strategy_id"]
                     self.target_ss.loc[etf,"priority"]=self.target_ss.loc[i,"priority"]
                     
@@ -155,7 +156,7 @@ class StockStatusManager():
                         present_norm_quantity=0
                     else:
                         present_norm_quantity=self.present_ss.loc[etf,"quantity"]/abs(self.present_ss.loc[etf,"quantity"])
-                    self.target_ss.loc[etf,"norm_delta_quantity"]=self.target_ss.loc[i,"norm_quantity"]-present_norm_quantity
+                    self.target_ss.loc[etf,"norm_delta_quantity"]=abs(self.target_ss.loc[i,"norm_quantity"])-present_norm_quantity
                     self.target_ss.loc[i,"norm_quantity"]=0
                     self.target_ss.loc[i,"norm_delta_quantity"]=0
             

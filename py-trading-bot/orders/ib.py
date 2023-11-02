@@ -101,11 +101,7 @@ def check_enough_cash(
     """ 
     base_order_size=convert_to_base(currency,order_size)
     base_cash=cash_balance(None) #for IB "BASE" is the one that allows determining if you 
-    
-    print("base_cash "+str(base_cash))
-    
     money_engaged=get_money_engaged(st.name,action.stock_ex.name,False)
-    print("money_engaged "+str(money_engaged))
     
     enough_cash=False
     excess_money_engaged=False
@@ -463,16 +459,11 @@ class IBData(RemoteData):
         
         if it_is_index:
             return Index(exchange=exchange_ib,symbol=symbol_ib)
-        elif exchange_ib in ["NASDAQ","NYSE"]:
+        else:
             if currency is None:
                 return Stock(symbol_ib,"SMART", primaryExchange=exchange_ib)
             else:
                 return Stock(symbol_ib,"SMART", currency, primaryExchange=exchange_ib)
-        else:
-            if currency is None:
-                return Stock(symbol_ib,exchange_ib)
-            else:
-                return Stock(symbol_ib,exchange_ib, currency)
         
     @classmethod 
     def convert_to_base(
@@ -949,14 +940,20 @@ class OrderPerformer():
                             testing=self.testing
                             )
             else:
+                last_price=get_last_price(self.action)
+                if last_price!=0:
+                    quantity=math.floor(order_size/last_price)
+                else:
+                    quantity=1
+                
                 self.new_order.entering_price=1.0
                 logger_trade.info("Manual " + buy_sell_txt[buy] + "order symbol: "+self.symbol+" , strategy: " + self.st.name)
                 self.ss.order_in_ib=False
 
                 if not buy:
-                    self.ss.quantity=-1.0
+                    self.ss.quantity=-1.0*quantity
                 else:
-                    self.ss.quantity=1.0
+                    self.ss.quantity=1.0*quantity
             self.new_order.save()
             self.ss.save()
             self.executed=True
