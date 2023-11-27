@@ -26,6 +26,7 @@ else:
     from backports.zoneinfo import ZoneInfo
 
 from reporting.models import Report, Alert, OrderExecutionMsg 
+from telegram.ext import CommandHandler
 
 from orders.ib import actualize_ss, get_last_price, get_ratio
 from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,\
@@ -46,7 +47,6 @@ This file contains the logic for:
  - Send message after each order
 '''
 logging.basicConfig(level=logging.INFO)  
-
 '''
 Start the bot in the background
 '''    
@@ -96,7 +96,7 @@ class MyScheduler():
                 self.do_weekday(start_check_time, self.check_pf, s_ex=s_ex, opening=True)
             if _settings["INDEX_CHECK"]:
                 self.do_weekday(start_check_time, self.check_pf, it_is_index=True,s_ex=s_ex, opening=True)
-            if _settings["REPORT"]:
+            if _settings["REPORT"] and s_ex.calc_report:
                 report_time=self.shift_time(s_ex.closing_time,-_settings["DAILY_REPORT_MINUTE_SHIFT"],s_ex.timezone) #write report 15 min before closing, so we have 15 min to calculate and pass the orders
                 self.do_weekday(report_time,self.daily_report,s_ex=s_ex) 
             if _settings["INTRADAY"]:
@@ -116,13 +116,13 @@ class MyScheduler():
             self.do_weekday(time(10,00,tzinfo=ZoneInfo('Europe/Paris')), self.update_slow_strat) #performed away from the opening
         if self.update_ss:
             self.manager.every(_settings["TIME_INTERVAL_UPDATE"], 'minutes').do(actualize_ss)
-                
+
         #the "background is created by celery"
         #OOTB vbt start_in_background does not seem to be compatible with django
         if not kwargs.get("test",False):
             self.manager.start() 
         self.telegram_bot.send_message_to_all("Scheduler started in background")   
-
+        
     def do_weekday(self, 
                    strh: str, 
                    f,

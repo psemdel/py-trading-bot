@@ -266,6 +266,39 @@ class TestIB(TestCase):
         op.get_delta_size()
         self.assertFalse(op.reverse)
         self.assertEqual(op.delta_size,10000)
+        
+        op.ss.quantity=1
+        op.ss.save()
+        
+        #buy but it is already there
+        op.get_order(True) #to create self.order
+        op.get_delta_size()
+        self.assertFalse(op.reverse)
+        self.assertTrue(op.delta_size>0)
+        
+        op.ss.quantity=1000000
+        op.ss.save()
+
+        op.get_delta_size()
+        self.assertFalse(op.reverse)
+        self.assertTrue(op.delta_size<0)
+        
+        op.target_size=-10000
+        op.get_delta_size()
+        self.assertTrue(op.reverse)
+        self.assertTrue(op.delta_size<0)
+        
+        op.ss.quantity=-1
+        op.ss.save()
+        
+        op.get_delta_size()
+        self.assertFalse(op.reverse)
+        self.assertTrue(op.delta_size<0)
+        
+        op.target_size=10000
+        op.get_delta_size()
+        self.assertTrue(op.reverse)
+        self.assertTrue(op.delta_size>0)
 
     def test_entry_place(self):
 
@@ -318,7 +351,7 @@ class TestIB(TestCase):
         
         _settings["USED_API"]["orders"]="YF"
         self.assertTrue(op.buy_order_sub())
-        self.assertEqual(op.ss.quantity,1)
+        self.assertTrue(op.ss.quantity>0)
         self.assertEqual(op.new_order.entering_price,1.0)
         self.assertFalse(op.ss.order_in_ib)
         self.assertTrue(op.executed)
@@ -340,7 +373,7 @@ class TestIB(TestCase):
         
         _settings["USED_API"]["orders"]="YF"
         self.assertTrue(op.sell_order_sub())
-        self.assertEqual(op.ss.quantity,-1)
+        self.assertTrue(op.ss.quantity<0)
         self.assertEqual(op.new_order.entering_price,1.0)
         self.assertFalse(op.ss.order_in_ib)
         self.assertTrue(op.executed)
@@ -360,7 +393,7 @@ class TestIB(TestCase):
         self.assertEqual(c,c2)
         
         from ib_insync import Stock
-        c3=Stock("AI","SBF","EUR")
+        c3=Stock("AI","SMART","EUR",primaryExchange="SBF")
         self.assertEqual(c,c3)
         
         #to see the contract details

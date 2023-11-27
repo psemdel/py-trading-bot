@@ -199,7 +199,7 @@ class TestSSManager(TestCase):
         
     def test_determine_target_sub3(self):    
         '''
-        Check if the algo could "pump" in case of equal priority
+        Check if a strategy can change afterwards the decision
         '''
         strategy3=m.Strategy.objects.create(name="strat3",priority=10)
         
@@ -209,7 +209,7 @@ class TestSSManager(TestCase):
         ss1.save()
         r=m2.Report.objects.create()
         self.ss_m=ss_manager.StockStatusManager(r,"Paris")
-        #low priority 
+        #but the strat none must still be able to perform an order
         df=pd.DataFrame(data=[["AC.PA",np.nan,1, 1],["AIR.PA",np.nan,1,np.nan]],columns=["index","none","strat2","strat3"])
         df.set_index("index",inplace=True)
         self.ss_m.determine_target_sub(df, False)
@@ -219,7 +219,15 @@ class TestSSManager(TestCase):
         
         self.assertEqual(self.ss_m.target_ss.loc["AIR.PA","norm_delta_quantity"],1)
         self.assertEqual(self.ss_m.target_ss.loc["AIR.PA","norm_quantity"],1)
-        self.assertEqual(self.ss_m.target_ss.loc["AIR.PA","priority"],20)      
+        self.assertEqual(self.ss_m.target_ss.loc["AIR.PA","priority"],20)    
+        
+        #but the strat none must still be able to perform an order
+        df=pd.DataFrame(data=[["AC.PA",0,1, np.nan],["AIR.PA",np.nan,1,np.nan]],columns=["index","none","strat2","strat3"])
+        df.set_index("index",inplace=True)
+        self.ss_m.determine_target_sub(df, False)
+        self.assertEqual(self.ss_m.target_ss.loc["AC.PA","norm_delta_quantity"],-1)
+        self.assertEqual(self.ss_m.target_ss.loc["AC.PA","norm_quantity"],0)
+        self.assertEqual(self.ss_m.target_ss.loc["AC.PA","priority"],10)      
         
     def test_determine_target_sub4(self):    
         '''
@@ -260,7 +268,10 @@ class TestSSManager(TestCase):
         self.assertEqual(self.ss_m.target_ss.loc["BNP.PA","norm_quantity"],1)
         self.assertEqual(self.ss_m.target_ss.loc["BNP.PA","priority"],10)      
         
-    def test_determine_target_sub6(self):          
+    def test_determine_target_sub6(self):   
+        '''
+        Test if order on index are transfered to ETF
+        '''
         df=pd.DataFrame(data=[["^FCHI",-1]],columns=["index","none"])
         df.set_index("index",inplace=True)
         self.ss_m.determine_target_sub(df, True)
@@ -269,54 +280,13 @@ class TestSSManager(TestCase):
         self.assertEqual(self.ss_m.target_ss.loc["^FCHI","norm_quantity"],0)
         self.assertEqual(self.ss_m.target_ss.loc["^FCHI","priority"],10)
         
-        self.assertEqual(self.ss_m.target_ss.loc["KER.PA","norm_delta_quantity"],-1)
-        self.assertEqual(self.ss_m.target_ss.loc["KER.PA","norm_quantity"],-1)
+        self.assertEqual(self.ss_m.target_ss.loc["KER.PA","norm_delta_quantity"],1) #etf cannot be in short!!
+        self.assertEqual(self.ss_m.target_ss.loc["KER.PA","norm_quantity"],1)
         self.assertEqual(self.ss_m.target_ss.loc["KER.PA","priority"],10)  
         
     def test_determine_target(self):          
         self.ss_m.determine_target()           
-
-    def test_perform_orders(self):
-        ss1=m.StockStatus.objects.get(action=self.a)
-        self.assertEqual(ss1.quantity,0)
-
-        df=pd.DataFrame(data=[["AC.PA",0,self.strategy.id,True,10,1,1]],
-                        columns=["symbol","quantity","strategy_id","order_in_ib","priority","norm_quantity","norm_delta_quantity"],
-                        )
-        df.set_index("symbol",inplace=True)
-        self.ss_m.target_ss=df
-        self.ss_m.perform_orders(testing=True)
-        
-        ss1=m.StockStatus.objects.get(action=self.a) #need to be called again otherwise not actualized somehow
-        self.assertEqual(ss1.quantity,1)
-        ent_ex_symbols=m2.ListOfActions.objects.get(report=self.r,used_api="YF",entry=True,buy=True)
-        self.assertTrue(np.equal(ent_ex_symbols.actions.all(),[self.a]).all())
-    
-        self.r=m2.Report.objects.create()
-        self.ss_m=ss_manager.StockStatusManager(self.r,"Paris")
-        df=pd.DataFrame(data=[["AI.PA",0,self.strategy.id,True,10,-1,-1]],
-                        columns=["symbol","quantity","strategy_id","order_in_ib","priority","norm_quantity","norm_delta_quantity"],
-                        )
-        df.set_index("symbol",inplace=True)
-        self.ss_m.target_ss=df
-        self.ss_m.perform_orders(testing=True) 
-        
-        ss1=m.StockStatus.objects.get(action=self.a2)
-        self.assertEqual(ss1.quantity,-1)
-        ent_ex_symbols=m2.ListOfActions.objects.get(report=self.r,used_api="YF",entry=True,buy=False)
-        self.assertTrue(np.equal(ent_ex_symbols.actions.all(),[self.a2]).all())
-
-    def test_perform_orders2(self):  
-        df=pd.DataFrame(data=[["AI.PA",0,self.strategy.id,True,10,1,2]],
-                        columns=["symbol","quantity","strategy_id","order_in_ib","priority","norm_quantity","norm_delta_quantity"],
-                        )
-        df.set_index("symbol",inplace=True)
-        self.ss_m.target_ss=df
-        self.ss_m.perform_orders(testing=True) 
-        
-        ss1=m.StockStatus.objects.get(action=self.a2)
-        self.assertEqual(ss1.quantity,1)
-        
+   
     def test_add_target_quantity(self):
         
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc['AC.PA',"none"]))

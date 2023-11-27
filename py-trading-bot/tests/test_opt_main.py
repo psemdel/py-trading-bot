@@ -20,16 +20,16 @@ class TestOptMain(TestCase):
     def setUpClass(self):  
         super().setUpClass()
         self.a={"bull":
-           {"ent":[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
-            "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+           {"ent":["STOCH","RSI20","CDLINVERTEDHAMMER"],
+            "ex": []
            },
           "bear":
-             {"ent":[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
-              "ex": [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
+             {"ent":[],
+              "ex": ["RSI20","RSI30","CDLHIKKAKEMOD"]
              },
           "uncertain":
-             {"ent":[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,],
-              "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+             {"ent":["SUPERTREND","MFI","BBANDS","CDLTRISTAR"],
+              "ex": []
              },             
           }     
 
@@ -97,7 +97,7 @@ class TestOptMain(TestCase):
         
         self.o.defi_i("total")
         
-        self.assertEqual(np.shape(self.o.all_t["CAC40"]["total"]["ent"])[0],22)
+        self.assertEqual(np.shape(self.o.all_t["CAC40"]["total"]["ent"])[0],34)
         self.assertEqual(np.shape(self.o.all_t["CAC40"]["total"]["ent"])[1],4004)
         self.assertEqual(np.shape(self.o.all_t["CAC40"]["total"]["ent"])[2],39)
         
@@ -113,18 +113,19 @@ class TestOptMain(TestCase):
         
         self.assertEqual(np.shape(self.o.exs["CAC40"])[0],4004)
         self.assertEqual(np.shape(self.o.exs["CAC40"])[1],39)
+
         self.assertFalse(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[0])
         self.assertFalse(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-1])
-        self.assertTrue(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-3])
+        self.assertFalse(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-3])
         self.assertFalse(self.o.exs["CAC40"][self.o.exs["CAC40"].columns[0]].values[-4])
 
         self.o.defi_ent("total")
         self.assertEqual(np.shape(self.o.ents["CAC40"])[0],4004)
         self.assertEqual(np.shape(self.o.ents["CAC40"])[1],39)
-        
-        self.assertFalse(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[0]].values[0])
+
+        self.assertFalse(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[0]].values[-1])
         self.assertTrue(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-1])
-        self.assertTrue(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-4])
+        self.assertTrue(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-2])
         
         exs_total=copy.deepcopy(self.o.exs)
         ents_total=copy.deepcopy(self.o.ents)
@@ -139,11 +140,18 @@ class TestOptMain(TestCase):
 
         self.o.defi_i("learn")
         self.o.defi_ex("learn")
-        i=self.o.exs["CAC40"].index[:-1]
+        
+        if self.o.test_window_start["CAC40"]==0:
+            i=self.o.exs["CAC40"].index
+        else:
+            #remove self.test_window_start[ind]-1
+            r=[ii for ii in range(0,self.o.test_window_start["CAC40"]-1)]+[ii for ii in range(self.o.test_window_start["CAC40"],len(self.o.exs["CAC40"].index))]
+            i=self.o.exs["CAC40"].index[r]
+                    
         self.assertTrue(np.equal(exs_total["CAC40"].loc[i],self.o.exs["CAC40"].loc[i]).all().all())
-        self.o.defi_ent("test")
-        i2=self.o.ents["CAC40"].index[:-1]
-        self.assertTrue(np.equal(ents_total["CAC40"].loc[i2],self.o.ents["CAC40"].loc[i2]).all().all())
+        self.o.defi_ent("learn")
+        i=self.o.ents["CAC40"].index
+        self.assertTrue(np.equal(ents_total["CAC40"].loc[i],self.o.ents["CAC40"].loc[i]).all().all())
         
     def test_random(self):
         self.assertEqual(np.shape(self.o.random(10))[0],10)
@@ -161,10 +169,6 @@ class TestOptMain(TestCase):
         
         self.assertTrue("ent" in self.o.calc_arr["bull"])
         self.assertTrue("ex" in self.o.calc_arr["bull"])
-        self.assertTrue(np.equal(self.o.calc_arr["bull"]["ent"],self.o.calc_arr["bear"]["ent"]).all())
-        self.assertTrue(np.equal(self.o.calc_arr["bull"]["ent"],self.o.calc_arr["uncertain"]["ent"]).all())
-        self.assertTrue(np.equal(self.o.calc_arr["bull"]["ex"],self.o.calc_arr["bear"]["ex"]).all())
-        self.assertTrue(np.equal(self.o.calc_arr["bull"]["ex"],self.o.calc_arr["uncertain"]["ex"]).all())
         
         self.o.nb_macro_modes=1
         self.o.assign_random()
@@ -240,17 +244,51 @@ class TestOptMain(TestCase):
         self.assertEqual(self.o.test_arrs.loc["011",'col3'],'a')
         self.assertEqual(self.o.test_arrs.loc["011",'col4'],4)
     
-    def test_check_tested_arrs(self):
+    def test_deinterpret(self):
+        l=self.o.deinterpret([],"ex")
+        self.assertEqual(len(l),32)
+        self.assertFalse(1 in l)
+        
+        l=self.o.deinterpret([],"ent")
+        self.assertEqual(len(l),34)
+        self.assertFalse(1 in l)
+        
+        l=self.o.deinterpret(["STOCH","RSI20","CDLINVERTEDHAMMER"],"ent")
+        self.assertTrue(np.equal(l,[0,0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]).all())
+        
+        l=self.o.deinterpret(["SUPERTREND","MFI","BBANDS","CDLTRISTAR"],"ent")
+        self.assertTrue(np.equal(l,[0,1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]).all())
+    
+    def test_deinterpret_all(self):
+        self.o.strat_arr=self.a    
+        self.o.deinterpret_all()
+        
+        self.assertTrue(np.equal(self.o.arr["bull"]["ent"],[0,0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]).all())
+        self.assertTrue(np.equal(self.o.arr["uncertain"]["ex"],[0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).all())
+
+    def test_arr_to_key(self):
         self.o=opt_strat.Opt("2007_2022_08",
                          loops=1,
                          testing=True,
                          filename="test")
+        self.o.strat_arr=self.a    
+        self.o.deinterpret_all()
+        self.o.calc_arr=self.o.arr
+        self.o.arr_to_key()
+
+        t=""
+        for e in self.o.ind_k:
+            t+=str(e)
+            
+        ref="001000100000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000011000000000000000001000000010011000000000000000000000001000000000000000000000000000000000000"
+        self.assertEqual(t,ref)
+        
+    def test_check_tested_arrs(self):
         self.o.test_arrs=None
-        self.o.calc_arr=self.a
+        self.o.strat_arr=self.a    
+        self.o.deinterpret_all()
+        self.o.calc_arr=self.o.arr
         self.assertTrue(self.o.check_tested_arrs())
         self.o.append_row()
         self.assertFalse(self.o.check_tested_arrs())
-        
-        self.o.calc_arr["bull"]["ent"]=[1., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.,]
-        self.assertTrue(self.o.check_tested_arrs())
       

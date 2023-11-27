@@ -36,9 +36,10 @@ class Opt(OptMain):
             class_name: str,
             period: str,
             filename:str="presel",
+            indexes: list=["CAC40","DAX","NASDAQ","FIN","HEALTHCARE","INDUSTRY"],
             **kwargs):
         super().__init__(period,filename=filename,
-                         indexes=["CAC40","DAX","NASDAQ","FIN","HEALTHCARE","INDUSTRY"], #with only CAC40, DAX and Nasdaq it overfits
+                         indexes=indexes, #with only CAC40, DAX and Nasdaq it overfits 
                          **kwargs)
         self.pr={}
         
@@ -54,18 +55,21 @@ class Opt(OptMain):
 
             #no run otherwise it will crash, as ust is not splited
 
-    def calculate_eq_ret(self,pf,ind:str):
+    def calculate_eq_ret(self,pf,ind:str,dic:str):
         '''
         Calculate an equivalent score for a portfolio  
         
         Arguments
         ----------
            pf: vbt portfolio
+           ind: index
+           dic: train, test or total
         ''' 
         m_rb=pf.total_market_return
         m_rr=pf.get_total_return()
-        self.row["return_"+ind]=m_rr
-        self.row["delta_"+ind]=m_rr-m_rb
+        
+        self.row["return_"+ind+"_"+dic]=m_rr
+        self.row["delta_"+ind+"_"+dic]=m_rr-m_rb
         
         if abs(m_rb)<0.1: #avoid division by zero
             p=(m_rr)/ 0.1*np.sign(m_rb)   
@@ -82,7 +86,7 @@ class Opt(OptMain):
         self.defi_ent("total")
         self.defi_ex("total")
         self.macro_mode("total")
-        
+       
         for ind in self.indexes: #CAC, DAX, NASDAQ
             self.pr[ind].close=self.close_dic[ind]["total"]
             self.pr[ind].reinit() #in case the function was called ealier
@@ -99,7 +103,7 @@ class Opt(OptMain):
             self.exs[ind]=self.pr[ind].exits.loc[i]
             self.ents_short[ind]=self.pr[ind].entries_short.loc[i]
             self.exs_short[ind]=self.pr[ind].exits_short.loc[i]
-                            
+
             pf_dic[ind]=vbt.Portfolio.from_signals(self.data_dic[ind][dic],
                                           self.ents[ind],
                                           self.exs[ind],
@@ -110,7 +114,6 @@ class Opt(OptMain):
                                           call_seq='auto',
                                           cash_sharing=True
                                           ) #stop_exit_price="close"
-        
         return pf_dic
     
     def calculate_pf(
@@ -134,11 +137,11 @@ class Opt(OptMain):
         #create the underlying strategy
         ret=0
         ret_arr=[]
-        
+
         pf_dic=self.calculate_pf_sub(dic)
 
         for ind in self.indexes: #CAC, DAX, NASDAQ    
-            ret_arr.append(self.calculate_eq_ret(pf_dic[ind],ind))
+            ret_arr.append(self.calculate_eq_ret(pf_dic[ind],ind, dic))
             
         ret=self.summarize_eq_ret(ret_arr)
 

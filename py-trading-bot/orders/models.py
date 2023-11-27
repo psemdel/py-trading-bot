@@ -433,7 +433,8 @@ class StockEx(models.Model):
     presel_at_sector_level: if true, the strategy will be performed at sector level. Is true only for NYSE, as there are too many stocks
                             in the S&P 500. You may want to use the same strategy on 5 bundles of 100 stocks instead of 1 strategy for 
                             500 stocks.
-    main_index: select the index related to this stock exchange    
+    main_index: select the index related to this stock exchange  
+    calc_report: should the report be calculated, useful to deactivate report about ETF stock exchanges
     '''
     name=models.CharField(max_length=100, blank=False)
     fees=models.ForeignKey('Fees',on_delete=models.CASCADE)
@@ -447,6 +448,7 @@ class StockEx(models.Model):
     strategies_in_use_intraday=models.ManyToManyField(Strategy,blank=True, related_name='strategies_in_use_intraday')  
     presel_at_sector_level=models.BooleanField(blank=False,default=False)
     main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=None)
+    calc_report=models.BooleanField(blank=False,default=True)
     
     class Meta:
         ordering = ["name"]

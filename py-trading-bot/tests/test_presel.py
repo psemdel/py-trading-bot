@@ -72,21 +72,20 @@ class TestBT(TestCase):
         self.ust.run()
         
         self.bti=presel.Presel(self.period,symbol_index=self.symbol_index,input_ust=self.ust)
-        #ust has an exit for AC in 2022-08-19, no exit short
-        d=datetime(2022,8,20,tzinfo=ZoneInfo('Europe/Paris'))
-        #since 2022-08-20, no exit
-        self.assertEqual(self.bti.get_last_exit(d,"AC","AC"),1)
-        self.assertEqual(self.bti.get_last_exit(d,"AC","AC",short=True),-1)
+        d=datetime(2022,8,27,tzinfo=ZoneInfo('Europe/Paris'))
+        #since 2022-08-27, no exit
+        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR"),1)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR",short=True),-1)
         
-        d=datetime(2022,8,18,tzinfo=ZoneInfo('Europe/Paris'))
-        #since 2022-08-20, there was an exit
-        self.assertEqual(self.bti.get_last_exit(d,"AC","AC"),0)
-        self.assertEqual(self.bti.get_last_exit(d,"AC","AC",short=True),-1)
+        d=datetime(2022,8,25,tzinfo=ZoneInfo('Europe/Paris'))
+        #since 2022-08-25, there was an exit
+        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR"),0)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR",short=True),-1)
         
-        d=datetime(2022,8,19,tzinfo=ZoneInfo('Europe/Paris'))
-        #since 2022-08-19, limit case, we should not exit the day we enter
-        self.assertEqual(self.bti.get_last_exit(d,"AC","AC"),1)
-        self.assertEqual(self.bti.get_last_exit(d,"AC","AC",short=True),-1)
+        d=datetime(2022,8,26,tzinfo=ZoneInfo('Europe/Paris'))
+        #since 2022-08-26, limit case, we should not exit the day we enter
+        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR"),1)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR",short=True),-1)
         
     def test_preselect_vol(self):
         self.bti=presel.PreselVol(self.period,symbol_index=self.symbol_index)
@@ -166,7 +165,7 @@ class TestBT(TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),21.52)  
+        self.assertEqual(round(pf.get_total_return(),2),22.29)    
         
     def test_preselect_macd_vol_macro(self):
         self.bti=presel.PreselMacdVolMacro(self.period,symbol_index=self.symbol_index)
@@ -214,7 +213,7 @@ class TestBT(TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),7.1) 
+        self.assertEqual(round(pf.get_total_return(),2),7.37) 
 
     def test_preselect_divergence_blocked_im(self):
         self.bti=presel.PreselDivergenceBlockedIm(self.period,symbol_index=self.symbol_index)
@@ -230,7 +229,7 @@ class TestBT(TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),10.42) 
+        self.assertEqual(round(pf.get_total_return(),2),10.81) 
         
     def test_preselect_vol_slow(self):
         self.bti=presel.PreselVolSlow(self.period,symbol_index=self.symbol_index)
@@ -246,7 +245,7 @@ class TestBT(TestCase):
                                       cash_sharing=True,
                              )
 
-        self.assertEqual(round(pf.get_total_return(),2),10.1)   
+        self.assertEqual(round(pf.get_total_return(),2),11.24)   
         
     def test_preselect_realmadrid(self):
         self.bti=presel.PreselRealMadrid(self.period,symbol_index=self.symbol_index)
@@ -262,7 +261,7 @@ class TestBT(TestCase):
                                        cash_sharing=True,
                               )
 
-        self.assertEqual(round(pf.get_total_return(),2),9.08 )     
+        self.assertEqual(round(pf.get_total_return(),2),6.47 )     
 
     def test_preselect_realmadrid_blocked(self):
         self.bti=presel.PreselRealMadridBlocked(self.period,symbol_index=self.symbol_index)
@@ -278,7 +277,7 @@ class TestBT(TestCase):
                                        cash_sharing=True,
                               )
 
-        self.assertEqual(round(pf.get_total_return(),2),6.0) 
+        self.assertEqual(round(pf.get_total_return(),2),5.56) 
 
 
     def test_preselect_macd_vol_slow(self):

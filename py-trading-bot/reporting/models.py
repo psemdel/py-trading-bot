@@ -110,7 +110,7 @@ class Report(models.Model):
         '''
         buy_sell_txt={True:"buying ", False: "selling "}
         if used_api!="YF":
-            txt=buy_sell_txt[buy]+"order executed, symbol: " +action.symbol +" strategy: " + strategy
+            txt=buy_sell_txt[buy].capitalize()+"order executed, symbol: " +action.symbol +" strategy: " + strategy
         else:
             txt="Manual " + buy_sell_txt[buy].lower()+"order request, symbol: " +action.symbol +" strategy: " + strategy
         logger_trade.info(txt)
@@ -146,7 +146,14 @@ class Report(models.Model):
                         st=st
                         )  
                     if ust_or_pr is not None: #presel with it_is_index
-                        ust_or_pr.perform(self, st_name=st.name)
+                        if st.class_name in ["PreselRetard","PreselRetardMacro"]:
+                            keep=False
+                            for st1 in strats: #if retard_keep is also active, keep.
+                                if st1.name=="retard_keep":
+                                    keep=True
+                            ust_or_pr.perform(self, st_name=st.name,keep=keep)
+                        else:
+                            ust_or_pr.perform(self, st_name=st.name)
                     
         except Exception as e:
               import sys
@@ -198,8 +205,7 @@ class Report(models.Model):
             ust_hold,
             ust_trend,
             ust_kama,
-            ust_ma,
-            ust_pattern):
+            ust_ma):
         '''
         Fill the report with result of the calculations
         
@@ -207,7 +213,7 @@ class Report(models.Model):
        	----------
            symbols: list of YF ticker
            symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
-           ust_hold, ust_trend, ust_kama, ust_ma, ust_pattern: underlying strategies containing some calculation results 
+           ust_hold, ust_trend, ust_kama, ust_ma: underlying strategies containing some calculation results 
            exchange: name of the stock exchange
         '''
         for symbol in symbols:
@@ -255,13 +261,6 @@ class Report(models.Model):
                     ar.ma_ent=ust_ma.entries[symbol].values[-1]
                     ar.ma_ex=ust_ma.exits[symbol].values[-1]
             
-                    if ust_pattern is not None:
-                        ar.pattern_light_ent=ust_pattern.entries[(True, symbol)].values[-1] or\
-                                             ust_pattern.entries[(True, symbol)].values[-2]
-                                             
-                        ar.pattern_light_ex=ust_pattern.exits[(True, symbol)].values[-1] or\
-                                            ust_pattern.exits[(True, symbol)].values[-2]
-            
                     if self.it_is_index:
                         if ar.kama_ent:
                             self.concat(" Index " + symbol + " KAMA bottom detected!")
@@ -288,9 +287,9 @@ class Report(models.Model):
         target_order: which desired state (-1, 0, 1) is wanted   
         strategy: name of the strategy
         '''
-        if target_order==1:
+        if target_order==-1:
             self.concat(symbol + " present decision for "+str(strategy)+" strategy : sell")
-        elif target_order==-1:
+        elif target_order==1:
             self.concat(symbol + " present decision for "+str(strategy)+" strategy : buy")
             
     def init_ust(
@@ -351,7 +350,7 @@ class Report(models.Model):
 
             if exchange is not None:
                 self.stock_ex=StockEx.objects.get(name=exchange)
-                
+            
             if len(actions)==0:
                 print("No actions found for exchange: "+str(exchange))
                 logger.info("No actions found for exchange: "+str(exchange))
@@ -371,9 +370,6 @@ class Report(models.Model):
                     ust_kama=ic.VBTSTOCHKAMA.run(ust_hold.high,ust_hold.low,ust_hold.close)
                     ust_ma=ic.VBTMA.run(ust_hold.close)
     
-                    ust_pattern=None
-                    if _settings["CALCULATE_PATTERN"]:
-                        ust_pattern=ic.VBTPATTERN.run(ust_hold.open,ust_hold.high,ust_hold.low,ust_hold.close,light=True)
                     ust_trend=None
                     if _settings["CALCULATE_TREND"]:
                         ust_trend=name_to_ust_or_presel(
@@ -383,7 +379,7 @@ class Report(models.Model):
                             prd=True
                             )    
     
-                    self.populate_report(ust_hold.symbols, ust_hold.symbols_to_YF, ust_hold,ust_trend, ust_kama, ust_ma, ust_pattern)
+                    self.populate_report(ust_hold.symbols, ust_hold.symbols_to_YF, ust_hold,ust_trend, ust_kama, ust_ma)
                     logger.info("Strat daily report written " +(exchange or ""))
               
                 if sec is not None:
@@ -436,8 +432,6 @@ class ActionReport(models.Model):
     stoch: Stochastic Oscillator. figure between 0 and 100, 
     pattern_ent: was one pattern of the BULL_PATTERNS (see constants.py) detected?
     pattern_ex: was one pattern of the BEAR_PATTERNS (see constants.py) detected?
-    pattern_light_ent: was one pattern of the BULL_PATTERNS_LIGHT (see constants.py) detected?
-    pattern_light_ex: was one pattern of the BEAR_PATTERNS_LIGHT (see constants.py) detected?
     kama_ent: indicates a minimum on the smoothed price (kama)
     kama_ex: indicates a maximum on the smoothed price (kama)
     stoch_ent: was an entry signal created by the Stochastic Oscillator. Typically if its value crosses 80.
@@ -466,8 +460,8 @@ class ActionReport(models.Model):
     stoch=models.DecimalField(max_digits=100, decimal_places=5, default=0.0)
     pattern_ent=models.BooleanField(blank=False,default=False) #not used
     pattern_ex=models.BooleanField(blank=False,default=False) #not used
-    pattern_light_ent=models.BooleanField(blank=False,default=False)
-    pattern_light_ex=models.BooleanField(blank=False,default=False) 
+    pattern_light_ent=models.BooleanField(blank=False,default=False) #not used
+    pattern_light_ex=models.BooleanField(blank=False,default=False)  #not used
     kama_ent=models.BooleanField(blank=False,default=False)
     kama_ex=models.BooleanField(blank=False,default=False)
     

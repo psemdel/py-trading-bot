@@ -10,7 +10,6 @@ import gc
 import copy
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS, COL_DIC, bull_bear_to_int
 from core.common import remove_multi
-import itertools
 import pandas as pd
 import math
 
@@ -84,12 +83,14 @@ class OptMain():
            tsl: daily stop loss threshold
            strat_arr: array of the strategy combination to use, if defined then the loop will start from this arr
            testing: set to True to perform unittest on the function
+           filename: name of the file where to solve the result
+           opt_only_exit: optimize only the exits as the entries are fixed by another mechanism
         '''
         for k in ["ratio_learn_train","split_learn_train", "indexes", "it_is_index","nb_macro_modes",
                   "strat_arr","fees", "sl", "tsl", "filename","testing","opt_only_exit"]:
             setattr(self,k,locals()[k])
         #init
-        for key in ["close","open","low","high","data"]:
+        for key in ["close","open","low","high","data","volume"]:
             setattr(self,key+"_dic",{})
             
             for ind in self.indexes:
@@ -99,9 +100,7 @@ class OptMain():
         for ind in self.indexes:
             ind_str+=ind+"_"
 
-        text_it_is_index=""
-        if it_is_index:
-           text_it_is_index="index_" 
+        text_it_is_index= "index_" if it_is_index else ""
 
         self.test_arrs_path=os.path.join(os.path.dirname(__file__), "tested_arrs/"+ind_str+ period+"_"+ 
                                          text_it_is_index+ self.filename+".csv")
@@ -112,13 +111,11 @@ class OptMain():
 
         self.row={}
         self.total_len={}
-
+        self.test_window_start={}
+        
         for ind in self.indexes:
             retrieve_data_offline(self,ind,period)
-            if self.it_is_index:
-                self.suffix="_ind"
-            else:
-                self.suffix=""
+            self.suffix="_ind" if self.it_is_index else ""
             
             if self.split_learn_train=="time":
                 self.total_len[ind]=len(getattr(self,"close"+self.suffix))
@@ -129,27 +126,27 @@ class OptMain():
             test_len=self.total_len[ind]-learn_len
             
             if test_window_start_init is None:
-                self.test_window_start=np.random.randint(0,learn_len)
+                self.test_window_start[ind]=np.random.randint(0,learn_len)
             else:
-                self.test_window_start=test_window_start_init
-            self.test_window_end=self.test_window_start+test_len
+                self.test_window_start[ind]=test_window_start_init
+            self.test_window_end=self.test_window_start[ind]+test_len
             
-            self.log("random test start at index number " + ind + " for : "+str(self.test_window_start) +
-                ", "+str(self.close.index[self.test_window_start]) +", "+\
+            self.log("random test start at index number " + ind + " for : "+str(self.test_window_start[ind]) +
+                ", "+str(self.close.index[self.test_window_start[ind]]) +", "+\
                 "until index number: "+str(self.test_window_end) + ", "+str(self.close.index[self.test_window_end])
                 )
             
             self.data_dic[ind]["total"]=getattr(self,"data"+self.suffix)
-            learn_range=[i for i in range(0,self.test_window_start)]+[i for i in range(self.test_window_end,self.total_len[ind])]
+            learn_range=[i for i in range(0,self.test_window_start[ind])]+[i for i in range(self.test_window_end,self.total_len[ind])]
             
             if self.split_learn_train=="time": 
-                self.data_dic[ind]["test"]=getattr(self,"data"+self.suffix).iloc[self.test_window_start:self.test_window_end]
+                self.data_dic[ind]["test"]=getattr(self,"data"+self.suffix).iloc[self.test_window_start[ind]:self.test_window_end]
                 self.data_dic[ind]["learn"]=getattr(self,"data"+self.suffix).iloc[learn_range]
             else: #symbol
-                self.data_dic[ind]["test"]=getattr(self,"data"+self.suffix).select(list(self.close.columns[self.test_window_start:self.test_window_end]))
+                self.data_dic[ind]["test"]=getattr(self,"data"+self.suffix).select(list(self.close.columns[self.test_window_start[ind]:self.test_window_end]))
                 self.data_dic[ind]["learn"]=getattr(self,"data"+self.suffix).select(list(self.close.columns[learn_range]))
                 
-            for d in ["Close","Open","Low","High"]:
+            for d in ["Close","Open","Low","High","Volume"]:
                 for k in ["test","learn","total"]:
                     getattr(self,d.lower()+"_dic")[ind][k]=self.data_dic[ind][k].get(d)
         self.out={}
@@ -157,16 +154,10 @@ class OptMain():
         #init
         self.init_threshold=-1000 
         self.confidence_threshold=60
-        self.non_pattern_len=7
-
         
-        #self.a_init={}
-        #for key in ["bull","bear","uncertain"]:
-        #    self.a_init[key]=locals()["a_"+key]
-           
         if self.strat_arr is not None:
             self.predef=True
-            self.arr=self.strat_arr
+            self.deinterpret_all()
             self.loops=1
             self.nb_macro_modes=len(self.strat_arr)
         else:
@@ -196,6 +187,7 @@ class OptMain():
         self.defi_macro_trend("learn")
         
         self.shift=False
+
         print("init finished")
        
     def log(
@@ -224,19 +216,10 @@ class OptMain():
         '''
         Calculate the entries and exits for each strategy. Relatively slow, but must be performed only once.
         
-        Array explanation:
-            
-        Index 0-6, same for entry and exit
-        0: moving average
-        1: stochastic oscillator
-        2: price smoothed with kama extrema (minimum -> entry, maximum -> exit)
-        3: supertrend
-        4: Bollinger bands (price crosses lower band -> entry, price crosses higher band -> exit)
-        5: RSI with threshold 20/80
-        6: RSI with threshold 30/70
+        An array instead of a dictionary is used as it makes the variation algorithm easier. It just has to replace 0 with 1 and the other way around.
         
-        Index for ent: 7-21, see BULL_PATTERNS in constants.py
-        Index for ex: 7-21, see BEAR_PATTERNS in constants.py
+        Be careful that this function is consistent with entry_cols in constant.py
+
         Arguments
         ----------
            key: total/learn/test
@@ -249,18 +232,30 @@ class OptMain():
             high=self.high_dic[ind]["total"]
             low=self.low_dic[ind]["total"]
             close=self.close_dic[ind]["total"]
-            
-            t=ic.VBTMA.run(close)
-            all_t['ent'].append(t.entries)
-            all_t['ex'].append(t.exits)
+            volume=self.volume_dic[ind]["total"]
             
             t=ic.VBTSTOCHKAMA.run(high,low,close)
-            all_t['ent'].append(t.entries_stoch)
-            all_t['ex'].append(t.exits_stoch)    
-
             all_t['ent'].append(t.entries_kama)
-            all_t['ex'].append(t.exits_kama)   
-
+            all_t['ex'].append(t.exits_kama)
+            
+            t=vbt.talib("MFI").run(high, low, close,volume)
+            all_t['ent'].append(t.real_crossed_below(20))
+            all_t['ex'].append(t.real_crossed_above(80))
+            #all_t['ent'].append(t.real_crossed_above(20))
+            #all_t['ex'].append(t.real_crossed_below(80))
+            
+            t=vbt.STOCH.run(high,low,close)
+            all_t['ent'].append(t.slow_k_crossed_below(20))
+            all_t['ex'].append(t.slow_k_crossed_above(80))
+            #all_t['ent'].append(t.slow_k_crossed_above(20))
+            #all_t['ex'].append(t.slow_k_crossed_below(80))
+  
+            t=vbt.talib("WILLR").run(high, low, close)
+            all_t['ent'].append(t.real_crossed_below(-90))
+            all_t['ex'].append(t.real_crossed_above(-10))
+            #all_t['ent'].append(t.real_crossed_above(-90))
+            #all_t['ex'].append(t.real_crossed_below(-10))
+            
             t=ic.VBTSUPERTREND.run(high,low,close)
             all_t['ent'].append(t.entries)
             all_t['ex'].append(t.exits)
@@ -272,9 +267,23 @@ class OptMain():
             t=vbt.RSI.run(close,wtype='simple')
             all_t['ent'].append(t.rsi_crossed_below(20))
             all_t['ex'].append(t.rsi_crossed_above(80))
+            #all_t['ent'].append(t.rsi_crossed_above(20))
+            #all_t['ex'].append(t.rsi_crossed_below(80))
             
             all_t['ent'].append(t.rsi_crossed_below(30))
             all_t['ex'].append(t.rsi_crossed_above(70))
+            #all_t['ent'].append(t.rsi_crossed_above(30))
+            #all_t['ex'].append(t.rsi_crossed_below(70))
+            
+            t=vbt.talib("ULTOSC").run(high, low, close)
+            all_t['ent'].append(t.real_crossed_below(20))
+            all_t['ex'].append(t.real_crossed_above(80))
+            #all_t['ent'].append(t.real_crossed_above(20))
+            #all_t['ex'].append(t.real_crossed_below(80))
+            all_t['ent'].append(t.real_crossed_below(25))
+            all_t['ex'].append(t.real_crossed_above(75))
+            #all_t['ent'].append(t.real_crossed_above(25))
+            #all_t['ex'].append(t.real_crossed_below(75))
 
             for func_name in BULL_PATTERNS:
                 t=ic.VBTPATTERNONE.run(open_,high,low,close,func_name, "ent").out
@@ -323,18 +332,60 @@ class OptMain():
                 i=self.open_dic[ind][key].index
                 self.macro_trend[ind][key]=self.macro_trend[ind]["total"].loc[i]
 
+    def deinterpret_all(self):
+        '''
+        human readable information in binary array
+        '''
+        self.arr={}
+
+        for k, v in self.strat_arr.items():
+            self.arr[k]={}
+            for ent_or_ex, vv in v.items():
+                if len(vv)>0 and type(vv[0])==int:
+                    self.arr=self.strat_arr
+                    return
+                else:
+                    self.arr[k][ent_or_ex] =self.deinterpret(vv,ent_or_ex)
+
+    def deinterpret(self,arr_input_explicit: list,ent_or_ex: str):
+        '''
+        human readable information in binary array
+        
+        Arguments
+        ----------
+           arr_input_explicit: strategy array with names
+           ent_or_ex: key which can be "ent" or "ex"
+        '''
+        l=[]
+        if len(arr_input_explicit)==0:
+            l=[0 for e in COL_DIC[ent_or_ex]]
+        else:
+            #warning
+            for e in arr_input_explicit:
+                if e not in COL_DIC[ent_or_ex]:
+                    print("warning: "+e+" not found in col_dic")
+            
+            for e in COL_DIC[ent_or_ex]:
+                if e in arr_input_explicit:
+                    l.append(1)
+                else:
+                    l.append(0)
+        return l       
+
     def interpret(self,arr_input: list,ent_or_ex: str):
         '''
         to translate the binary array in human readable information
         
         Arguments
         ----------
-           arr_input: strategy array to be displayed
+           arr_input: strategy array with figures to be displayed
         '''
+        l=[]
         for ii, e in enumerate(arr_input[ent_or_ex]):
             if e:
-                self.log(COL_DIC[ent_or_ex][ii])
-      
+                l.append(COL_DIC[ent_or_ex][ii])
+        self.log(l)
+        
     def defi_ent(self,key: str):
         '''
         See defi
@@ -373,13 +424,11 @@ class OptMain():
                 s=np.full(np.shape(self.all_t[ind][key][ent_or_ex][0]),0.0)
                 
                 for ii in range(len(arr)):
-                    t=self.all_t[ind][key][ent_or_ex][ii]
-                    t2=ic.VBTSUM.run(t,k=arr[ii]).out #equivalent to if arr[ii]: then consider self.all_t_ents[ind][key][ii]
-                    t2=remove_multi(t2)
-                    s+=t2
+                    if arr[ii]==1:
+                        s+=remove_multi(self.all_t[ind][key][ent_or_ex][ii])
 
                 ents_raw=(s>=self.threshold)
-                   
+
                 if self.nb_macro_modes==1:
                     ent=ents_raw
                 else:
@@ -393,9 +442,9 @@ class OptMain():
             if ent_or_ex=="ent":
                 self.ents[ind]=ent
             else:
-                if "learn" in key and self.test_window_start!=0:
-                    ent.iloc[self.test_window_start-1]=True #exit all before the gap due to the exit
-                    #ent.iloc[self.test_window_start-1,:]
+                if "learn" in key and self.test_window_start[ind]!=0 and self.split_learn_train=="time":
+                    #exit all before the gap due to the exit
+                    ent.iloc[self.test_window_start[ind]-1]=True 
                 self.exs[ind]=ent
            
     def macro_mode(self,key:str):
@@ -428,12 +477,14 @@ class OptMain():
 
     def arr_to_key(self):
         self.ind_k=""
+        
         for k, v in self.calc_arr.items():
             for ent_or_ex in ["ent","ex"]:
                 for e in v[ent_or_ex]:
                     self.ind_k+=str(int(e)) 
 
     def key_to_arr(self, ind_k):
+        
         self.arr={}
         a=[int(e) for e in ind_k]
         if len(a)>(len(COL_DIC["ent"])+len(COL_DIC["ex"])):
@@ -452,6 +503,26 @@ class OptMain():
             self.arr["simple"]["ent"]=a[:len(COL_DIC["ent"])]
             self.arr["simple"]["ex"]=a[len(COL_DIC["ent"]):]
             
+    def key_to_arr_h(self, ind_k):
+            '''
+            to translate the binary array in human readable information
+            
+            Arguments
+            ----------
+               ind_k: index in test_arr. Combination of 0 and 1.
+            '''
+            self.key_to_arr(ind_k)
+            arr_h={}
+                        
+            for k, v in self.arr.items():
+                arr_h[k]={}
+                for ent_or_ex, vv in v.items():
+                    arr_h[k][ent_or_ex]=[]
+                    for ii, e in enumerate(vv):
+                        if e==1:
+                            arr_h[k][ent_or_ex].append(COL_DIC[ent_or_ex][ii])
+            return arr_h
+            
     def check_tested_arrs(
             self,
             )-> bool:
@@ -468,6 +539,13 @@ class OptMain():
         return not self.ind_k in self.test_arrs.index
             
     def get_cols_sub(self,name):
+        '''
+        Define cols which is used for the columns of the Dataframe to be saved
+        
+        Arguments
+        ----------
+            name: name of the preprocessing function used
+        '''
         for ent_or_ex in ["ent","ex"]:
             for ii, v in enumerate(self.calc_arr[name][ent_or_ex]):
                 if ent_or_ex=="ent":
@@ -497,15 +575,16 @@ class OptMain():
     def assign_random(self):
         b=True
         while b:
-            r_ent=self.random(len(COL_DIC["ent"]))
-            r_ex=self.random(len(COL_DIC["ex"]))
-            
             if self.nb_macro_modes==1:
-                self.calc_arr={"simple": {'ent':r_ent,'ex':r_ex}}
+                self.calc_arr={"simple": {'ent':self.random(len(COL_DIC["ent"])),
+                                          'ex':self.random(len(COL_DIC["ex"]))}}
             else:
-                self.calc_arr={"bull": {'ent':r_ent,'ex':r_ex},
-                          "bear": {'ent':r_ent,'ex':r_ex},
-                          "uncertain": {'ent':r_ent,'ex':r_ex},
+                self.calc_arr={"bull": {'ent':self.random(len(COL_DIC["ent"])),
+                                        'ex':self.random(len(COL_DIC["ex"]))},
+                          "bear": {'ent':self.random(len(COL_DIC["ent"])),
+                                   'ex':self.random(len(COL_DIC["ex"]))},
+                          "uncertain": {'ent':self.random(len(COL_DIC["ent"])),
+                                   'ex':self.random(len(COL_DIC["ex"]))},
                           }
             
             b=not self.check_tested_arrs() #random until new one is found
@@ -558,7 +637,6 @@ class OptMain():
 
                     if np.sum(self.calc_arr[k][ent_or_ex] )!=0:
                         nb_calc+=self.calculate_pf(dic=dic)
-
         
         if nb_calc==0:
             self.progression=False
@@ -567,11 +645,11 @@ class OptMain():
                 sub_df=self.test_arrs
             else:
                 sub_df=self.test_arrs.loc[self.variate_first_ind:]
-                
+
             if sub_df["opt_return"].max() > self.best_loop_ret and self.trades>50:
                 self.progression=True
                 self.best_loop_ret=sub_df["opt_return"].max()
-                self.log("Overall perf, "+dic+": " + str(self.best_loop_ret),pr=True)
+                self.log("Overall perf, "+dic+": " + str(round(self.best_loop_ret,3)),pr=True)
                 self.key_to_arr(sub_df.index[ sub_df["opt_return"].argmax() ]) #set a new self.arr
                 self.calc_arr=self.arr
             else:
@@ -628,14 +706,16 @@ class OptMain():
         self.log("algorithm completed")
         self.log("best of all")
         self.log('arr'+str(self.best_all))
-        self.log("return : " + str(self.best_all_ret))
+        self.log("return : " + str(round(self.best_all_ret,3)))
 
         for ent_or_ex in ["ent","ex"]:
-            self.log(ent_or_ex,pr=True)
+            self.log(ent_or_ex)
             for k in self.best_all:
+                self.log(k)
                 self.interpret(self.best_all[k],"ent")
         self.test(verbose=2,**kwargs)
         
+        #Not really useful anymore as everything can be read in the resulting dataframe
         #self.summary_total("test")
         #self.summary_total()
             
@@ -731,11 +811,13 @@ class OptMain():
             self.row["confidence_ratio"]=confidence_ratio
             
             if verbose>0:
-                self.log("confidence_ratio: "+str(confidence_ratio) + "%",pr=True)    
+                self.log("confidence_ratio: "+str(round(confidence_ratio,2)) + "%",pr=True)    
         return confidence_ratio
     
     def summary_total(self, dic:str="total"):
-        #self.defi_i(dic)
+        '''
+        Display some summary of the results
+        '''
         pf_dic=self.calculate_pf_sub(dic)
 
         for ind in self.indexes:
@@ -827,6 +909,14 @@ class OptMain():
     def split_in_part_sub(self,o,ii:int,split:str,target_l:dict,ind:str):
         '''
         Subfunction for split_in_part
+        
+        Arguments
+        ----------
+            o: object to split
+            split: split by time or symbol?
+            ii: number of this part
+            target_l: expected length of the resulting parts
+            ind: index    
         '''
         if split=="time": 
             if ii==(self.number_of_parts-1):
@@ -958,6 +1048,8 @@ class OptMain():
         Arguments
         ----------
            pf: vbt portfolio
+           ind: index
+           dic: train, test or total
         '''   
         out={}
         if self.it_is_index or type(pf.total_market_return)!=pd.core.series.Series:
@@ -979,7 +1071,11 @@ class OptMain():
         return out  
 
     def append_row(self):
+        '''
+        Append a row to test_arrs
+        '''
         df_row=pd.DataFrame(self.row,index=[self.ind_k])
+        
         if self.test_arrs is None:
             self.test_arrs=df_row
         else:
@@ -998,6 +1094,9 @@ class OptMain():
                 self.test_arrs=pd.concat([self.test_arrs.loc[:],df_row])   
 
     def save_test_arrs(self):
+        '''
+        Save the test_arr to the disc
+        '''
         self.test_arrs.to_csv(self.test_arrs_path)
     
     def calculate_eq_ret(self,pf,ind:str)-> numbers.Number:
@@ -1007,6 +1106,7 @@ class OptMain():
         Arguments
         ----------
            pf: vbt portfolio
+           ind: index
         ''' 
         if self.it_is_index or type(pf.total_market_return)!=pd.core.series.Series:
             rb=pf.total_market_return
@@ -1014,11 +1114,11 @@ class OptMain():
         else:
             rb=pf.total_market_return.values
             rr=pf.get_total_return().values
-       
+
         self.row["mean_return_"+ind+"_raw"]=np.mean(rr)
         delta=rr-rb
         self.row["mean_delta_"+ind+"_raw"]=np.mean(delta)
-        
+
         #check that there is no extrem value that bias the whole result
         #if it the case, this value is not considered in the calculation of the score
         while np.std(delta)>10:

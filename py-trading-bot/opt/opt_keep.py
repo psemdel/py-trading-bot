@@ -48,6 +48,6 @@ class Opt(OptPresel):
                                           cash_sharing=True
                                           ) #stop_exit_price="close"
             
-            self.calculate_eq_ret(pf_dic[ind],ind)
+            self.calculate_eq_ret(pf_dic[ind],ind,dic)
            
         return pf_dic        

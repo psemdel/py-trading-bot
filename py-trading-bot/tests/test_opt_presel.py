@@ -15,16 +15,20 @@ import numpy as np
 class TestOptPresel(TestCase):
     def test_div(self):
         a={'simple': 
-         {'ent': [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          'ex':  [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0]}}
+         {'ent': ['RSI20'],
+          'ex':  ['KAMA','SUPERTREND','BBANDS',"CDLBELTHOLD","CDLHIKKAKE","CDLRISEFALL3METHODS","CDLBREAKAWAY",
+                  "CDL3BLACKCROWS"]
+          }}
         
         self.o=opt_presel.Opt("PreselDivergence",
                               "2007_2022_08",
+                         indexes=["CAC40","DAX"],
                          strat_arr=a,
                          testing=True,
                          fees=0,
                          test_window_start_init=0,
-                         filename="test"
+                         filename="test",
+                         opt_only_exit=True,
                          )
         self.o.test_arrs=None
         
@@ -44,7 +48,6 @@ class TestOptPresel(TestCase):
                                       call_seq='auto',
                                       cash_sharing=True,
                              )
-
         self.assertTrue(np.equal(self.bti.entries, self.o.ents["CAC40"]).all().all())
         self.assertTrue(np.equal(self.bti.exits, self.o.exs["CAC40"]).all().all())
         self.assertTrue(np.equal(self.bti.entries_short, self.o.ents_short["CAC40"]).all().all())
@@ -86,24 +89,23 @@ class TestOptPresel(TestCase):
         self.assertTrue(np.equal(pf.get_total_return(), pf_dic["CAC40"].get_total_return()).all())  
 
     def test_keep(self):
-        a={'bull': 
-           {'ent': [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-            'ex': [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0]},
-           'bear': 
-           {'ent': [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-            'ex': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0]},
-           'uncertain': 
-           {'ent': [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-            'ex': [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0]}
-           }
+        a={'bull': {'ent': ['RSI20'],
+                    'ex':['SUPERTREND',"CDLENGULFING", "CDLSEPARATINGLINES","CDLEVENINGDOJISTAR","CDLDARKCLOUDCOVER"]},
+           'bear': {'ent': ['RSI20'],
+                    'ex': ["CDL3LINESTRIKE","CDLSEPARATINGLINES","CDLEVENINGDOJISTAR"]},
+           'uncertain': {'ent': ['RSI20'],
+                         'ex': ['RSI20',"CDLEVENINGDOJISTAR"]}
+          }
             
         self.o=opt_keep.Opt(
                          "2007_2022_08",
+                         indexes=["CAC40","DAX"],
                          strat_arr=a,
                          testing=True,
                          fees=0,
                          test_window_start_init=0,
-                         filename="test"
+                         filename="test",
+                         opt_only_exit=True
                          )
         self.o.test_arrs=None
         

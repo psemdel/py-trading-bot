@@ -76,3 +76,7 @@ def closing(action,st, c1, c2, c3, c4):
     ss.quantity=0
     ss.save()
 
+    sc=StratCandidates.objects.filter(strategy=st) #keep consistency
+    if len(sc)>0:
+        if action not in sc[0].actions.all():
+            sc[0].actions.remove(action)  

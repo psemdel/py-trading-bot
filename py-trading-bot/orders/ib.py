@@ -107,6 +107,9 @@ def check_enough_cash(
     excess_money_engaged=False
     out_order_size=0
     base_out_order_size=0
+    
+    print("base_cash:"+str(base_cash))
+    print("money_engaged:"+str(money_engaged))
     if base_cash is not None: 
         if base_cash>=base_order_size:
             enough_cash=True
@@ -613,9 +616,11 @@ class IBData(RemoteData):
         if self.client and ib_global["connected"]:
             print("myIB retrieve")
             action=None
-    
+
             #check already in IB but not in pf, so bought manually
             for pos in self.client.positions():
+                print(pos)
+                
                 contract=pos.contract
                 actions=Action.objects.filter(symbol__contains=contract.localSymbol)
                 if len(actions)==0:
@@ -634,9 +639,9 @@ class IBData(RemoteData):
                     present_ss=StockStatus.objects.get(action=action)
                     if present_ss.quantity!=pos.position:
                         if pos.position==0:
-                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + " update strategy set to none")
+                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", strategy set to none")
                         else:
-                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + " update manually the strategy")
+                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", update manually the strategy")
                         present_ss.quantity=pos.position
                         present_ss.strategy=Strategy.objects.get(name="none")
                         present_ss.order_in_ib=True
@@ -733,6 +738,8 @@ class IBData(RemoteData):
         """
         Place an order
         
+        IB needs a quantity>0, if none is available, it will be deduced from the quantity
+        
         Arguments
         ----------
         buy: should the order buy or sell the stock
@@ -751,10 +758,10 @@ class IBData(RemoteData):
                 if quantity==0 or quantity is None:
                     last_price=self.get_last_price(action)
                     if last_price!=0:
-                        if order_size is not None:
+                        if order_size is not None and order_size!=0:
                             quantity=math.floor(abs(order_size)/last_price)
                         else:
-                            logger.error("quantity and order size for : " + action.symbol + " are None!")
+                            logger.error("quantity and order size for : " + action.symbol + " are None or 0!")
                             return 1.0, 0.0
                     else:
                         logger.error("last price for symbol: " + action.symbol + " is nan!")
@@ -876,20 +883,22 @@ class OrderPerformer():
         """
         Function to perform an entry order, the Django part is within it. Place has the IB part
         
+        It always create a new order. In case of reverse, the old order needs to be closed elsewhere. It populates the new order
+        Contains the logic to make the split between stock size and option size to be traded
+        The conversion quantity / order_size is in place(), except if no IB is used       
+        
         Arguments
         ----------
         buy: should the order buy or sell the stock
         quantity: quantity, in number of stocks, of the stock to be ordered
-        order_size: size, in currency, of the stock to be ordered
+        order_size: size, in currency, of the stock to be ordered, has a sign
         """
         if (self.symbol in self.excluded.retrieve() ):
             logger.info(str(self.symbol) + " excluded")  
         
         #entry
-        
         if ((self.reverse or self.symbol not in pf_retrieve_all_symbols()) and 
              self.symbol not in self.excluded.retrieve()):
-            
             self.new_order=Order(action=self.action, strategy=self.st, short=not buy)
             self.entry=True
             self.ss.strategy=self.st
@@ -941,11 +950,10 @@ class OrderPerformer():
                             )
             else:
                 last_price=get_last_price(self.action)
-                if last_price!=0:
-                    quantity=math.floor(order_size/last_price)
+                if last_price!=0 and order_size is not None:
+                    quantity=math.floor(abs(order_size)/last_price) #sign is brought back with buy
                 else:
                     quantity=1
-                
                 self.new_order.entering_price=1.0
                 logger_trade.info("Manual " + buy_sell_txt[buy] + "order symbol: "+self.symbol+" , strategy: " + self.st.name)
                 self.ss.order_in_ib=False
@@ -954,6 +962,7 @@ class OrderPerformer():
                     self.ss.quantity=-1.0*quantity
                 else:
                     self.ss.quantity=1.0*quantity
+                    
             self.new_order.save()
             self.ss.save()
             self.executed=True
@@ -972,6 +981,10 @@ class OrderPerformer():
         """
         Calculate the difference between the desired final position (self.target_size)
         and the present position (self.order.quantity) for a stock (self.action)
+        
+        It returns a size = price, not a quantity
+        
+        self.target_size has a sign, self.delta_size has a sign also
         """
         if _settings["USED_API"]["orders"]=="IB":
             #safer than looking in what we saved
@@ -979,17 +992,18 @@ class OrderPerformer():
         else:
             present_quantity=abs(self.ss.quantity)
             present_sign=np.sign(self.ss.quantity)
+
         if "order" in self.__dir__():
             self.order.quantity=present_quantity
             self.order.save()
-            
+        self.reverse=False    
         if present_quantity!=0:
-            present_size= present_sign*present_quantity*get_last_price(self.action)
-            self.reverse=True
+            self.present_size= present_sign*present_quantity*get_last_price(self.action)
+            if present_sign!= np.sign(self.target_size):
+                self.reverse=True
         else:
-            present_size=0
-            self.reverse=False
-        self.delta_size=self.target_size-present_size
+            self.present_size=0
+        self.delta_size=self.target_size-self.present_size 
 
     def close_order(self):
         """
@@ -1006,6 +1020,14 @@ class OrderPerformer():
     def sell_order_sub(self):
         """
         Subfunction for sell order
+        
+        Main logic:
+            - If it is a new order, do it
+            - If present position >0 and we want <-0, it is a reverse, close present order and create a new one. get_delta_size() calculate the correct amount.
+              Rest of the logic is in entry_place()
+            - If present position >0 and we want 0, then it is not a reverse, we just close
+            - If the symbol is now excluded we need to go to 0, see last step
+            - If we want 0 and are not using IB, then send a telegram order
         """
         try:
             self.get_order(False)
@@ -1018,7 +1040,7 @@ class OrderPerformer():
                 self.entry=False
                 self.get_delta_size()
                 #profit
-                if self.delta_size<0:
+                if self.delta_size<0 and self.present_size>=0: #if self.present_size is negative, no change
                     #if reverse but excluded then close without further conditions
                     if self.reverse and self.symbol not in self.excluded.retrieve():
                         self.entry_place(False, order_size=self.delta_size)     
@@ -1033,7 +1055,6 @@ class OrderPerformer():
                                                quantity=self.order.quantity,
                                                testing=self.testing
                                                )
-                        self.order.exiting_price=self.order.exiting_price
                         self.close_quantity()
                     else:
                         logger_trade.info("Manual exit order symbol: "+self.symbol+" , strategy: " + self.st.name + " which is in long direction")
@@ -1051,13 +1072,15 @@ class OrderPerformer():
         """
         Subfunction for buy order
         
-        Compared to sell, we need to check in the beginning if there is enough cash
+        Compared to sell_order_sub, we need to check in the beginning if there is enough cash. The order_size is therefore not always equal to
+        self.delta_size
         """
         try:
             #type check necessary for indexes
             self.get_order(True)
             self.get_delta_size()
             
+            #The order_size need to be corrected if the money is not sufficient
             if _settings["USED_API"]["orders"]!="YF":
                 enough_cash, order_size, excess_money_engaged=check_enough_cash(
                                                                 self.delta_size,
@@ -1069,7 +1092,7 @@ class OrderPerformer():
                 enough_cash=True
                 order_size=self.delta_size
                 excess_money_engaged=False    
-            
+
             if not enough_cash:
                 logger.info(str(self.symbol) + " order not executed, not enough cash available")
             elif excess_money_engaged:
@@ -1083,7 +1106,7 @@ class OrderPerformer():
                     self.entry=False
                     #we close or reverse an old short order
                     #profit
-                    if order_size>0:
+                    if order_size>0 and self.present_size<=0:
                         #if reverse but excluded then close without further conditions
                         if self.reverse and self.symbol not in self.excluded.retrieve():
                             print("entry place")

@@ -67,11 +67,15 @@ class StockStatusManager():
         self.target_ss["priority"]=np.nan
         
         #will contain the target normalized quantity for each stock
+        
+        
         if exchange is not None:
             self.target_ss_by_st=pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values("action_id"),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","category_id"),index="symbol")
             
             if len(etf_not_found)>0:    
+                target_ss_by_st_not_found=pd.DataFrame.from_records(StockStatus.objects.all().values("action_id"),index="action_id").loc[etf_not_found]
+                self.target_ss_by_st=pd.concat([self.target_ss_by_st,target_ss_by_st_not_found],axis=0)
                 comp_not_found= pd.DataFrame.from_records(Action.objects.all().values("symbol","category_id"),index="symbol").loc[etf_not_found]
                 comp=pd.concat([ comp,comp_not_found],axis=0)
         else:
@@ -125,8 +129,8 @@ class StockStatusManager():
                 if c!="category_id" and not np.isnan(df.loc[i,c]):
                     p=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].values[0] #normally only one
                     p_id=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].index[0]
-
-                    if p<self.target_ss.loc[i].priority and not np.isnan(float(df.loc[i,c])):
+                    
+                    if (p<self.target_ss.loc[i].priority or p_id==self.present_ss.loc[i,"strategy_id"]) and not np.isnan(float(df.loc[i,c])):
                         self.target_ss.loc[i,"strategy_id"]=p_id
                         self.target_ss.loc[i,"priority"]=p
                         self.target_ss.loc[i,"norm_quantity"]=df.loc[i,c]
@@ -135,6 +139,7 @@ class StockStatusManager():
                             present_norm_quantity=0
                         else:
                             present_norm_quantity=self.present_ss.loc[i,"quantity"]/abs(self.present_ss.loc[i,"quantity"])
+                            
                         self.target_ss.loc[i,"norm_delta_quantity"]=float(self.target_ss.loc[i,"norm_quantity"])-present_norm_quantity
 
             if it_is_index:
@@ -342,6 +347,7 @@ class StockStatusManager():
                          exchange: str, 
                          strategy: str, 
                          short: bool,
+                         keep: bool=False,
                          **kwargs):
         """
     	Buy automatically the candidate, without any other underlying strategy
@@ -354,7 +360,7 @@ class StockStatusManager():
         exchange: name of the stock exchange
         strategy: name of the strategy
         short: direction of the desired order
-        
+        keep: should the candidate in exit be kept
     	"""        
         if len(candidates)==0:
             self.report.concat(strategy +" no candidates")
@@ -363,7 +369,7 @@ class StockStatusManager():
         
         sold_symbols=self.cand_to_quantity(candidates, strategy, short)
         
-        if kwargs.get("keep",False) and not short: #no keep short
+        if keep and not short: #no keep short
             for s, v in sold_symbols.items():
                 self.add_target_quantity(s, "retard_keep", v)
 

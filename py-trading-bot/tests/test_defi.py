@@ -15,24 +15,21 @@ import numbers
 import vectorbtpro as vbt
 from core.strat import UnderlyingStrat
 
-a={"bull":
-   {"ent":[1., 0., 0., 1., 0., 1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1.,1., 0., 0., 0., 1., 1.],
-    "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,0., 0., 0., 0., 0., 0., 0., 0.]
-   },
-  "bear":
-     {"ent":[0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 1., 1., 1., 0., 1., 0., 1., 0.],
-      "ex": [0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-     },
-  "uncertain":
-     {"ent":[0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 0., 0., 0.,0., 0., 0., 1., 1., 1.],
-      "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-     },             
-  }   
+a={'bull': {'ent': ['RSI20','RSI30','CDLMARUBOZU',"CDL3WHITESOLDIERS","CDLENGULFING","CDLTAKURI",
+                    "CDLMORNINGDOJISTAR","CDLMORNINGSTAR","CDLKICKING_INV"],
+            'ex': ["CDLRISEFALL3METHODS","CDLABANDONEDBABY"]},
+   'bear': {'ent': ['STOCH','RSI20','RSI30',"CDLMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING","CDLTAKURI",
+                    "CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV"],
+            'ex': ['SUPERTREND','BBANDS',"CDLBELTHOLD"]},
+   'uncertain': {'ent': ['STOCH','RSI20','RSI30',"CDLMARUBOZU","CDLCLOSINGMARUBOZU","CDL3WHITESOLDIERS",
+                         "CDLLONGLINE","CDLENGULFING","CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV",
+                         "CDLKICKING_INV"],
+                 'ex': ["CDLHIKKAKE","CDL3LINESTRIKE","CDLBREAKAWAY"]}}    
 
 a_simple={"simple":
-   {"ent":[1., 0., 0., 1., 0., 1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1.,1., 0., 0., 0., 1., 1.],
-    "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0.,0., 0., 0., 0., 0., 0., 0., 0.]
-   }
+          {"ent":['STOCH','SUPERTREND','RSI20','RSI30',"CDLMARUBOZU","CDL3WHITESOLDIERS","CDLTAKURI","CDLMORNINGDOJISTAR",
+                             "CDLKICKINGBYLENGTH_INV","CDLKICKING_INV"],
+           "ex": ["CDLRISEFALL3METHODS"]}
            
   } 
 
@@ -100,7 +97,7 @@ class TestDefi(TestCase):
 
         self.assertEqual(rr1,rr2)
         self.assertEqual(rb1,rb2)
-        
+
     def test_defi_i2(self):
         '''
         Goal is to compare defi_i with defi_i_fast
