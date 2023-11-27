@@ -80,7 +80,7 @@ def retrieve_data_online(o,
             
         logger.info("number of days retrieved: " + str(np.shape(o.close)[0]))
         if len(o.open_ind)==0 or len(o.open_ind)==0:
-            raise ValueError("Retrieve data failed and returned empty Dataframe, check the symbols")
+            raise ValueError("Retrieve data failed and returned empty Dataframe, check the tickers, tickers: " +str(symbols) + ", index ticker: " + str(index_symbol))
 
         return symbols
 

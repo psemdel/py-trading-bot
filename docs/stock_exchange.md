@@ -21,6 +21,7 @@ Following inputs can be defined:
 - strategies_in_use_intraday: select the strategies you want to use for this stock exchange, during the day. Overriden by those at sector level if presel_at_sector_level is true!
 - presel_at_sector_level: if true, the strategy will be performed at sector level. Is true only for NYSE, as there are too many stocks in the S&P 500. You may want to use the same strategy on 5 bundles of 100 stocks instead of 1 strategy for 500 stocks.
 - main_index: select the index related to this stock exchange 
+- calc_report: should the report be calculated, useful to deactivate report about ETF stock exchanges
 
 # Writing a report for the new stock exchange
 The scheduler will generate automatically a report for all stock exchanges where at least a strategy is in use, 15 min before its closing. There is nothing to do.

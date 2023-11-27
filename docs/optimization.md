@@ -3,7 +3,7 @@ Optimization algorithms are important to determine the best set of parameters or
 
 The optimization scripts provided must be started by opt_starter.py (in the root). Several scripts are provided, but obviously they are only examples (no guarantee here!). The only thing that matters here is the resulting strategy, the optimization algorithm is just a mean.
 
-In opt_main, the set will be split in a learning and a test set. By comparing the results on both set, you can verify how reliable is your strategy. By default this split is made on the time (`split_learn_train=time`). You can also split on the symbols (`split_learn_train=symbol`).
+In opt_main, the set will be split in a learning and a test set. By comparing the results on both sets, you can verify how reliable is your strategy. By default this split is made on the time (`split_learn_train=time`). You can also split on the symbols (`split_learn_train=symbol`).
 
 Most of the algorithm will make evolve the strategy array until it cannot be improved anymore. The starting array can be defined by setting `strat_arr=` a strategy array. If no starting array is defined, a random one will be generated, the consideration of the trend depends on the `nb_macro_modes`, if you don't want to consider the trend put 1 otherwise 3. The process is performed several time in a row. The number of iterations is defined by the parameter `loops`. To be sure that your optimization met one of the best possible combination, it is recommended to perform many loops (it is a typical local extremum vs global extremum issue). 
 

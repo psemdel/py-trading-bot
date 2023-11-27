@@ -15,9 +15,6 @@ from trading_bot.settings import _settings
 @njit
 def major_int_sub(
         kama: np.array, 
-        init: int, 
-        last_top_ind: int, 
-        last_bot_ind: int, 
         threshold: numbers.Number, 
         threshold_uncertain: numbers.Number, 
         deadband: numbers.Number
@@ -25,12 +22,11 @@ def major_int_sub(
     '''
     Determine when the trend is bull/bear or uncertain in order to improve the underlying strategy or
     to determine the ideal direction (long/short/both)
+    Use the top and bottom from the KAMA function
     
     The convention is -1=bull, 1=bear, 0=uncertain
-    '''
-
-    '''
-    Determine the top and bottom from the KAMA function
+    
+    Note: we could maybe go faster by starting now and going backward, but I fear mistake
 
     Arguments
     ----------
@@ -42,40 +38,41 @@ def major_int_sub(
         threshold_uncertain: threshold to determine when we are in an uncertain period
         deadband: deadband before changing the trend decision
     '''
-    macro_trend_nouncertain= np.full(kama.shape, 0)
-    macro_trend= np.full(kama.shape, 0)
+    init=len(kama[np.isnan(kama)])+2
+    last_top_ind=init-2
+    last_bot_ind=init-2
+    macro_trend_nouncertain=np.full(kama.shape, 0)
+    macro_trend=np.full(kama.shape, 0)
     max_ind= np.full(kama.shape, 0)
     min_ind= np.full(kama.shape, 0)
     
-    if init is None:
-        return macro_trend, min_ind, max_ind
-    
     for ii in range(init,len(kama)):
+        last_extrema_ind=max(last_top_ind,last_bot_ind)
         macro_trend_nouncertain[ii]=macro_trend_nouncertain[ii-1] #init
         
         #since last extrema
-        maximum=np.max(kama[max(last_top_ind,last_bot_ind):ii])
-        maximum_ind=max(last_top_ind,last_bot_ind)+np.argmax(kama[max(last_top_ind,last_bot_ind):ii])
+        maximum=np.max(kama[last_extrema_ind:ii])
+        maximum_ind=last_extrema_ind+np.argmax(kama[last_extrema_ind:ii])
 
         #some checks without interest to avoid error
-        if max(last_top_ind,last_bot_ind)==maximum_ind:
-            left_min=kama[max(last_top_ind,last_bot_ind)]
+        if last_extrema_ind==maximum_ind:
+            left_min=kama[last_extrema_ind]
         else:
-            left_min=np.min(kama[max(last_top_ind,last_bot_ind):maximum_ind])
+            left_min=np.min(kama[last_extrema_ind:maximum_ind])
             
         if maximum_ind==ii:
             right_min=kama[ii]
         else:
             right_min=np.min(kama[maximum_ind:ii]) 
 
-        minimum=np.min(kama[max(last_top_ind,last_bot_ind):ii])
-        minimum_ind=max(last_top_ind,last_bot_ind)+np.argmin(kama[max(last_top_ind,last_bot_ind):ii])
+        minimum=np.min(kama[last_extrema_ind:ii])
+        minimum_ind=last_extrema_ind+np.argmin(kama[last_extrema_ind:ii])
         
         #some checks without interest to avoid error
-        if max(last_top_ind,last_bot_ind)==minimum_ind:
-            left_max=kama[max(last_top_ind,last_bot_ind)]
+        if last_extrema_ind==minimum_ind:
+            left_max=kama[last_extrema_ind]
         else:
-            left_max=np.max(kama[max(last_top_ind,last_bot_ind):minimum_ind])
+            left_max=np.max(kama[last_extrema_ind:minimum_ind])
             
         if maximum_ind==ii:
             right_max=kama[ii]
@@ -131,19 +128,7 @@ def major_int(
         deadband: deadband before changing the trend decision
     '''
     kama=talib.KAMA(close,timeperiod=30)
-
-    #by kama the begin is nan
-    init=None
-    last_top_ind=None
-    last_bot_ind=None
-    for ii in range(2,len(kama)):
-        if not np.isnan(kama[ii]):
-            last_top_ind=ii
-            last_bot_ind=ii
-            init=ii+2 #needs at least 2 to make a max
-            break
-
-    return major_int_sub(kama, init, last_top_ind, last_bot_ind, threshold, threshold_uncertain, deadband)
+    return major_int_sub(kama, threshold, threshold_uncertain, deadband)
 
 VBTMACROTREND= vbt.IF(
      class_name='Major',

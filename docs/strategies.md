@@ -11,17 +11,17 @@ fter having started the bot click on "Admin panel" (http://localhost:8000/admin/
 Following inputs can be defined:
 
 - name: name of this strategy
-- class: name of the Class in strat.py or presel.py used to determine when to perform orders using this strategy, the algorithm
-- perform_order: boolean that determines if automatic orders in IB should be performed. If False, only manual trade is possible
+- class: name of the Class in strat.py or presel.py used to determine when to perform orders using this strategy, the algorithm.
+- perform_order: boolean that determines if automatic orders in IB should be performed. If False, only manual trade is possible.
 - priority: figure to rank the strategies by priority. Lower figure has higher priority. Concretely, if the report calculated lead to the performance of 2 orders but you have money for only one, it will define which one to execute.
-- target_order_size: which order size in the base currency should be performed. For instance 1000, with base currency EUR, will perform order of 1000 euros
-- minimum_order_size: if the target_order_size cannot be reached (not enough money), what is minimum size of the trade which should lead to a trade execution
+- target_order_size: which order size in the base currency should be performed. For instance 1000, with base currency EUR, will perform order of 1000 euros.
+- minimum_order_size: if the target_order_size cannot be reached (not enough money), what is minimum size of the trade which should lead to a trade execution.
 - maximum_money_engaged: maximum total money that can be engaged in this strategy / stock exchange. To avoid having all the money invested in one strategy.
-- sl_threshold: stop loss threshold for orders performed with this strategy
-- daily_sl_threshold: daily stop loss threshold for orders performed with this strategy
-- option_share_per: percentage of the order that should be performed with options instead of stocks
-- option_min_days_distance: minimum time in day between now and option expiration
-- option_max_strike_distance_per: maximum difference between present stock price and option strike price
+- sl_threshold: stop loss threshold for orders performed with this strategy.
+- daily_sl_threshold: daily stop loss threshold for orders performed with this strategy.
+- option_share_per: percentage of the order that should be performed with options instead of stocks.
+- option_min_days_distance: minimum time in day between now and option expiration.
+- option_max_strike_distance_per: maximum difference between present stock price and option strike price.
 
 ## Algorithm introduction
 Fundamentally the bot differentiate two types of strategies:
@@ -80,18 +80,6 @@ This indicator will create an entry when fast_ma crosses above slow_ma, and an e
 
 ### Strategy array
 Simple strategies are easy to understand, but they can be quite limited. Combination of different indicators can provide better results, without much more complexity. The bot provides the possibility to optimise combination of signals for certain stocks (see the [documentation about optimization](https://github.com/psemdel/py-trading-bot/blob/main/docs/optimization.md). The combination is always using OR, so signal1 or signal2 or ... A combination is represented by an array, as following:
-
-    Index 0-6, same for entry and exit
-    0: moving average
-    1: stochastic oscillator
-    2: price smoothed with kama extrema (minimum -> entry, maximum -> exit)
-    3: supertrend
-    4: Bollinger bands (price crosses lower band -> entry, price crosses higher band -> exit)
-    5: RSI with threshold 20/80
-    6: RSI with threshold 30/70
-    
-    Index for ent: 7-21, see BULL_PATTERNS in constants.py
-    Index for ex: 7-21, see BEAR_PATTERNS in constants.py
     
 For instance:
 
@@ -102,16 +90,82 @@ For instance:
         def __init__(self,
                      period: numbers.Number,
                      **kwargs):
-
+            
             a={"simple":
-               {"ent":[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
-                "ex": [0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+               {"ent":['RSI20'],
+                "ex": ['RSI20']
                }
               }
 
             super().__init__(period,strat_arr=a,**kwargs )
 
 Uses RSI with threshold 20/80 for the entries and exits. It is perfectly equivalent to StratRSI presented above.
+
+Possible key words are (for explanation about the different indicators refer to vbt and [talib documentation](https://github.com/TA-Lib/ta-lib-python/tree/master/docs/func_groups):
+- MA (period 5/15)
+- MFI (threshold 20/80)
+- STOCH (threshold 20/80)
+- WILLR (threshold -90/-10)
+- SUPERTREND 
+- BBANDS (crossing between the price and the bands)
+- RSI20 (threshold 20/80)
+- RSI30 (threshold 30/70)
+- ULTOSC20 (threshold 20/80)
+- ULTOSC25 (threshold 25/75)
+Note: this is defined in strat.py
+
+And all following patterns. They are defined in constants.py for explanation refer to [talib documentation](https://github.com/TA-Lib/ta-lib-python/tree/master/docs/func_groups). Bear can be used only for exits, bull for entries:            
+             
+BEAR_PATTERNS:
+- CDLLONGLINE
+- CDLENGULFING
+- CDLCLOSINGMARUBOZU
+- CDLBELTHOLD
+- CDLHIKKAKE
+- CDLRISEFALL3METHODS
+- CDL3LINESTRIKE
+- CDLBREAKAWAY
+- CDLABANDONEDBABY
+- CDLEVENINGSTAR
+- CDLSEPARATINGLINES
+- CDLEVENINGDOJISTAR
+- CDL3BLACKCROWS
+- CDLDARKCLOUDCOVER
+- CDLMARUBOZU
+- CDLHIKKAKEMOD
+- CDLMORNINGSTAR
+- CDLUNIQUE3RIVER
+- CDLXSIDEGAP3METHODS
+- CDLCOUNTERATTACK
+- CDL3INSIDE
+- CDLMORNINGDOJISTAR
+- CDLBREAKAWAY
+
+BULL_PATTERNS:
+- CDLKICKINGBYLENGTH
+- CDLKICKING
+- CDLMARUBOZU
+- CDLCLOSINGMARUBOZU
+- CDL3WHITESOLDIERS
+- CDLLONGLINE
+- CDLENGULFING
+- CDLDRAGONFLYDOJI
+- CDLTAKURI
+- CDLMORNINGDOJISTAR
+- CDLMORNINGSTAR
+- CDLHANGINGMAN
+- CDL3INSIDE
+- CDLKICKINGBYLENGTH_INV
+- CDLKICKING_INV
+- CDLINVERTEDHAMMER
+- CDLPIERCING
+- CDLHIKKAKEMOD
+- CDLSTICKSANDWICH
+- CDLTRISTAR
+- CDL3LINESTRIKE
+- CDLDARKCLOUDCOVER
+- CDLINNECK
+- CDL3BLACKCROWS          
 
 ### Trend dependent strategies
 In addition to various combination of signal, it may be interesting to variate on one side the strategy depending on the trend of the market, on the other side a variation of the direction depending on the trend may also be useful. So when the market is bear, you will want to short, whereas it can be risky when the market is bull.
@@ -127,25 +181,20 @@ The trend calculation is explained in the corresponding documentation. It sorts 
         def __init__(self,
                      period: numbers.Number,
                      **kwargs):
-            
-            a={"bull":
-               {"ent":[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1., 1., 1., 0., 0., 0., 1.],
-                "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
-               },
-              "bear":
-                 {"ent":[0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1., 1., 0., 1., 0., 1., 0.],
-                  "ex": [0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-                 },
-              "uncertain":
-                 {"ent":[0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 0., 1., 0., 1., 0., 1., 1.],
-                  "ex": [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
-                 },             
-              }        
+
+            a={'bull': {'ent': ['KAMA','RSI20','RSI30','CDLMARUBOZU',"CDL3WHITESOLDIERS","CDLENGULFING","CDLTAKURI","CDLMORNINGDOJISTAR","CDLMORNINGSTAR","CDLKICKING_INV"],
+                        'ex': ["CDLRISEFALL3METHODS","CDLABANDONEDBABY"]},
+               'bear': {'ent': ['STOCH','RSI20','RSI30',"CDLMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING","CDLTAKURI",
+                                "CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV"],
+                        'ex': ['SUPERTREND','BBANDS',"CDLBELTHOLD"]},
+               'uncertain': {'ent': ['STOCH','KAMA','RSI20','RSI30',"CDLMARUBOZU","CDLCLOSINGMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING",
+                                     "CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV","CDLKICKING_INV"],
+                             'ex': ["CDLHIKKAKE","CDL3LINESTRIKE","CDLBREAKAWAY"]}} 
             
             super().__init__(
                 period,
                 strat_arr=a,
-                **kwargs )   
+                **kwargs )     
 
 Concerning the direction, by default the following is configured:
 
@@ -206,15 +255,19 @@ To determine which stock(s) to buy/sell, a sorting function is often required. T
             v[symbol]=self.vol[symbol].values[ii]
         self.sorted=sorted(v.items(), key=lambda tup: tup[1], reverse=True)
     
-For the volatility preselection, the volatility (self.vol) serves to sort the stocks.
+For the volatility preselection, the volatility (self.vol) serves to sort the stocks. 
+If the sorting function can be calculated once and for all, it is done with the function sorting_g.
 
 ### Supplementary criterium
-For certain strategy, the condition to become candidate is not only about the sorting. This supplementary condition can be defined in supplementary_criterium. For instance:
+For certain strategy, the condition to become candidate is not only about the sorting. This supplementary condition can be defined in supplementary_criterium which used variable "condition". For instance:
 
-    def supplementary_criterium(self,symbol_simple, ii,v, short=False):
-        return self.macd_tot.hist[('simple','simple',symbol_simple)].values[ii]*short_to_sign[short]>0
+    self.condition["long"]=remove_multi(self.macd_tot.macd>0)
+    self.condition["short"]=remove_multi(self.macd_tot.macd<0)
     
-The candidates here need to have a macd_tot.hist >0.
+The candidates here need to have a macd_tot.hist >0, if the direction is long.
+
+### Strategy name
+If you use pre-defined preselection strategies, note for some, the name of the strategy in your bot should be the same as the one defined in self.strategy in presel.py. 
 
 ### Maximum number of candidates
 The maximum number of candidates at the same time is defined by `self.max_candidates_nb`. When it is higher than 1, the underlying strategy will be decisive about which one of the candidates will be actually bought.
@@ -246,7 +299,7 @@ Eventually, slow preselection strategies can be defined. The idea is that severa
 To calculate portfolio optimization algorithm like max sharpe, OLMAR and similar, you can use the Jupyter notebook presel_classic.
 
 ### Machine learning
-None of the strategies above use machine learning. An [optimization](https://github.com/psemdel/py-trading-bot/blob/main/docs/optimization.md) is proposed, but no machine learning out-of-box. However, the algorithm in strat.py require you only to define entries and exits to use the strategy in production. You can perfectly use a ML algorithm to determine the entries and exits.
+For machine learning, see the dedicated documentation. 
 
 
 

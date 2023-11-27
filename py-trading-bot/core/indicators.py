@@ -11,7 +11,6 @@ import talib
 from talib.abstract import *
 import numpy as np
 from numba import njit
-from scipy.signal import morlet
 
 import logging
 logger = logging.getLogger(__name__)
@@ -36,7 +35,8 @@ def func_name_to_res(
         open_: np.array, 
         high: np.array, 
         low: np.array, 
-        close: np.array
+        close: np.array,
+        volume: np.array= None
         ):
     '''
     Wrapper for talib functions
@@ -59,13 +59,22 @@ def func_name_to_res(
                 'close': close,
             }        
         else:
-            inputs={
-                'open': open_,
-                'high': high,
-                'low': low,
-                'close': close,
-            }
-        
+            if volume is None:
+                inputs={
+                    'open': open_,
+                    'high': high,
+                    'low': low,
+                    'close': close,
+                }
+            else:
+                inputs={
+                    'open': open_,
+                    'high': high,
+                    'low': low,
+                    'close': close,
+                    'volume': volume
+                }                
+
         f=getattr(talib.abstract,f_name)
         return f(inputs)
     
@@ -119,35 +128,40 @@ def get_final_bands_nb(
         close: np.array, 
         upper: np.array, 
         lower: np.array
-        ) -> (np.array, np.array, np.array, np.array, np.array, np.array): 
+        ) -> (np.array, np.array, np.array, np.array, np.array, np.array, np.array): 
     trend = np.full(close.shape, np.nan)  
 
     dir_ = np.full(close.shape, 1)
-    long = np.full(close.shape, np.nan)
+    long=  np.full(close.shape, np.nan)
     short = np.full(close.shape, np.nan)
-    entries = np.full(close.shape, False) #needed if combined with other methods.
-    exits = np.full(close.shape, False)
+    entries=  np.full(close.shape, False)
+    exits = np.full(close.shape, False) #needed if combined with other methods.
+    duration=np.full(close.shape, 0)
 
     for i in range(1, close.shape[0]):
          if close[i] > upper[i - 1]:  
              dir_[i] = 1
              entries[i]=True
+             duration[i]=0
          elif close[i] < lower[i - 1]:
              dir_[i] = -1
              exits[i]=True
+             duration[i]=0
          else:
              dir_[i] = dir_[i - 1]
              if dir_[i] > 0 and lower[i] < lower[i - 1]:
                  lower[i] = lower[i - 1]
+                 duration[i]=duration[i-1]-1
              if dir_[i] < 0 and upper[i] > upper[i - 1]:
                  upper[i] = upper[i - 1]
+                 duration[i]=duration[i-1] + 1
  
          if dir_[i] > 0:
              trend[i] = long[i] = lower[i]
          else:
              trend[i] = short[i] = upper[i]
              
-    return trend, dir_, long, short, entries, exits
+    return trend, dir_, long, short, entries, exits, duration
 
 def faster_supertrend(
         high: np.array, 
@@ -166,30 +180,12 @@ VBTSUPERTREND = vbt.IF(
      short_name='st',
      input_names=['high', 'low', 'close'],
      param_names=['multiplier'],
-     output_names=['supert', 'superd', 'superl', 'supers','entries','exits']
+     output_names=['supert', 'superd', 'superl', 'supers','entries','exits','duration']
 ).with_apply_func(
      faster_supertrend, 
      takes_1d=True,  
      multiplier=3)
 
-def willr(
-        high: np.array, 
-        low: np.array, 
-        close: np.array,
-        window: int=7,
-        ):
-    return talib.WILLR(high,low, close, window)    
-    
-VBTWILLR = vbt.IF(
-      class_name='Willr',
-      short_name='willr',
-      input_names=['high', 'low', 'close'],
-      param_names=['window'],
-      output_names=['out']
- ).with_apply_func(
-      willr, 
-      takes_1d=True,  
-      window=7)   
 '''
 Strategy that base on the crossing of the MA function and the supertrend
 
@@ -208,7 +204,7 @@ def supertrend_ma(
     slow_ma = vbt.MA.run(close, 15)
     ent =  fast_ma.ma_crossed_above(slow_ma)
     ex = fast_ma.ma_crossed_below(slow_ma)
-    _, _, _, supers, _, _=faster_supertrend(high, low, close)
+    _, _, _, supers, _, _, _=faster_supertrend(high, low, close)
 
     for ii in range(len(supers)):
         if not np.isnan(supers[ii]):
@@ -225,33 +221,7 @@ VBTSUPERTRENDMA = vbt.IF(
      supertrend_ma, 
      takes_1d=True,  
      )
-
-'''
-Calculate the volatility
-
-Arguments
-----------
-    high: high prices
-    low: low prices
-    close: close prices
-'''
-def natr_f(
-        high: np.array,
-        low: np.array,
-        close: np.array
-        ) -> np.array:
-    return talib.NATR(high, low, close,timeperiod=14)
-
-VBTNATR = vbt.IF( #just to keep everything the same shape... but useless here
-     class_name='NATR',
-     short_name='natr',
-     input_names=['high','low','close'],
-     output_names=['natr']
-).with_apply_func(
-     natr_f, 
-     takes_1d=True,  
-     )
-    
+ 
 '''
 Strategy where the exit and entries depends on the crossing of moving average with 5 and 15 days period
 
@@ -457,7 +427,7 @@ def kama_trend(close: np.array)->(np.array, np.array):
 @njit    
 def kama_trend_sub(kama: np.array)->(np.array, np.array): 
     trend=np.full(kama.shape, 0.0)
-    duration=np.full(kama.shape, 0)
+    duration=np.full(kama.shape, 0.0)
 
     for ii in range(len(kama)):
         if ii==0:
@@ -510,24 +480,26 @@ def pattern(
         high: np.array,
         low: np.array,
         close: np.array,
-        light: bool=False
         )-> (np.array, np.array): 
     
-    if light:
-        arr=[constants.BEAR_PATTERNS_LIGHT, constants.BULL_PATTERNS_LIGHT]
-    else:
-        arr=[constants.BEAR_PATTERNS, constants.BULL_PATTERNS]
 
+    arr=[constants.BEAR_PATTERNS, constants.BULL_PATTERNS]
     entries=np.full(close.shape, False)
     exits=np.full(close.shape, False)
 
     for kk, pat in enumerate(arr):
         for func_name in pat:
             res=func_name_to_res(func_name, open_, high, low, close)
-            if kk==0:
-                exits=np.logical_or((res==pat[func_name]), exits)
+            if type(pat[func_name])==int:
+                values=[pat[func_name]]
             else:
-                entries=np.logical_or((res==pat[func_name]), entries)
+                values=pat[func_name]
+            
+            for v in values:
+                if kk==0:
+                    exits=np.logical_or((res==v), exits)
+                else:
+                    entries=np.logical_or((res==v), entries)
                     
     return entries, exits
                     
@@ -535,13 +507,13 @@ VBTPATTERN = vbt.IF(
       class_name='VBTPattern',
       short_name='pattern',
       input_names=['open_','high', 'low', 'close'],
-      param_names=['light'],
       output_names=['entries','exits']
  ).with_apply_func(
       pattern, 
       takes_1d=True,  
  )  
-        
+      
+   
 '''
 For only one pattern
 
@@ -560,17 +532,29 @@ def pattern_one(
         low: np.array,
         close: np.array,
         f_name: str,
-        ent_or_ex: str
+        ent_or_ex: str,
+        second: bool=False
         ):
     try:
+
         if ent_or_ex=="ent":
             arr=constants.BULL_PATTERNS
         else:
             arr=constants.BEAR_PATTERNS
         
         res=func_name_to_res(f_name, open_, high, low, close)
-    
-        return res==arr[f_name]
+        
+        if f_name not in arr:
+            raise ValueError(f_name +" not in the BEAR_PATTERNS or BULL_PATTERNS defined in constants")
+        
+        if type(arr[f_name])==int:
+            return res==arr[f_name]
+        else:
+            entex=np.full(close.shape, False)
+            for v in arr[f_name]:
+                entex=np.logical_or((res==v), entex)
+            return entex
+
     except Exception as e:
         logger.error(e, stack_info=True, exc_info=True)  
         pass 
@@ -676,8 +660,8 @@ def macd_trend_sub2(
 
     trend= np.full(close.shape, 0.0)  
     bband_lim=_settings["BBAND_THRESHOLD"]
-    trend_dir_arr=0 #append to table perf very bad so we make a work around
-    trend_dir_arr_dim=0
+    trend_dir_arr=0
+    trend_dir_arr_dim=0 #append to table perf very bad so we make a work around
 
     for ii in range(1,len(bb_bw)):     
         e=bb_bw[ii]   
@@ -846,7 +830,8 @@ Arguments
 ----------
     ent: entries
     k: 1 or 0
-'''       
+'''  
+@njit     
 def sum_ent(
         ent: np.array,
         k: int
@@ -869,8 +854,7 @@ def min_max_sub(
         close: np.array,
         distance: numbers.Number,
         )-> np.array:
-    minimum=np.full(close.shape, 0.0)
-    maximum=np.full(close.shape, 0.0)
+    minimum=maximum=np.full(close.shape, 0.0)
     for ii in range(len(close)-1):
         maximum[ii]=rel_dif(close[ii+1:ii+distance].max(),close[ii])*100
         minimum[ii]=rel_dif(close[ii+1:ii+distance].min(),close[ii])*100
@@ -888,9 +872,104 @@ VBTMINMAX = vbt.IF(
       distance=30,
       takes_1d=True,  
  ) 
-
-
-
+     
+@njit
+def support_resistance_sub(
+        kama: np.array, 
+        threshold: numbers.Number, 
+        )-> (np.array, np.array):
+    '''
+    Re-use the algorithm of major_int_sub to determine the distance from support and resistance
+    Use the top and bottom from the KAMA function
     
+    Note: we could maybe go faster by starting now and going backward, but I fear mistake
 
- 
+    Arguments
+    ----------
+        kama: smoothed price (KAMA method)
+        threshold: threshold to determine when there is a top or a bottom
+        last_v: last price
+    '''
+    init=len(kama[np.isnan(kama)])+2
+    last_top_ind=last_bot_ind=init-2
+    last_bot_ind=init-2
+    last_top_v=last_bot_v=0
+    pu_resistance= np.full(kama.shape, 0.0)
+    pu_support= np.full(kama.shape, 0.0)
+
+    #value max, value min, distance from max, distance from min
+    for ii in range(init,len(kama)):
+        #since last extrema
+        last_extrema_ind=max(last_top_ind,last_bot_ind)
+        maximum=np.max(kama[last_extrema_ind:ii])
+        maximum_ind=last_extrema_ind+np.argmax(kama[last_extrema_ind:ii])
+
+        #some checks without interest to avoid error
+        if last_extrema_ind==maximum_ind:
+            left_min=kama[last_extrema_ind]
+        else:
+            left_min=np.min(kama[last_extrema_ind:maximum_ind])
+            
+        if maximum_ind==ii:
+            right_min=kama[ii]
+        else:
+            right_min=np.min(kama[maximum_ind:ii]) 
+
+        minimum=np.min(kama[last_extrema_ind:ii])
+        minimum_ind=last_extrema_ind+np.argmin(kama[last_extrema_ind:ii])
+        
+        #some checks without interest to avoid error
+        if last_extrema_ind==minimum_ind:
+            left_max=kama[last_extrema_ind]
+        else:
+            left_max=np.max(kama[last_extrema_ind:minimum_ind])
+            
+        if maximum_ind==ii:
+            right_max=kama[ii]
+        else:
+            right_max=np.max(kama[minimum_ind:ii])       
+
+        #detection major extrema
+        if left_min < maximum* (1-threshold) and right_min < maximum* (1-threshold):
+            if maximum_ind != last_top_ind:
+                last_top_ind=maximum_ind
+                last_top_v=maximum
+        if left_max > minimum* (1+threshold) and right_max > minimum* (1+threshold):
+            if minimum_ind !=last_bot_ind:
+                last_bot_ind=minimum_ind  
+                last_bot_v=minimum
+
+        if last_top_v!=0:
+            pu_resistance[ii]=kama[ii]/last_top_v #resistance reached by 1
+    
+        if last_bot_v!=0:
+            pu_support[ii]=kama[ii]/last_bot_v #support reached by 1
+
+    return pu_resistance, pu_support
+
+def support_resistance(
+        close: np.array,
+        threshold: numbers.Number
+        )-> (np.array, np.array):
+    '''
+    Determine the top and bottom from the KAMA function
+
+    Arguments
+    ----------
+        close: close price
+        threshold: threshold to determine when there is a top or a bottom
+    '''
+    kama=talib.KAMA(close,timeperiod=30)
+    return support_resistance_sub(kama, threshold)  
+
+VBTSUPPORTRESISTANCE = vbt.IF(
+      class_name='VBTSupportResistance',
+      short_name='vbt_support_resistance',
+      input_names=['close'],
+      param_names=['threshold'],
+      output_names=["pu_resistance","pu_support"]
+ ).with_apply_func(
+      support_resistance, 
+      threshold=0.03,
+      takes_1d=True,  
+ ) 
