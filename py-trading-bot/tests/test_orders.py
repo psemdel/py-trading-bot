@@ -9,6 +9,7 @@ import numpy as np
 from django.test import TestCase
 from orders import models as m
 from datetime import datetime
+from trading_bot.settings import _settings 
 
 import sys
 if sys.version_info.minor>=9:
@@ -197,3 +198,30 @@ class TestOrders(TestCase):
     def test_symbol_to_action(self):
         self.assertEqual(self.a, m.symbol_to_action('AI.PA'))
         self.assertEqual(self.a, m.symbol_to_action(self.a))
+        
+    def test_check_ib_permission(self):
+        _settings["USED_API_DEFAULT"]={
+            "orders": "IB", 
+            "alerting": "IB", 
+            "reporting": "YF", 
+            }
+        
+        m.check_ib_permission(None)    
+        self.assertEqual(_settings["USED_API"]["orders"],"IB")
+        self.assertEqual(_settings["USED_API"]["alerting"],"IB")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF")
+        
+    def test_check_ib_permission2(self):
+        _settings["USED_API_DEFAULT"]={
+            "orders": "CCXT", 
+            "alerting": "MT5", 
+            "reporting": "TS", 
+            }
+        
+        m.check_ib_permission(["AI","AC"])    
+        self.assertEqual(_settings["USED_API"]["orders"],"CCXT")
+        self.assertEqual(_settings["USED_API"]["alerting"],"MT5")
+        self.assertEqual(_settings["USED_API"]["reporting"],"TS")      
+
+        
+        

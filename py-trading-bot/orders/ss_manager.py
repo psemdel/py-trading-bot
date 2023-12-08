@@ -63,12 +63,12 @@ class StockStatusManager():
             
         self.present_ss=pd.concat([self.present_ss,comp], axis=1)
         
+        
+        
         self.target_ss=self.present_ss.copy()
         self.target_ss["priority"]=np.nan
         
         #will contain the target normalized quantity for each stock
-        
-        
         if exchange is not None:
             self.target_ss_by_st=pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values("action_id"),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","category_id"),index="symbol")
