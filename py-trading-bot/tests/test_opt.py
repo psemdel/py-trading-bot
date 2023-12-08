@@ -19,6 +19,7 @@ class TestOptByPart(TestCase):
 class TestOptPressel(TestCase):
     def test_pressel(self):
         self.o=opt_presel.Opt("PreselHistVol","2007_2022_08",
+                         indexes=["CAC40","DAX"],
                          loops=1,
                          testing=True,
                          filename="test")
@@ -35,6 +36,7 @@ class TestOptMacro(TestCase):
 class TestOptDiv(TestCase):
     def test_div(self):
         self.o=opt_presel.Opt("PreselDivergence","2007_2022_08",
+                         indexes=["CAC40","DAX"],
                          loops=1,
                          testing=True,
                          filename="test")

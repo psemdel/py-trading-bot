@@ -51,7 +51,7 @@ class TestML(TestCase):
           model_type="MLP",
           steps=10,
           features_name=self.features_name)   
-        self.assertEqual(self.m.x_df.shape,(429787, 36))
+        self.assertEqual(m.x_df.shape,(429787, 36))
 
     def test_several_index_LSTM(self):
         m=ml.ML(self.period,indexes=['CAC40','NASDAQ'])
@@ -61,7 +61,7 @@ class TestML(TestCase):
           model_type="LSTM",
           steps=10,
           features_name=self.features_name)        
-        self.assertEqual(self.m.x_df.shape,(109, 3933, 10, 36))
+        self.assertEqual(m.x_df.shape,(109, 3933, 10, 36))
         
     def test_prepare_MLP(self):
         self.m.prepare(preprocessing=True, 

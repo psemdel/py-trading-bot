@@ -653,7 +653,6 @@ class PreselRetard(Presel):
         self.no_ust=True
         self.calc_all=True
         self.last_short=False
-        self.strategy="retard"
 
     def sorting(
             self,
@@ -685,11 +684,11 @@ class PreselRetard(Presel):
         else:
             direction="long"
 
-        r.concat(self.strategy.capitalize()+", " + "direction " + direction + ", stockex: " + self.ust.exchange +\
+        r.concat(self.st.name.capitalize()+", " + "direction " + direction + ", stockex: " + self.ust.exchange +\
                     ", action duration: " +str(self.out))
   
-        r.ss_m.clean_excluded(self.strategy, self.excluded)
-        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.strategy, self.last_short,keep=keep)
+        r.ss_m.clean_excluded(self.st.name, self.excluded)
+        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.st.name, self.last_short,keep=keep)
               
 class PreselRetardMacro(PreselRetard):
     '''
@@ -700,7 +699,6 @@ class PreselRetardMacro(PreselRetard):
         if self.macro_trend_select is None:
             self.macro_trend_select="ind_mod"
         PreselMacro.preliminary(self)
-        self.strategy="retard_macro"
     
     def run(self,**kwargs):
         self.last_short=PreselMacro.run(self,**kwargs)
@@ -711,7 +709,6 @@ class PreselRetardKeep(Presel):
     '''
     def __init__(self,period: str,**kwargs):
         super().__init__(period,**kwargs)
-        self.strategy="retard_keep"
         
     def underlying(self):
         self.underlying_creator("StratKeep")    
@@ -931,11 +928,11 @@ class PreselSlow(Presel):
         '''
         from orders.models import  get_candidates
 
-        if not "strategy" in self.__dir__():
-            raise ValueError("actualize cannot be called at this level")
+        if not "st" in self.__dir__():
+            raise ValueError("actualize cannot be called without st defined")
         if self.exchange is None:
             raise ValueError("exchange not defined in actualize hist vol")
-        cand=get_candidates(self.strategy,self.exchange) #
+        cand=get_candidates(self.st.name,self.exchange) #
         cand.reset()
 
         if self.sorted_rank is None:
@@ -965,7 +962,6 @@ class PreselVolSlow(PreselSlow):
             self.vol=vbt.talib("NATR").run(self.high,self.low,self.close).real
         self.frequency=_settings["VOL_SLOW_FREQUENCY"]
         self.max_candidates_nb=_settings["VOL_SLOW_MAX_CANDIDATES_NB"]
-        self.strategy="vol_slow"
         
     def underlying(self):
         self.underlying_creator("StratF")
@@ -983,7 +979,6 @@ class PreselMacdVolSlow(PreselVolSlow):
         self.max_candidates_nb=_settings["MACD_VOL_SLOW_MAX_CANDIDATES_NB"]
         self.condition["long"]=remove_multi(self.macd_tot.macd>0)
         self.condition["short"]=remove_multi(self.macd_tot.macd<0)
-        self.strategy="macd_slow"
         
     def underlying(self):
         self.underlying_creator("StratKamaStochMatrendBbands")
@@ -995,7 +990,6 @@ class PreselHistVolSlow(PreselMacdVolSlow):
         self.max_candidates_nb=_settings["MACD_VOL_SLOW_MAX_CANDIDATES_NB"]
         self.condition["long"]=remove_multi(self.macd_tot.hist>0)
         self.condition["short"]=remove_multi(self.macd_tot.hist<0)
-        self.strategy="hist_slow"
         
     def underlying(self):
         self.underlying_creator("StratE")
@@ -1013,7 +1007,6 @@ class PreselRealMadrid(PreselSlow):
             self.grow=ic.VBTGROW.run(self.close,distance=self.distance,ma=True).out
         self.frequency=_settings["REALMADRID_FREQUENCY"]
         self.max_candidates_nb=_settings["REALMADRID_MAX_CANDIDATES_NB"]
-        self.strategy="real_madrid"
         
     def underlying(self):
         self.underlying_creator("StratReal")
@@ -1032,11 +1025,11 @@ class PreselRealMadrid(PreselSlow):
         from orders.models import Excluded
         from orders.models import  get_candidates
         
-        if not "strategy" in self.__dir__():
-            raise ValueError("actualize cannot be called at this level")
+        if not "st" in self.__dir__():
+            raise ValueError("actualize cannot be called without st defined")
         if self.exchange is None:
             raise ValueError("exchange not defined in actualize hist vol")
-        cand=get_candidates(self.strategy,self.exchange) #
+        cand=get_candidates(self.st.name,self.exchange) #
         cand.reset()
         
         short=False

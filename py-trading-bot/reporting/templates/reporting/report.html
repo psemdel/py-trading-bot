@@ -20,8 +20,6 @@
             <tr>
                 <th>Stock</th>
                 <th>Symbol</th>
-                <th>Pattern light, ent</th>
-                <th>Pattern light, ex</th>
                 <th>Kama, ent</th>
                 <th>Kama, ex</th>
                 <th>Stoch, ent</th>
@@ -36,19 +34,6 @@
         <tr>
             <td>{{ar.action.name}}{{ar.index.name}}</td>
             <td>{{ar.action.symbol}}{{ar.index.symbol}}</td>
-            
-            {% if ar.pattern_light_ent %}
-                <td class="true">{{ar.pattern_light_ent}}</td> 
-            {% else %}
-                <td class="false">{{ar.pattern_light_ent}}</td> 
-            {% endif %}                 
-
-             {% if ar.pattern_light_ex %}
-                 <td class="exit">{{ar.pattern_light_ex}}</td> 
-             {% else %}
-                 <td class="false">{{ar.pattern_light_ex}}</td> 
-             {% endif %} 
-             
 
             {% if ar.kama_ent %}
                 <td class="true">{{ar.kama_ent}}</td>

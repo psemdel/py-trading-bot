@@ -33,7 +33,7 @@ from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,
                           pf_retrieve_all,exchange_to_index_symbol,\
                           get_exchange_actions, action_to_short, ActionSector
                  
-from core import constants, presel
+from core import caller
 
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
@@ -479,7 +479,7 @@ class MyScheduler():
             if today>(timedelta(days=j.frequency_days)+j.last_execution):
                 actions=get_exchange_actions(j.stock_ex.name)
                 st=Strategy.objects.get(name=j.strategy.name)
-                pr=presel.name_to_ust_or_presel(
+                pr=caller.name_to_ust_or_presel(
                     st.class_name, 
                     str(j.period_year)+"y",
                     prd=True, 
