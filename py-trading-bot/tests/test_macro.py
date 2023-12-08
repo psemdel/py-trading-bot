@@ -75,18 +75,17 @@ class TestMacro(TestCase):
         t2=macro.VBTMACROFILTER.run(self.ust.entries,t.macro_trend, mode=0 )
         
         self.assertEqual(t.macro_trend['AC'].values[0],t2.out[t2.out.columns[0]].values[0])
+        self.assertEqual(self.ust.entries['AC'].values[-1],True)
+        self.assertEqual(t.macro_trend['AC'].values[-1],1)
+        self.assertFalse(t2.out[t2.out.columns[0]].values[-1])
         
-        self.assertEqual(self.ust.entries['AC'].values[-3],True)
-        self.assertEqual(t.macro_trend['AC'].values[-3],1)
-        self.assertFalse(t2.out[t2.out.columns[0]].values[-3])
+        self.assertEqual(self.ust.entries['ATO'].values[-1],True)
+        self.assertEqual(t.macro_trend['ATO'].values[-1],1)
+        self.assertFalse(t2.out[t2.out.columns[4]].values[-1])
         
-        self.assertEqual(self.ust.entries['ATO'].values[-6],True)
-        self.assertEqual(t.macro_trend['ATO'].values[-6],1)
-        self.assertFalse(t2.out[t2.out.columns[4]].values[-6])
-        
-        self.assertEqual(self.ust.entries['DSY'].values[-1],True)
-        self.assertEqual(t.macro_trend['DSY'].values[-1],-1)
-        self.assertFalse(t2.out[t2.out.columns[11]].values[-1])
+        self.assertEqual(self.ust.entries['BNP'].values[-34],True)
+        self.assertEqual(t.macro_trend['BNP'].values[-34],0)
+        self.assertTrue(t2.out[t2.out.columns[6]].values[-34])
         
         
         

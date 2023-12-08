@@ -1,5 +1,5 @@
 ### Setting of the trading bot ###
-import os
+import os, sys
 
 _settings={
       
@@ -69,7 +69,7 @@ _settings={
 "FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
 
 "STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
-          "PreselDivergenceBlocked","PreselWQ7","PreselWQ31","PreselWQ53","PreselWQ54"],
+          "PreselDivergenceBlocked","PreselWQ7","PreselWQ19","PreselWQ21","PreselWQ31","PreselWQ53","PreselWQ54"],
 
 ## API configurations
 "IB_LOCALHOST":'127.0.0.1',
@@ -77,29 +77,8 @@ _settings={
 
 "ETF_IB_auth":False, 
 "IB_BASE_CURRENCY":"EUR",
-
-"CCXT_EXCHANGE":"ace",
-"MT5_HOST":os.environ.get("MT5_HOST",0),
-"MT5_PORT":os.environ.get("MT5_PORT",0),
-"TD_API_KEY":os.environ.get("TD_API_KEY","YOUR_KEY")
 }
-
-### For other API ###
-## CCXT ##
-'''
-vbt.CCXTData.set_custom_settings(
-             exchanges=dict(
-                 binance=dict(
-                     exchange_config=dict(
-                         apiKey=os.environ.get("CCXT_KEY","YOUR_KEY"),
-                         secret=os.environ.get("CCXT_SECRET","YOUR_SECRET")
-                     )
-                 )
-             )
-        )
-''' 
-    
-    
+  
 """
 Django settings for trading_bot project.
 
@@ -193,7 +172,7 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb'),
+        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb2023'),
         'USER': DB_USER,
         'PASSWORD': DB_SECRET_KEY,
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
@@ -307,16 +286,22 @@ LOGGING = {
                 'class': 'logging.FileHandler',
                 'filename': 'logs/trade.log',
                  'formatter': 'trade_format',
-            },       
+            },  
+       'console': {
+               'level': 'INFO',
+               'class': 'logging.StreamHandler',
+               'stream': sys.stdout,
+               'formatter': 'default',
+               },
     },
     'loggers': {
         '': {
-            'handlers': ['info_file', 'warning_file'],
+            'handlers': ['info_file', 'warning_file', 'console'],
             'level': 'INFO',
             'propagate': True,
         },
        'trade': {
-           'handlers': ['trade_file'],
+           'handlers': ['trade_file', 'console'],
            'level': 'INFO',
            'propagate': True,
        }, 

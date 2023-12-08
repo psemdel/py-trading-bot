@@ -1,7 +1,9 @@
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
 import numpy as np
+import pandas as pd
 from opt.opt_main import OptMain
+
 """
 Script to optimize the combination of patterns/signals used for a given strategy
 
@@ -38,9 +40,9 @@ class Opt(OptMain):
            ind: index, for instance "CAC40"
            dic: total/learn/test
         '''  
-        self.calc_arrs=[]
+        self.calc_arr=[]
         for arr in args:
-            self.calc_arrs.append(arr)
+            self.calc_arr.append(arr)
         
         self.defi_ent(dic)
         self.defi_ex(dic)
@@ -59,9 +61,6 @@ class Opt(OptMain):
 
     def calculate_pf(
             self,
-            best_arrs_cand,
-            best_ret_cand,
-            best_arrs_ret,
             dic: str="learn",
             bypass_tested_arrs: bool=False
             ):
@@ -70,49 +69,49 @@ class Opt(OptMain):
         
         Arguments
         ----------
-           best_arrs_cand: table containing the best candidate by the strategy array presently tested
-           best_ret_cand: table containing the return of the best candidate by the strategy array presently tested
-           best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
            dic: key of the dictionnary to be called: "learning", "test", "total"...
            bypass_tested_arrs: should the function tested_arrs be bypassed
         '''
-        try:
-            if (not self.check_tested_arrs()) and not "test" in dic and not bypass_tested_arrs:
-                return best_arrs_cand, best_ret_cand
-            
+        if (not self.check_tested_arrs()) and not "test" in dic and not bypass_tested_arrs:
+            return 0
+   
+        if self.it_is_index:
+            ret_arr=[]
+        else:
+            ret=0
+        
+        pf_dic=self.calculate_pf_sub(dic) 
+
+        for ind in self.indexes: #CAC, DAX, NASDAQ
+            t=self.calculate_eq_ret(pf_dic[ind],ind)
             if self.it_is_index:
-                ret_arr=[]
+                ret_arr.append(t)
             else:
-                ret=0
-            
-            pf_dic=self.calculate_pf_sub(dic) 
+                ret+=self.calculate_eq_ret(pf_dic[ind],ind)
+            self.row["trades_"+ind+"_"+dic]=len(pf_dic[ind].get_trades().records_arr)
 
-            for ind in self.indexes: #CAC, DAX, NASDAQ
+        if self.it_is_index:
+            self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_raw"]=np.mean(ret_arr)
+            while np.std(ret_arr)>10:
+                 ii=np.argmax(ret_arr)
+                 ret_arr=np.delete(ret_arr,ii,0)
+         
+            ret=np.mean(ret_arr)
+            self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_corrected"]=ret
+        else:
+            self.row["sum_surperf_factor_w_"+dic+"_all_indexes_corrected"]=ret
 
-                if self.it_is_index:
-                    ret_arr.append(self.calculate_eq_ret(pf_dic[ind]))
-                else:
-                    ret+=self.calculate_eq_ret(pf_dic[ind])
-    
-            if self.it_is_index:
-                while np.std(ret_arr)>10:
-                     ii=np.argmax(ret_arr)
-                     ret_arr=np.delete(ret_arr,ii,0)
-             
-                ret=np.mean(ret_arr)
-    
-            trades =len(pf_dic[ind].get_trades().records_arr)
-            del pf_dic
-             
-            if (ret> best_arrs_ret and ret>best_ret_cand and trades>50) or dic=="test":
-                return self.calc_arrs, ret
+        self.row["opt_return"]=ret    #used for the optimization
+
+        if "test" in dic:
+            self.log("Overall perf, "+dic+": " + str(ret),pr=True)
+        else:
+            self.trades=self.row["trades_"+ind+"_"+dic] #arbitrary last
             
-            return best_arrs_cand, best_ret_cand
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)
+        self.append_row()
+        del pf_dic
+        return 1
+
             
 
      

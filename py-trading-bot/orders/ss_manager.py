@@ -41,19 +41,43 @@ class StockStatusManager():
             s_ex=StockEx.objects.get(name=exchange)
             self.present_ss= pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values(),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","etf_long_id","etf_short_id"),index="symbol")
+            #add etf which may be in other stock exchange
+            comp_etf1=comp[~comp["etf_long_id"].isnull()]
+            etf_l=[e for e in comp_etf1["etf_long_id"].values]
+            comp_etf2=comp[~comp["etf_short_id"].isnull()]
+            etf_l+=[e for e in comp_etf2["etf_short_id"].values]
+            
+            etf_not_found=[]
+            for s in etf_l:
+                if s not in comp.index:
+                    etf_not_found.append(s)
+                    
+            if len(etf_not_found)>0:    
+                present_not_found= pd.DataFrame.from_records(StockStatus.objects.all().values(),index="action_id").loc[etf_not_found]
+                comp_not_found= pd.DataFrame.from_records(Action.objects.all().values("symbol","etf_long_id","etf_short_id"),index="symbol").loc[etf_not_found]
+                self.present_ss=pd.concat([self.present_ss,present_not_found],axis=0)
+                comp=pd.concat([ comp,comp_not_found],axis=0)
         else:
             self.present_ss= pd.DataFrame.from_records(StockStatus.objects.all().values(),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.all().values("symbol","etf_long_id","etf_short_id"),index="symbol")
+            
         self.present_ss=pd.concat([self.present_ss,comp], axis=1)
-
-        #condensated version
+        
+        
+        
         self.target_ss=self.present_ss.copy()
         self.target_ss["priority"]=np.nan
-
+        
         #will contain the target normalized quantity for each stock
         if exchange is not None:
             self.target_ss_by_st=pd.DataFrame.from_records(StockStatus.objects.filter(action__stock_ex=s_ex).values("action_id"),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.filter(stock_ex=s_ex).values("symbol","category_id"),index="symbol")
+            
+            if len(etf_not_found)>0:    
+                target_ss_by_st_not_found=pd.DataFrame.from_records(StockStatus.objects.all().values("action_id"),index="action_id").loc[etf_not_found]
+                self.target_ss_by_st=pd.concat([self.target_ss_by_st,target_ss_by_st_not_found],axis=0)
+                comp_not_found= pd.DataFrame.from_records(Action.objects.all().values("symbol","category_id"),index="symbol").loc[etf_not_found]
+                comp=pd.concat([ comp,comp_not_found],axis=0)
         else:
             self.target_ss_by_st=pd.DataFrame.from_records(StockStatus.objects.all().values("action_id"),index="action_id")
             comp= pd.DataFrame.from_records(Action.objects.all().values("symbol","category_id"),index="symbol")
@@ -66,7 +90,7 @@ class StockStatusManager():
         
         self.priority_st_lookup=pd.DataFrame.from_records(Strategy.objects.all().values("id","name", "priority"),index="id")
         self.priority_st_lookup.loc[np.nan]={"name":"not found","priority":1000}
-
+        
         self.report=report
         self.testing=testing
     
@@ -91,65 +115,60 @@ class StockStatusManager():
            df: subset of self.target_ss_by_st to summarize
            it_is_index: Is it indexes or stocks?
         '''
-        try:
-            r1=(self.present_ss["quantity"]!=0)
-            #init with present value, otherwise put 1000 and 0
-            self.target_ss.loc[r1,"strategy_id"]=self.present_ss.loc[r1,"strategy_id"]
-            self.target_ss.loc[r1,"priority"]=self.priority_st_lookup.loc[self.present_ss.loc[r1,"strategy_id"],"priority"].values
-            self.target_ss.loc[~r1,"priority"]=1000
-            self.target_ss.loc[r1,"norm_quantity"]=np.divide(self.present_ss.loc[r1,"quantity"], abs(self.present_ss.loc[r1,"quantity"]))
-            self.target_ss.loc[~r1,"norm_quantity"]=0
-    
-            for i in df.index:
-                #Replace with an order with more priority
-                for c in df.columns: #c is the strategy
-                    if c!="category_id" and not np.isnan(df.loc[i,c]):
-                        p=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].values[0] #normally only one
-                        p_id=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].index[0]
-    
-                        if p<self.target_ss.loc[i].priority and not np.isnan(float(df.loc[i,c])):
-                            self.target_ss.loc[i,"strategy_id"]=p_id
-                            self.target_ss.loc[i,"priority"]=p
-                            self.target_ss.loc[i,"norm_quantity"]=df.loc[i,c]
-                            
-                            if self.present_ss.loc[i,"quantity"]==0 or np.isnan(float(self.present_ss.loc[i,"quantity"])): #float required for decimals
-                                present_norm_quantity=0
-                            else:
-                                present_norm_quantity=self.present_ss.loc[i,"quantity"]/abs(self.present_ss.loc[i,"quantity"])
-                            self.target_ss.loc[i,"norm_delta_quantity"]=float(self.target_ss.loc[i,"norm_quantity"])-present_norm_quantity
-    
-                if it_is_index:
-                    #If index, we have to move the order from the index to the etf
-                    etf=None
-                    #Looking for the index of the corresponding etf
-                    if self.target_ss.loc[i,"norm_quantity"]>0:
-                        etf=self.present_ss.loc[i,"etf_long_id"]
-                    elif self.target_ss.loc[i,"norm_quantity"]<0:
-                        etf=self.present_ss.loc[i,"etf_short_id"]
-    
-                    #Copying the index self.target_ss to the etf self.target_ss
-                    if etf is not None:
-                        self.target_ss.loc[etf,"norm_quantity"]=self.target_ss.loc[i,"norm_quantity"]
-                        self.target_ss.loc[etf,"strategy_id"]=self.target_ss.loc[i,"strategy_id"]
-                        self.target_ss.loc[etf,"priority"]=self.target_ss.loc[i,"priority"]
+        r1=(self.present_ss["quantity"]!=0)
+        #init with present value, otherwise put 1000 and 0
+        self.target_ss.loc[r1,"strategy_id"]=self.present_ss.loc[r1,"strategy_id"]
+        self.target_ss.loc[r1,"priority"]=self.priority_st_lookup.loc[self.present_ss.loc[r1,"strategy_id"],"priority"].values
+        self.target_ss.loc[~r1,"priority"]=1000
+        self.target_ss.loc[r1,"norm_quantity"]=np.divide(self.present_ss.loc[r1,"quantity"], abs(self.present_ss.loc[r1,"quantity"]))
+        self.target_ss.loc[~r1,"norm_quantity"]=0
+
+        for i in df.index:
+            #Replace with an order with more priority
+            for c in df.columns: #c is the strategy
+                if c!="category_id" and not np.isnan(df.loc[i,c]):
+                    p=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].values[0] #normally only one
+                    p_id=self.priority_st_lookup[self.priority_st_lookup["name"]==c]["priority"].index[0]
+                    
+                    if (p<self.target_ss.loc[i].priority or p_id==self.present_ss.loc[i,"strategy_id"]) and not np.isnan(float(df.loc[i,c])):
+                        self.target_ss.loc[i,"strategy_id"]=p_id
+                        self.target_ss.loc[i,"priority"]=p
+                        self.target_ss.loc[i,"norm_quantity"]=df.loc[i,c]
                         
-                        if self.present_ss.loc[etf,"quantity"]==0 or np.isnan(float(self.present_ss.loc[etf,"quantity"])): #float required for decimals
+                        if self.present_ss.loc[i,"quantity"]==0 or np.isnan(float(self.present_ss.loc[i,"quantity"])): #float required for decimals
                             present_norm_quantity=0
                         else:
-                            present_norm_quantity=self.present_ss.loc[etf,"quantity"]/abs(self.present_ss.loc[etf,"quantity"])
-                        self.target_ss.loc[etf,"norm_delta_quantity"]=self.target_ss.loc[i,"norm_quantity"]-present_norm_quantity
-                        self.target_ss.loc[i,"norm_quantity"]=0
-                        self.target_ss.loc[i,"norm_delta_quantity"]=0
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)    
+                            present_norm_quantity=self.present_ss.loc[i,"quantity"]/abs(self.present_ss.loc[i,"quantity"])
+                            
+                        self.target_ss.loc[i,"norm_delta_quantity"]=float(self.target_ss.loc[i,"norm_quantity"])-present_norm_quantity
+
+            if it_is_index:
+                #If index, we have to move the order from the index to the etf
+                etf=None
+                #Looking for the index of the corresponding etf
+                if self.target_ss.loc[i,"norm_quantity"]>0:
+                    etf=self.present_ss.loc[i,"etf_long_id"]
+                elif self.target_ss.loc[i,"norm_quantity"]<0:
+                    etf=self.present_ss.loc[i,"etf_short_id"]
+
+                #Copying the index self.target_ss to the etf self.target_ss
+                if etf is not None:
+                    self.target_ss.loc[etf,"norm_quantity"]=abs(self.target_ss.loc[i,"norm_quantity"]) #etf cannot be in short
+                    self.target_ss.loc[etf,"strategy_id"]=self.target_ss.loc[i,"strategy_id"]
+                    self.target_ss.loc[etf,"priority"]=self.target_ss.loc[i,"priority"]
+                    
+                    if self.present_ss.loc[etf,"quantity"]==0 or np.isnan(float(self.present_ss.loc[etf,"quantity"])): #float required for decimals
+                        present_norm_quantity=0
+                    else:
+                        present_norm_quantity=self.present_ss.loc[etf,"quantity"]/abs(self.present_ss.loc[etf,"quantity"])
+                    self.target_ss.loc[etf,"norm_delta_quantity"]=abs(self.target_ss.loc[i,"norm_quantity"])-present_norm_quantity
+                    self.target_ss.loc[i,"norm_quantity"]=0
+                    self.target_ss.loc[i,"norm_delta_quantity"]=0
             
     def determine_target(self):
         #start with index
-        self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]=="IND"],True) #move order from index to etf
-        self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]!="IND"],False)
+        self.determine_target_sub(self.target_ss_by_st[ (self.target_ss_by_st["category_id"]=="IND")],True) #move order from index to etf
+        self.determine_target_sub(self.target_ss_by_st[self.target_ss_by_st["category_id"]=="ACT"],False)
         
     def display_target_ss_by_st(self,it_is_index:bool=False):
         pd.set_option('display.max_columns', None)
@@ -193,46 +212,50 @@ class StockStatusManager():
         ----------
         testing: set to True to perform unittest on the function
         """
-        try:
-            if testing==False:
-                testing=self.testing
-            
-            if "norm_delta_quantity" in self.target_ss: #otherwise there is not order to perform
-                sell_df=self.target_ss[self.target_ss["norm_delta_quantity"]<0]
+        if testing==False:
+            testing=self.testing
         
-                for symbol, row in sell_df.iterrows():
-                    st=Strategy.objects.get(id=row["strategy_id"])
-                    
-                    op= OrderPerformer(
-                        symbol,
-                        row["strategy_id"],
-                        row["norm_quantity"]*st.target_order_size,
-                        testing=testing
+        if "norm_delta_quantity" in self.target_ss: #otherwise there is not order to perform
+            sell_df=self.target_ss[self.target_ss["norm_delta_quantity"]<0]
+    
+            for symbol, row in sell_df.iterrows():
+                st=Strategy.objects.get(id=row["strategy_id"])
+                
+                op= OrderPerformer(
+                    symbol,
+                    row["strategy_id"],
+                    row["norm_quantity"]*st.target_order_size,
+                    testing=testing
+                    )
+                out=op.sell_order()
+                if out:
+                    self.report.handle_OrderExecutionMsg(
+                        op.action, 
+                        _settings["USED_API"]["orders"], 
+                        False, 
+                        st.name
                         )
-                    out=op.sell_order()
-                    if out:
-                        self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], False, st.name, reverse=op.reverse)
-        
-                buy_df=self.target_ss[self.target_ss["norm_delta_quantity"]>0].copy()
-                buy_df.sort_values(by=["priority"],inplace=True)
-        
-                #will stop when not enough cash
-                for symbol, row in buy_df.iterrows():
-                    st=Strategy.objects.get(id=row["strategy_id"])
-                    op= OrderPerformer(
-                        symbol,
-                        row["strategy_id"],
-                        row["norm_quantity"]*st.target_order_size,
-                        testing=testing
+    
+            buy_df=self.target_ss[self.target_ss["norm_delta_quantity"]>0].copy()
+            buy_df.sort_values(by=["priority"],inplace=True)
+    
+            #will stop when not enough cash
+            for symbol, row in buy_df.iterrows():
+                st=Strategy.objects.get(id=row["strategy_id"])
+                op= OrderPerformer(
+                    symbol,
+                    row["strategy_id"],
+                    row["norm_quantity"]*st.target_order_size,
+                    testing=testing
+                    )
+                out=op.buy_order()
+                if out:
+                    self.report.handle_OrderExecutionMsg(
+                        op.action, 
+                        _settings["USED_API"]["orders"],
+                        True,
+                        st.name
                         )
-                    out=op.buy_order()
-                    if out:
-                        self.report.handle_listOfActions(op.action, op.entry, _settings["USED_API"]["orders"], True, st.name, reverse=op.reverse)
-        except Exception as msg:
-            import sys
-            _, _, exc_tb = sys.exc_info()
-            print("line " + str(exc_tb.tb_lineno))
-            print(msg)
 
     def resolve(self):
         self.determine_target()
@@ -324,6 +347,7 @@ class StockStatusManager():
                          exchange: str, 
                          strategy: str, 
                          short: bool,
+                         keep: bool=False,
                          **kwargs):
         """
     	Buy automatically the candidate, without any other underlying strategy
@@ -336,7 +360,7 @@ class StockStatusManager():
         exchange: name of the stock exchange
         strategy: name of the strategy
         short: direction of the desired order
-        
+        keep: should the candidate in exit be kept
     	"""        
         if len(candidates)==0:
             self.report.concat(strategy +" no candidates")
@@ -345,7 +369,7 @@ class StockStatusManager():
         
         sold_symbols=self.cand_to_quantity(candidates, strategy, short)
         
-        if kwargs.get("keep",False):
+        if keep and not short: #no keep short
             for s, v in sold_symbols.items():
                 self.add_target_quantity(s, "retard_keep", v)
 
@@ -418,7 +442,20 @@ class StockStatusManager():
         for s in df_to_be_cleaned.index:
             self.target_ss_by_st.loc[s,strategy]=0
 
-
+    def clean_excluded(
+            self, 
+            strategy: str, 
+            excluded: list):
+        """
+        Sell excluded symbols
+        
+        Arguments
+    	----------
+        strategy: strategy name following the trend, which could have experienced a reversal
+        excluded: list of excluded symbols
+        """
+        for s in excluded:
+            self.target_ss_by_st.loc[s,strategy]=0
 
         
         

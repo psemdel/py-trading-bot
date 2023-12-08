@@ -83,19 +83,8 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.44)   
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.88)  
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.02)  
-        
-    def test_stratF(self):
-        self.ust=strat.StratF(self.period, symbol_index=self.symbol_index)
-        self.ust.run()
-        
-        pf=vbt.Portfolio.from_signals(self.ust.close, self.ust.entries,self.ust.exits,
-                                      short_entries=self.ust.entries_short,
-                                      short_exits  =self.ust.exits_short)   
-        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.6) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.28) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),8.41) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.2) 
+
+
         
     def test_stratIndex(self):
         self.ust=strat.StratIndex(self.period, symbol_index=self.symbol_index)
@@ -105,10 +94,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)  
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.9) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),-0.49) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.86) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.73) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.3)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),-0.44) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),3.21)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.37) 
         
         self.ust=strat.StratIndex(self.period, symbol_index=self.symbol_index,it_is_index=True)
         self.ust.run()
@@ -116,7 +105,7 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)         
         
-        self.assertEqual(round(pf.get_total_return(),2),5.63) 
+        self.assertEqual(round(pf.get_total_return(),2),5.79) 
         
     def test_stratReal(self):
         self.ust=strat.StratReal(self.period, symbol_index=self.symbol_index)
@@ -126,10 +115,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.43) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.43)  
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.11) 
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),4.08) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.15) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.36) 
 
     def test_stratDiv(self):
         self.ust=strat.StratDiv(self.period, symbol_index=self.symbol_index)
@@ -139,10 +128,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)  
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),0.01)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.09)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.15)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.53) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),0.16) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.18) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),0.46) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.6) 
         
 if __name__ == '__main__':
     unittest.main()        

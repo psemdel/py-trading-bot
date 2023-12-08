@@ -16,3 +16,6 @@ django-filter >= 22.1
 psycopg2-binary
 
 backports.zoneinfo; python_version < '3.9'
+
+#### Only if making machine learning, remove the ordner ml if you don't need it
+keras

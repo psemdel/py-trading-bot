@@ -27,6 +27,7 @@ class Opt(OptStrat):
         self.number_of_parts=0
         corr_arrs={}
         for ind in self.indexes: #CAC, DAX, NASDAQ
+            
             _, corr_arrs[ind]=cluster_corr(self.close_dic[ind]["learn"].corr())
             self.split_in_part(corr_arrs,ind)
             self.number_of_parts+=len(corr_arrs[ind])
@@ -42,7 +43,6 @@ class Opt(OptStrat):
                 self.log("symbols optimized: " + str(self.close_dic[ind]["learn_part_"+str(ii)].columns))
 
             self.defi_i("learn_part_"+str(ii))
-            self.init_best_arr() #reinit
             self.perf(dic="learn_part_"+str(ii),dic_test="test_part_"+str(ii))
 
     def split_in_part(self,corr_arrs: list, ind: str):
@@ -54,6 +54,9 @@ class Opt(OptStrat):
            corr_arrs: array where the symbols are gathered together depending on their correlation
            ind: index
         '''
+        self.defi_macro_trend("learn")
+        self.defi_macro_trend("test")
+        
         for ii, arr in enumerate(corr_arrs[ind]):
             for d in ["close","open","low","high","data"]:
                 for dic in ["learn","test"]:

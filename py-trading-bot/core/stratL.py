@@ -9,7 +9,7 @@ import vectorbtpro as vbt
 import numbers
 
 from core.strat import UnderlyingStrat
-from core import common, constants, strat, presel
+from core import common, constants, strat, presel, caller
 from core.data_manager import retrieve_data_live
 from trading_bot.settings import _settings
 
@@ -75,7 +75,7 @@ def scan(
         l=strat_l
 
     for p in l:
-        bti=presel.name_to_ust_or_presel(p, ust.period,input_ust=ust)
+        bti=caller.name_to_ust_or_presel(p, ust.period,input_ust=ust)
 
         if restriction is not None and type(restriction)==int:
             pf=vbt.Portfolio.from_signals(bti.close[-restriction:], 

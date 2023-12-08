@@ -5,8 +5,6 @@ Created on Sun Dec 12 11:27:07 2021
 
 @author: maxime
 """
-
-
 '''
 List of patterns and the expected value that indicate a bear behavior, so a sell signal
 '''
@@ -16,23 +14,31 @@ BEAR_PATTERNS={
     "CDLCLOSINGMARUBOZU":-100,
     "CDLBELTHOLD":-100,
     "CDLHIKKAKE":-200,
-    "CDLRISEFALL3METHODS":-100,   #very rare
+    "CDLRISEFALL3METHODS":[100,-100],   #very rare ##
     "CDL3LINESTRIKE":100,         #very rare
-    "CDLBREAKAWAY":-100,
+    "CDLBREAKAWAY":100, #-100
     "CDLABANDONEDBABY":-100,      #very rare
     "CDLEVENINGSTAR":-100,
     "CDLSEPARATINGLINES":-100,    #very rare
     "CDLEVENINGDOJISTAR":-100,
     "CDL3BLACKCROWS":-100,
     "CDLDARKCLOUDCOVER":-100,
-    "CDLMARUBOZU":-100
+    "CDLMARUBOZU":-100,
+    "CDLHIKKAKEMOD":[200,-200],
+    "CDLMORNINGSTAR":100,
+    "CDLUNIQUE3RIVER":100,
+    "CDLXSIDEGAP3METHODS":[-100,100],
+    "CDLCOUNTERATTACK":-100,
+    "CDL3INSIDE":100,
+    "CDLMORNINGDOJISTAR":100,
+    "CDLBREAKAWAY":100, #first bull and then bear
     }
 
 '''
 List of patterns and the expected value that indicate a bull behavior, so a buy signal
 '''
 BULL_PATTERNS={
-    "CDLKICKINGBYLENGTH":100,
+    "CDLKICKINGBYLENGTH":[100,-100],
     "CDLKICKING":100,
     "CDLMARUBOZU":100,
     "CDLCLOSINGMARUBOZU":100,
@@ -47,27 +53,31 @@ BULL_PATTERNS={
     "CDL3INSIDE":100,
     "CDLKICKINGBYLENGTH_INV":100,
     "CDLKICKING_INV":100,
-    }
-
-'''
-Sub-selection of BEAR_PATTERNS, purely arbitrary, put whatever you want
-'''
-BEAR_PATTERNS_LIGHT={
-    "CDLBREAKAWAY":-100,
-    "CDLEVENINGDOJISTAR":-100,
+    "CDLINVERTEDHAMMER":100,
+    "CDLPIERCING":100,
+    "CDLHIKKAKEMOD":100,
+    "CDLSTICKSANDWICH":100,
+    "CDLTRISTAR":-100,
+    "CDL3LINESTRIKE":100,
     "CDLDARKCLOUDCOVER":-100,
-    }
-'''
-Sub-selection of BULL_PATTERNS, purely arbitrary, put whatever you want
-'''
-BULL_PATTERNS_LIGHT={
-    "CDLKICKING":100,
-    "CDLMARUBOZU":100,
-    "CDLDRAGONFLYDOJI":100,
-    "CDLMORNINGSTAR":100,
-    "CDLHANGINGMAN":-100,
+    "CDLINNECK":-100,
+    "CDL3BLACKCROWS":-100,  
     }
 
+entry_cols=["KAMA","MFI","STOCH","WILLR", "SUPERTREND","BBANDS",
+             "RSI20","RSI30","ULTOSC20","ULTOSC25"]
+exit_cols=entry_cols.copy()
+
+for _, k in enumerate(BULL_PATTERNS):
+    entry_cols.append(k)
+for _, k in enumerate(BEAR_PATTERNS):
+    exit_cols.append(k)
+    
+COL_DIC={
+    "ent":entry_cols,
+    "ex":exit_cols
+    }    
+ 
 '''
 ### General note ###
 All lists below are also in the Django DB. However, we need to be able to call them without Django, for backtesting.
@@ -156,7 +166,6 @@ DAX=[
     "DB1.DE",
     "DBK.DE", #=DB
     "DHER.DE",
-    "DPW.DE",
     "DTE.DE", 
     "DTG.DE", 
     "ENR.DE", 
@@ -353,7 +362,9 @@ NASDAQ_INTRO={
 '''
 Delisting date of the stocks if relevant
 '''
-NASDAQ_DELIST={}
+NASDAQ_DELIST={
+    "ATVI":"2023-10-20"
+    }
 
 '''
 List of YF tickers for NYSE stocks in the S&P 500
@@ -850,7 +861,9 @@ NYSE_DELIST={
     "NLSN":"2022-10-01",
     "SIVBQ":"2023-03-27",
     "SBNY":"2023-03-24",
-    "TWTR":"2022-11-01"
+    "TWTR":"2022-11-01",
+    "PKI":"2023-05-16",
+    "ABMD":"2023-01-01"
     }
 
 
@@ -922,14 +935,9 @@ RAW=["BZ=F", #brent
 '''
 Conversion between a trend and a number in the strategy array
 '''
-mode_to_int={
-    "bull":0,
-    "bear":1,
-    "uncertain":2
-    }
-
 short_to_str={True: "short", False: "long"}
 short_to_sign={True:-1, False:1}
+bull_bear_to_int={"bull":-1,"bear":1,"uncertain":0}
 
 
 

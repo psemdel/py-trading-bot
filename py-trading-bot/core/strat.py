@@ -20,6 +20,7 @@ from trading_bot.settings import _settings
 
 import logging
 logger = logging.getLogger(__name__)
+
 """
 Strategies on one action, no preselection
 
@@ -29,9 +30,10 @@ Some of the strategies have been optimized to work with a preselection (see pres
 """
 def defi_i_fast_sub(
         all_t: list,
-        t: pd.core.frame.DataFrame, 
-        calc_arrs: list, 
-        jj: int
+        t_ent: pd.core.frame.DataFrame, 
+        t_ex: pd.core.frame.DataFrame, 
+        strat_arr_h: dict,
+        key: str,
         ) -> list:
     """
     Multiply the entries or exits by the array (0 or 1)
@@ -39,18 +41,26 @@ def defi_i_fast_sub(
     Arguments
     ----------
         all_t: entries or exits for all strategies before
-        t: entries or exits for the strategy to be added
-        calc_arrs: array of the strategy combination 
-        jj: index of the strategy to be added in calc_arrs
+        t_ent: entries for the strategy to be added
+        t_ex: exits for the strategy to be added
+        strat_arr: dict of the strategy combination
+        key: key of the strategy to be added in calc_arrs
     """ 
-    for ii in range(len(calc_arrs)):
-        t2=ic.VBTSUM.run(t,k=calc_arrs[ii][jj]).out
-        t2=remove_multi(t2)
-        all_t[ii]+=t2
+    for ent_or_ex in ['ent','ex']:
+        if ent_or_ex == 'ent':
+            t=t_ent
+        else:
+            t=t_ex
+        
+        if t is not None:
+            for k, v in strat_arr_h.items(): #3,
+                if key in v[ent_or_ex]:
+                    all_t[ent_or_ex][k]+=remove_multi(t)
 
-    return all_t  
+    return all_t 
+
    
-def filter_macro(all_t: list,
+def filter_macro(all_t_ent: list,
                  macro_trend: pd.core.frame.DataFrame,
                  ) -> pd.core.frame.DataFrame:
     """
@@ -62,136 +72,145 @@ def filter_macro(all_t: list,
         macro_trend: trend for each symbols and moment in time
     """   
     ent=None
-    dic={0:-1, 1:1, 2:0}  #bull, bear, uncertain
+    dic={'bull':-1, 'bear':1, 'uncertain':0}  
     
-    for ii in range(len(all_t)):
-        ents_raw=VBTMACROFILTER.run(all_t[ii],macro_trend,dic[ii]).out #
+    for k, v in all_t_ent.items():
+        ents_raw=VBTMACROFILTER.run(v,macro_trend,dic[k]).out #
         if ent is None:
             ent=ents_raw
         else:
             ent=ic.VBTOR.run(ent, ents_raw).out
     return ent
-      
+
 def defi_i_fast( 
         open_: pd.core.frame.DataFrame,
         high: pd.core.frame.DataFrame, 
         low: pd.core.frame.DataFrame, 
         close: pd.core.frame.DataFrame,
-        calc_arrs: list,
+        volume: pd.core.frame.DataFrame,
+        strat_arr_h: dict,
         macro_trend: pd.core.frame.DataFrame=None,
-        ) -> (list, list):
+        ) -> (dict):
     """
     Calculate the entries and exits for each strategy of the array separately
-    
-    Array explanation:
-        index 0-21: entry
-        index 22-end: exit
-        
-    Index 0-6, same for entry and exit
-    0: moving average
-    1: stochastic oscillator
-    2: price smoothed with kama extrema (minimum -> entry, maximum -> exit)
-    3: supertrend
-    4: Bollinger bands (price crosses lower band -> entry, price crosses higher band -> exit)
-    5: RSI with threshold 20/80
-    6: RSI with threshold 30/70
-    
-    Index: 7-21, see BULL_PATTERNS in constants.py
-    Index: 29-end, see BEAR_PATTERNS in constants.py
+    Fast determine directly if an entry or exit is required. There is no intermediate result
+
+    Note: the "rev" proved to be less interesting than the normal signals
 
     Arguments
     ----------
+        open_: opening prices
         close: close prices
-        all_t: entries and exits for one strategy or the array
-        ent_or_ex: do we want to return the entries or exits?
-        calc_arr: array of the strategy combination 
+        high: high prices
+        low: low prices
+        volume: volumes        
+        strat_arr_h: dict of the strategy combination, written in a human readable way
         macro_trend: trend for each symbols and moment in time
     """ 
-    try:
-        non_pattern_len=7
-        
-        all_t_ent=[np.full(np.shape(close),0.0) for ii in range(len(calc_arrs))]
-        all_t_ex=[np.full(np.shape(close),0.0) for ii in range(len(calc_arrs))]
-        
-        #determine if it is needed to calculate
-        u_core=[False for ii in range(non_pattern_len)]
-        u_bull=[False for ii in range(len(BULL_PATTERNS))]
-        u_bear=[False for ii in range(len(BEAR_PATTERNS))]
-        
-        for ii in range(len(calc_arrs)): #3
-            for jj in range(non_pattern_len):
-                if calc_arrs[ii][jj] or calc_arrs[ii][jj+non_pattern_len+len(BULL_PATTERNS)]: #needed for entry or exit
-                     u_core[jj]=True
-            for jj in range(len(BULL_PATTERNS)):
-                if calc_arrs[ii][non_pattern_len+jj]:
-                    u_bull[jj]=True
-            for jj in range(len(BEAR_PATTERNS)):
-                if calc_arrs[ii][2*non_pattern_len+len(BULL_PATTERNS)+jj]:
-                    u_bear[jj]=True                    
+    all_t={'ent':{}, 'ex':{}}
+    out_t={}
 
-        if u_core[0]:
-            t=ic.VBTMA.run(close)
-            all_t_ent=defi_i_fast_sub(all_t_ent,t.entries, calc_arrs, 0)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits, calc_arrs, 0+non_pattern_len+len(BULL_PATTERNS))
-         
-        if u_core[1] or u_core[2]:
-            t=ic.VBTSTOCHKAMA.run(high,low,close)
-            all_t_ent=defi_i_fast_sub(all_t_ent,t.entries_stoch, calc_arrs, 1)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits_stoch, calc_arrs, 1+non_pattern_len+len(BULL_PATTERNS))
-            all_t_ent=defi_i_fast_sub(all_t_ent,t.entries_kama, calc_arrs, 2)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits_kama, calc_arrs, 2+non_pattern_len+len(BULL_PATTERNS))            
+    for k in strat_arr_h:
+        all_t['ent'][k]=np.full(np.shape(close),0.0)
+        all_t['ex'][k]=np.full(np.shape(close),0.0)
+        out_t['ent']=np.full(np.shape(close),0.0)
+        out_t['ex']=np.full(np.shape(close),0.0)
+    
+    item_to_calc=[]
+    for k, v in strat_arr_h.items():
+        for kk, vv in v.items():
+            item_to_calc+=vv
+    item_to_calc=list(set(item_to_calc))   
+    
+    if 'MA' in item_to_calc:
+        t=ic.VBTMA.run(close)
+        all_t=defi_i_fast_sub(all_t,t.entries,t.exits, strat_arr_h, 'MA')
         
-        if u_core[3]:
-            t=ic.VBTSUPERTREND.run(high,low,close)
-            all_t_ent=defi_i_fast_sub(all_t_ent,t.entries, calc_arrs, 3)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.exits, calc_arrs, 3+non_pattern_len+len(BULL_PATTERNS))
-              
-        if u_core[4]:
-            t=vbt.BBANDS.run(close)
-            all_t_ent=defi_i_fast_sub(all_t_ent,t.lower_above(close), calc_arrs, 4)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.upper_below(close), calc_arrs, 4+non_pattern_len+len(BULL_PATTERNS))
-  
-        if u_core[5] or u_core[6]: 
-            t=vbt.RSI.run(close,wtype='simple')
-            all_t_ent=defi_i_fast_sub(all_t_ent,t.rsi_crossed_below(20), calc_arrs, 5)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.rsi_crossed_above(80), calc_arrs, 5+non_pattern_len+len(BULL_PATTERNS))
-            all_t_ent=defi_i_fast_sub(all_t_ent,t.rsi_crossed_below(30), calc_arrs, 6)
-            all_t_ex=defi_i_fast_sub(all_t_ex,t.rsi_crossed_above(70), calc_arrs, 6+non_pattern_len+len(BULL_PATTERNS))            
-        
-        for ii, f_name in enumerate(BULL_PATTERNS):
-            if u_bull[ii]:
-                t=ic.VBTPATTERNONE.run(open_,high,low,close,f_name, "ent").out
-                all_t_ent=defi_i_fast_sub(all_t_ent,t, calc_arrs, non_pattern_len+ii)
+    if ('STOCH' in item_to_calc) or ('STOCH_rev' in item_to_calc):
+        t=vbt.STOCH.run(high,low,close)
+        if 'STOCH' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.slow_k_crossed_below(20),t.slow_k_crossed_above(80), strat_arr_h, 'STOCH')
+        if 'STOCH_rev' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.slow_k_crossed_above(20),t.slow_k_crossed_below(80), strat_arr_h, 'STOCH_rev')
             
-        for ii, f_name in enumerate(BEAR_PATTERNS):
-            if u_bear[ii]:
-                t=ic.VBTPATTERNONE.run(open_,high,low,close,f_name, "ex").out
-                all_t_ex=defi_i_fast_sub(all_t_ex,t, calc_arrs, ii+2*non_pattern_len+len(BULL_PATTERNS))        
+    if 'KAMA' in item_to_calc:
+        t=ic.VBTSTOCHKAMA.run(high,low,close)
+        all_t=defi_i_fast_sub(all_t,t.entries_kama,t.exits_kama, strat_arr_h, 'KAMA')        
+        
+    if 'SUPERTREND' in item_to_calc:
+        t=ic.VBTSUPERTREND.run(high,low,close)
+        all_t=defi_i_fast_sub(all_t,t.entries,t.exits, strat_arr_h, 'SUPERTREND')
+        
+    if 'BBANDS' in item_to_calc:
+        t=vbt.BBANDS.run(close)
+        all_t=defi_i_fast_sub(all_t,t.lower_above(close),t.upper_below(close), strat_arr_h, 'BBANDS')
+       
+    if ('RSI20' in item_to_calc) or ('RSI30' in item_to_calc) or\
+       ('RSI20_rev' in item_to_calc) or ('RSI30_rev' in item_to_calc):
+        t=vbt.RSI.run(close,wtype='simple')
+        if 'RSI20' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.rsi_crossed_below(20),t.rsi_crossed_above(80), strat_arr_h, 'RSI20')
+        if 'RSI20_rev' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.rsi_crossed_above(20),t.rsi_crossed_below(80), strat_arr_h, 'RSI20_rev')            
+        if 'RSI30' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.rsi_crossed_below(30),t.rsi_crossed_above(70), strat_arr_h, 'RSI30')
+        if 'RSI30_rev' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.rsi_crossed_above(30),t.rsi_crossed_below(70), strat_arr_h, 'RSI30_rev')
+            
+    if ('MFI' in item_to_calc) or ('MFI_rev' in item_to_calc):
+        t=vbt.talib("MFI").run(high, low, close,volume)
+        if 'MFI' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_below(20),t.real_crossed_above(80), strat_arr_h, 'MFI')
+        if 'MFI_rev' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_above(20),t.real_crossed_below(80), strat_arr_h, 'MFI_rev')        
 
-        for ii in range(len(calc_arrs)):
-            all_t_ent[ii]=(all_t_ent[ii]>=1)
-            all_t_ex[ii]=(all_t_ex[ii]>=1)
-        #agregate the signals for different macro trends
-        if macro_trend is not None:
-            all_t_ent=filter_macro(all_t_ent, macro_trend)                    
-            all_t_ex=filter_macro(all_t_ex, macro_trend)     
-        else:
-            all_t_ent=all_t_ent[0]
-            all_t_ex=all_t_ex[0]
+    if ('WILLR' in item_to_calc) or ('WILLR_rev' in item_to_calc):
+        t=vbt.talib("WILLR").run(high, low, close)
+        if 'WILLR' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_below(-90),t.real_crossed_above(-10), strat_arr_h, 'WILLR')
+        if 'WILLR_rev' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_above(-90),t.real_crossed_below(-10), strat_arr_h, 'WILLR_rev')        
 
-        return all_t_ent, all_t_ex
-    except Exception as e:
-        import sys
-        _, e_, exc_tb = sys.exc_info()
-        print(e)
-        print("line " + str(exc_tb.tb_lineno))
-        logger.error(e, stack_info=True, exc_info=True)     
+    if ('ULTOSC20' in item_to_calc) or ('ULTOSC25' in item_to_calc) or\
+       ('ULTOSC20_rev' in item_to_calc) or ('ULTOSC25_rev' in item_to_calc): 
+        t=vbt.talib("ULTOSC").run(high, low, close)
+        if 'ULTOSC20' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_below(20),t.real_crossed_above(80), strat_arr_h, 'ULTOSC20')
+        if 'ULTOSC20_rev' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_above(20),t.real_crossed_below(80), strat_arr_h, 'ULTOSC20_rev')            
+        if 'ULTOSC25' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_below(25),t.real_crossed_above(75), strat_arr_h, 'ULTOSC25')
+        if 'ULTOSC25_rev' in item_to_calc:
+            all_t=defi_i_fast_sub(all_t,t.real_crossed_above(25),t.real_crossed_below(75), strat_arr_h, 'ULTOSC25_rev')
+            
+    for ii, f_name in enumerate(BULL_PATTERNS):
+        if f_name in item_to_calc:
+            t=ic.VBTPATTERNONE.run(open_,high,low,close,f_name, "ent")
+            all_t=defi_i_fast_sub(all_t,t.out,None, strat_arr_h, f_name)
+        
+    for ii, f_name in enumerate(BEAR_PATTERNS):
+        if f_name in item_to_calc:
+            t=ic.VBTPATTERNONE.run(open_,high,low,close,f_name, "ex")
+            all_t=defi_i_fast_sub(all_t,None,t.out, strat_arr_h, f_name)
+
+    for ent_or_ex in ['ent','ex']:
+        for k in strat_arr_h:    
+            all_t[ent_or_ex][k]=(all_t[ent_or_ex][k]>=1)
+    #agregate the signals for different macro trends
+    if macro_trend is not None:
+        for ent_or_ex in ['ent','ex']:
+            out_t[ent_or_ex]=filter_macro(all_t[ent_or_ex], macro_trend)    
+    else:
+        for ent_or_ex in ['ent','ex']:
+            out_t[ent_or_ex]=all_t[ent_or_ex]['simple']
+
+    return out_t
 
 def defi_nomacro(
         close: pd.core.frame.DataFrame,
         all_t: list,
         ent_or_ex: str, 
-        a_simple: list
+        strat_arr: dict
         )-> (pd.core.frame.DataFrame, pd.core.frame.DataFrame):
     """
     transform the array of strategy into entries and exits
@@ -201,18 +220,13 @@ def defi_nomacro(
         close: close prices
         all_t: entries and exits for one strategy or the array
         ent_or_ex: do we want to return the entries or exits?
-        calc_arr: array of the strategy combination 
+        strat_arr: dict of the strategy combination
     """
-    non_pattern_len=7
-    len_ent=non_pattern_len+len(BULL_PATTERNS)
-    len_ex=non_pattern_len+len(BEAR_PATTERNS)
     ent=None
+    if 'simple' not in strat_arr:
+        raise ValueError("simple column not present in strat_arr")
+    arr=strat_arr['simple'][ent_or_ex]
 
-    if ent_or_ex=="ent":
-        arr=a_simple[0:len_ent] 
-    else:
-        arr=a_simple[len_ent:len_ent+len_ex]  
-    
     for ii in range(len(arr)):
         if arr[ii]:
             t=all_t[ii]
@@ -230,8 +244,9 @@ def strat_wrapper_simple(
         high: pd.core.frame.DataFrame, 
         low: pd.core.frame.DataFrame, 
         close: pd.core.frame.DataFrame, 
-        a_simple: list,
-        dir_simple:str="long"
+        volume: pd.core.frame.DataFrame, 
+        strat_arr: dict,
+        dir_simple:str="long",
         ) -> (pd.core.frame.DataFrame, pd.core.frame.DataFrame, pd.core.frame.DataFrame, pd.core.frame.DataFrame):
     """
     wrapper for the different strategy functions
@@ -246,22 +261,22 @@ def strat_wrapper_simple(
         high: high prices
         low: low prices
         close: close prices
-        a_simple: array of the strategy combination 
+        strat_arr: dict of the strategy combination
         dir_simple: direction to use during bull trend
     """
-    ent,ex=defi_i_fast( open_,high, low, close,[a_simple])
-    default=ic.VBTAND.run(ent, np.full(ent.shape, False)).out #trick to keep the right shape
+    t=defi_i_fast( open_,high, low, close,volume, strat_arr)
+    default=ic.VBTAND.run(t['ent'], np.full(t['ent'].shape, False)).out #trick to keep the right shape
     
     if dir_simple in ["long","both"]:
-        entries=ent
-        exits=ex
+        entries=t['ent']
+        exits=t['ex']
     else:
         entries=default
         exits=default
         
     if dir_simple in ["both","short"]:
-        entries_short=ex
-        exits_short=ent
+        entries_short=t['ex']
+        exits_short=t['ent']
     else:
         entries_short=default
         exits_short=default
@@ -272,9 +287,8 @@ def strat_wrapper_macro(open_: np.array,
                         high: np.array, 
                         low: np.array, 
                         close: np.array, 
-                        a_bull: list, 
-                        a_bear: list, 
-                        a_uncertain: list,
+                        volume: np.array,
+                        strat_arr: dict, 
                         dir_bull: str="long", 
                         dir_bear: str="both",
                         dir_uncertain: str="both",
@@ -294,9 +308,7 @@ def strat_wrapper_macro(open_: np.array,
         high: high prices
         low: low prices
         close: close prices
-        a_bull: array of the strategy combination to use for bull trend
-        a_bear: array of the strategy combination to use for bear trend
-        a_uncertain: array of the strategy combination to use for uncertain trend
+        strat_arr: dict of the strategy combination
         dir_bull: direction to use during bull trend
         dir_bear: direction to use during bear trend
         dir_uncertain: direction to use during uncertain trend
@@ -305,16 +317,19 @@ def strat_wrapper_macro(open_: np.array,
         t=VBTMACROTRENDPRD.run(close)
     else:
         t=VBTMACROTREND.run(close)
-    
+
     #combine for the given array the signals and patterns
-    ent,ex=defi_i_fast( open_,
+    tt=defi_i_fast( open_,
                        high,
                        low, 
                        close,
-                       calc_arrs=[a_bull,a_bear, a_uncertain ],
-                       macro_trend=t.macro_trend)
+                       volume,
+                       strat_arr,
+                       macro_trend=t.macro_trend
+                       )
+    
     #put both/long/short
-    t2=VBTMACROMODE.run(ent,ex, t.macro_trend,\
+    t2=VBTMACROMODE.run(tt['ent'],tt['ex'], t.macro_trend,\
                        dir_bull=dir_bull,
                        dir_bear=dir_bear,
                        dir_uncertain=dir_uncertain)
@@ -331,12 +346,9 @@ class UnderlyingStrat():
                  actions: list=None,
                  symbols: list=None,
                  input_ust=None, #itself a strat
-                 strat_arr_simple: list=None,
-                 strat_arr_bull: list=None,
-                 strat_arr_bear: list=None,
-                 strat_arr_uncertain: list=None,
+                 strat_arr: dict=None,
                  exchange:str=None,
-                 st=None
+                 st=None,
                  ):
         """
         Strategies on one action, no preselection. For production and non production, to make the strats as child of the main one.
@@ -348,92 +360,72 @@ class UnderlyingStrat():
         Arguments
         ----------
             symbol_index: main index to be retrieved
-            period: period of time in year for which we shall retrieve the data
+            period: period of time for which we shall retrieve the data
             prd: for production or backtesting
             it_is_index: is it indexes that are provided
             suffix: suffix for files
             actions: list of actions
             symbols: list of YF tickers
             input_ust: input underlying strategy with already all data downloaded, avoid downloading the same several times
-            strat_arr_simple: array of the strategy combination to use, no trend
-            strat_arr_bull: array of the strategy combination to use, trend bull
-            strat_arr_bear: array of the strategy combination to use, trend bear
-            strat_arr_uncertain: array of the strategy combination to use, trend uncertain
+            strat_arr: dict of the strategy combination to use
             exchange: stock exchange, only for saving
             st: strategy associated
         """
-        try:
-            self.suffix=suffix
-            if self.suffix!="":
-                self.suffix="_" + self.suffix
-            for k in ["prd","period","symbol_index", "actions","symbols","exchange","st"]:
-                if locals()[k] is None and input_ust is not None:
-                    setattr(self,k, getattr(input_ust,k))
-                else:
-                    setattr(self,k,locals()[k])
-               
-            self.strat_arr={}
-            if strat_arr_simple is not None:
-                self.strat_arr["simple"]=strat_arr_simple
-            if strat_arr_bull is not None:
-                self.strat_arr["bull"]=strat_arr_bull
-                self.strat_arr["bear"]=strat_arr_bear
-                if strat_arr_bear is None:
-                    raise ValueError("strat_arr_bull defined but not strat_arr_bear")
-                self.strat_arr["uncertain"]=strat_arr_uncertain
-                if strat_arr_uncertain is None:
-                    raise ValueError("strat_arr_bull defined but not strat_arr_uncertain")
-            
-            self.symbols_to_YF={}
-            
-            if input_ust is not None:
-                for l in ["close","open","high","low","volume","data"]:
-                    setattr(self,l,getattr(input_ust,l))
-                    if getattr(input_ust,l) is None:
-                        raise ValueError(l+" no value found in StratPRD")
-                    setattr(self,l+"_ind",getattr(input_ust,l+"_ind"))
-                    if getattr(input_ust,l+"_ind") is None:
-                        raise ValueError(l+"_ind no value found in StratPRD")
+        self.suffix=suffix
+        if self.suffix!="":
+            self.suffix="_" + self.suffix
+        for k in ["prd","period","symbol_index", "actions","symbols","exchange","st"]:
+            if locals()[k] is None and input_ust is not None:
+                setattr(self,k, getattr(input_ust,k))
             else:
-                if not self.prd:
-                    if self.symbol_index is None:
-                        raise ValueError("symbol_index is none for ust")
-                        
-                    retrieve_data_offline(self,self.symbol_index,self.period)
-            
-                    if it_is_index:
-                        for k in ["close","open","low","high"]:
-                            setattr(self,k,getattr(self,k+"_ind"))
-                    else:
-                        self.symbols_simple=self.close.columns.values
-                else:
-                    from orders.models import Action
-                    from core.data_manager_online import retrieve_data_online
-                    if self.actions is None:
-                        if self.symbols is None:
-                            raise ValueError("StratPRD, no symbols provided")
-                        self.actions=[Action.objects.get(symbol=symbol) for symbol in self.symbols]
-                    self.symbols=retrieve_data_online(self,self.actions,period,it_is_index=it_is_index, used_api_key="reporting")  #the symbols as output are then the YF symbols
-                    for s in self.symbols:
-                        self.symbols_to_YF[s]=s
+                setattr(self,k,locals()[k])
+        
+        self.symbols_to_YF={}
+        self.strat_arr=strat_arr
+        
+        if input_ust is not None:
+            for l in ["close","open","high","low","volume","data"]:
+                setattr(self,l,getattr(input_ust,l))
+                if getattr(input_ust,l) is None:
+                    raise ValueError(l+" no value found in StratPRD")
+                setattr(self,l+"_ind",getattr(input_ust,l+"_ind"))
+                if getattr(input_ust,l+"_ind") is None:
+                    raise ValueError(l+"_ind no value found in StratPRD")
+        else:
+            if not self.prd:
+                if self.symbol_index is None:
+                    raise ValueError("symbol_index is none for ust")
                     
-            if input_ust is not None and self.prd: 
-                self.symbols=[]
-                for a in self.actions:
-                    if _settings["USED_API"]["reporting"]=="IB":
-                        s=a.ib_ticker()
-                    else:
-                        s=a.symbol
-                    self.symbols.append(s)
-                    self.symbols_to_YF[s]=a.symbol
-     
-            self.vol=ic.VBTNATR.run(self.high,self.low,self.close).natr
-            self.actions=actions
-        except Exception as e:
-            import sys
-            _, e_, exc_tb = sys.exc_info()
-            print(e)
-            print("line " + str(exc_tb.tb_lineno))            
+                retrieve_data_offline(self,self.symbol_index,self.period)
+        
+                if it_is_index:
+                    for k in ["data","close","open","low","high"]:
+                        setattr(self,k,getattr(self,k+"_ind"))
+                else:
+                    self.symbols_simple=self.close.columns.values
+            else:
+                from orders.models import Action
+                from core.data_manager_online import retrieve_data_online
+                if self.actions is None:
+                    if self.symbols is None:
+                        raise ValueError("StratPRD, no symbols provided")
+                    self.actions=[Action.objects.get(symbol=symbol) for symbol in self.symbols]
+                self.symbols=retrieve_data_online(self,self.actions,period,it_is_index=it_is_index, used_api_key="reporting")  #the symbols as output are then the YF symbols
+                for s in self.symbols:
+                    self.symbols_to_YF[s]=s
+                
+        if input_ust is not None and self.prd: 
+            self.symbols=[]
+            for a in self.actions:
+                if _settings["USED_API"]["reporting"]=="IB":
+                    s=a.ib_ticker()
+                else:
+                    s=a.symbol
+                self.symbols.append(s)
+                self.symbols_to_YF[s]=a.symbol
+ 
+        self.vol=vbt.talib("NATR").run(self.high,self.low,self.close).real
+        self.actions=actions
         
     def get_output(self,s):
         self.entries=s.entries
@@ -462,6 +454,9 @@ class UnderlyingStrat():
             symbol_simple: YF ticker
             ent_or_ex: entry or exit
         '''
+        if pd.isnull(symbol_simple):
+            raise ValueError("simple symbol is nan")
+        
         if ent_or_ex=="ent":
             self.symbols_complex=self.entries.columns.values
         else:
@@ -473,7 +468,7 @@ class UnderlyingStrat():
                     return e
             elif type(e)==str:
                 if e==symbol_simple: #9
-                    return e                
+                    return e     
         raise ValueError("symbols_simple_to_complex not found for symbol: "+str(symbol_simple) +\
                          " columns available: "+str(self.symbols_complex))
     
@@ -504,8 +499,16 @@ class UnderlyingStrat():
         delta=pf.total_return().values[0]
         return delta
                 
-    def perform_StratCandidates(self, st_name, r):
-        from orders.models import Strategy, StratCandidates
+    def perform_StratCandidates(self, r, st_name):
+        '''
+        Perform during the report an underlying strategy on the candidates belonging to StratCandidates
+
+        Arguments
+        ----------
+            r: report
+            st_name: name of the strategy
+        '''
+        from orders.models import Strategy, StratCandidates #needs to be loaded here, as it will work only if Django is loaded
         st, _=Strategy.objects.get_or_create(name=st_name)
         st_actions, _=StratCandidates.objects.get_or_create(strategy=st)  #.id
         st_symbols=st_actions.retrieve()
@@ -521,17 +524,32 @@ class UnderlyingStrat():
                 
                 r.ss_m.add_target_quantity(symbol, st_name, target_order)
     
-    def perform(self, st_name, r): #default
-        self.perform_StratCandidates(st_name, r)        
+    def perform(self, r, st_name:str=None): #default
+        '''
+        See perform_StratCandidates
+        '''
+        if st_name is None:
+            raise ValueError("perform for underlying strategy should have an argument st_name")
+        self.perform_StratCandidates(r, st_name) 
+        
 ###production functions        
-    def get_last_decision(self, symbol_complex_ent: str, symbol_complex_ex: str):
+    def get_last_decision(self, symbol_complex_ent: str, symbol_complex_ex: str) -> int:
+        '''
+        Look for the last entry/exit for a stock, goes back in time. Target_order size is returned
+        
+        Arguments
+        ----------
+            symbol_complex_ent: multiindex column for the symbol, for instance (True, 5, 'AC') in the entry dataframe
+            symbol_complex_ex: multiindex column for the symbol, for instance (True, 5, 'AC') in the exit dataframe
+        
+        '''
         for ii in range(1,len(self.entries[symbol_complex_ent].values)-1):
             if (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]) and not\
             (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]):
-                return -1
+                return 1 #buy, target size is 1
             elif (self.exits[symbol_complex_ex].values[-ii] or self.entries_short[symbol_complex_ex].values[-ii]) and not\
                 (self.entries[symbol_complex_ent].values[-ii] or self.exits_short[symbol_complex_ent].values[-ii]):
-                return 1
+                return -1 #sell, target size is -1
         return 0
     
     def grow_past(self,
@@ -558,7 +576,9 @@ class UnderlyingStrat():
                             self.high, 
                             self.low,
                             self.close,
-                            self.strat_arr["simple"])   
+                            self.volume,
+                            self.strat_arr,
+                            )   
     
     def run_macro(self):
         '''
@@ -571,11 +591,10 @@ class UnderlyingStrat():
                             self.high, 
                             self.low,
                             self.close,
-                            self.strat_arr["bull"], 
-                            self.strat_arr["bear"], 
-                            self.strat_arr["uncertain"],
+                            self.volume,
+                            self.strat_arr, 
                             )  
-        
+
     def run(self):
         if "bull" in self.strat_arr:
             self.run_macro()
@@ -602,9 +621,9 @@ class StratRSI(UnderlyingStrat):
         t=vbt.RSI.run(self.close,wtype='simple')
         self.entries=t.rsi_crossed_below(20)
         self.exits=t.rsi_crossed_above(80)
-        t2=ic.VBTFALSE.run(self.close)
-        self.entries_short=t2.entries
-        self.exits_short=t2.entries
+        t2=ic.VBTFALSE.run(self.close).out
+        self.entries_short=t2
+        self.exits_short=t2
         
 class StratRSIeq(UnderlyingStrat):   
     '''
@@ -613,23 +632,14 @@ class StratRSIeq(UnderlyingStrat):
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a=[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       0., 0., 0., 0., 0., 
-           0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 
-       0., 0., 0., 0., 0.]
-        super().__init__(period,strat_arr_simple=a,**kwargs )
         
-class StratDbear(UnderlyingStrat):   
-    '''
-    Example of strategy without trend
-    '''
-    def __init__(self,
-                 period: numbers.Number,
-                 **kwargs):
-        a=[0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0.,
-        0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
-        0., 1., 0., 0., 0., 0., 0., 0., 1., 0.]
-        super().__init__(period,strat_arr_simple=a,**kwargs )
+        a={"simple":
+           {"ent":['RSI20'],
+            "ex": ['RSI20']
+           }
+          }
+
+        super().__init__(period,strat_arr=a,**kwargs )
         
 class StratDiv(UnderlyingStrat):    
     '''
@@ -638,19 +648,25 @@ class StratDiv(UnderlyingStrat):
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a=[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 1., 1.,
-       1., 0., 1., 0., 0., 0., 0., 1., 0., 0.]
-        super().__init__(period,strat_arr_simple=a,**kwargs )
+        a={'simple': 
+         {'ent': ['RSI20'],
+          'ex':  ['KAMA','SUPERTREND','BBANDS',"CDLBELTHOLD","CDLHIKKAKE","CDLRISEFALL3METHODS","CDLBREAKAWAY",
+                  "CDL3BLACKCROWS"]
+          }}
+
+        super().__init__(period,strat_arr=a,**kwargs )
 
 class StratTestSimple(UnderlyingStrat):    
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a=[0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
-       0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        super().__init__(period,strat_arr_simple=a,**kwargs )
+        
+        a={"simple":
+           {"ent":['STOCH'],
+            "ex": ['RSI20']
+           }
+          }        
+        super().__init__(period,strat_arr=a,**kwargs )
         
 class StratReal(UnderlyingStrat):    
     '''
@@ -659,95 +675,83 @@ class StratReal(UnderlyingStrat):
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a_bull=[1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0.,
-               1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-               1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        a_bear=[1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1,
-         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0]
-        a_uncertain= [1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-               0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1.,
-               1., 0., 0., 0., 0., 1., 0., 1., 1., 0.]        
+
+        a={'bull': {'ent': ['MA', 'STOCH',"CDLLONGLINE", "CDLDRAGONFLYDOJI", "CDLMORNINGSTAR"],
+                    'ex':['MA',"CDLRISEFALL3METHODS"]},
+           'bear': {'ent': ['MA', 'STOCH', 'RSI20',"CDLLONGLINE", "CDLDRAGONFLYDOJI", "CDLMORNINGSTAR"],
+                    'ex': ['MA',"CDLRISEFALL3METHODS","CDLSEPARATINGLINES"]},
+           'uncertain': {'ent':['MA', 'STOCH'],
+                         'ex': ["CDLHIKKAKE","CDLRISEFALL3METHODS","CDLSEPARATINGLINES","CDL3BLACKCROWS","CDLDARKCLOUDCOVER"]
+                         }
+          }            
+
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
-            **kwargs )        
-
-class StratD(UnderlyingStrat):    
+            strat_arr=a,
+            **kwargs )
+        
+class StratKeep(UnderlyingStrat):    
     '''
-    Strategy optimized to have the best yield used alone on stocks
+    Strategy optimized for retard_keep preselection
     
-    In long/both/both, on period 2007-2022, CAC40 return 5.26 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)  
+    ent has no impact at all here
     '''
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a_bull= [1., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 1., 1., 0.,
-                1., 0., 0., 1., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.]
-        a_bear= [1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1,
-         0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0]
-        a_uncertain= [0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 1., 0., 1.,
-                1., 1., 1., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.,
-                0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        
+
+        a={'bull': {'ent': ['RSI20'],
+                    'ex':['SUPERTREND',"CDLENGULFING", "CDLSEPARATINGLINES","CDLEVENINGDOJISTAR","CDLDARKCLOUDCOVER"]},
+           'bear': {'ent': ['RSI20'],
+                    'ex': ["CDL3LINESTRIKE","CDLSEPARATINGLINES","CDLEVENINGDOJISTAR"]},
+           'uncertain': {'ent': ['RSI20'],
+                         'ex': ['RSI20',"CDLEVENINGDOJISTAR"]}
+          }
+
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
-            **kwargs ) 
+            strat_arr=a,
+            **kwargs )  
 
 class StratE(UnderlyingStrat):    
     '''
     Strategy optimized to have the best yield used alone on stocks
-    
-    In long/both/both, on period 2007-2022, CAC40 return 4.35 (bench 2.26), DAX xy (2.66), NASDAQ xy (17.2)    
     '''
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a_bull=[0., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0.,
-        1., 1., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-        0., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0., 0.]
-        a_bear= [0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0,
-         1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0]
-        a_uncertain=  [1., 0., 0., 0., 0., 1., 0., 0., 1., 1., 0., 1., 1., 1., 0., 0.,
-         0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.,
-         0., 0., 1., 1., 0., 0., 1., 1., 0., 0., 0., 0.]
+
+        a={'bull': {'ent': ["STOCH","CDLKICKING","CDL3WHITESOLDIERS","CDLMORNINGDOJISTAR","CDLMORNINGSTAR", "CDLHANGINGMAN", "CDLKICKING_INV"],
+                    'ex': [  "CDLRISEFALL3METHODS", "CDLEVENINGDOJISTAR"]},
+           'bear': {'ent':['STOCH' ,  "CDLKICKING", "CDLMARUBOZU", "CDL3WHITESOLDIERS","CDLMORNINGDOJISTAR", "CDLMORNINGSTAR",  "CDLHANGINGMAN", "CDLKICKING_INV"],
+                    'ex': [ "CDLRISEFALL3METHODS","CDL3LINESTRIKE", "CDLEVENINGDOJISTAR","CDLDARKCLOUDCOVER"]},
+           'uncertain': {'ent':['MA','RSI20',"CDLKICKING", "CDLMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING"],
+                         'ex':["KAMA", "CDLRISEFALL3METHODS", "CDL3LINESTRIKE","CDLEVENINGSTAR","CDLSEPARATINGLINES"]}} 
         
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
-            **kwargs )     
+            strat_arr=a,
+            **kwargs )  
 
 class StratF(UnderlyingStrat):    
     '''
     Strategy optimized to have the best yield used alone on stocks
-    
-    In long/both/both   
     '''
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a_bull=[0., 0., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
-            1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-            0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        a_bear= [0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1,
-           1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0,
-           0, 0]
-        a_uncertain=  [0., 1., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 1., 0., 0., 0.,
-            0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-            0., 1., 0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
+
+        a={'bull': {'ent': ["RSI20","RSI30","CDLMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING","CDLTAKURI","CDLMORNINGDOJISTAR","CDLKICKINGBYLENGTH_INV", "CDLKICKING_INV"],
+                    'ex': [ "CDLRISEFALL3METHODS"]},
+           'bear': {'ent': ['STOCH','RSI20','RSI30', "CDLMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE", "CDLENGULFING",
+                            "CDLTAKURI","CDLMORNINGDOJISTAR","CDLKICKINGBYLENGTH_INV", "CDLKICKING_INV"],
+                    'ex': ['SUPERTREND','BBANDS', "CDLBELTHOLD","CDLRISEFALL3METHODS"]},
+           'uncertain': {'ent': ['STOCH','KAMA',"CDLMARUBOZU","CDLLONGLINE","CDLHANGINGMAN","CDLKICKING_INV"],
+                         'ex':[ "CDLHIKKAKE",  "CDL3LINESTRIKE", "CDL3BLACKCROWS"]}} 
         
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
+            strat_arr=a,
             **kwargs )  
 
 class StratG(UnderlyingStrat):    
@@ -759,71 +763,125 @@ class StratG(UnderlyingStrat):
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a_bull=[0., 0., 1., 0., 0., 1., 1., 0., 0., 1., 0., 1., 0., 1., 0., 1.,
-                1., 1., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0.]
-        a_bear= [0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 0., 1.,
-         1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0.,
-         1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-        a_uncertain=  [0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 1., 0., 0.,
-         1., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-         0., 1., 0., 1., 1., 0., 0., 0., 0., 1., 0., 0.]
+
+        a={'bull': {'ent': ['KAMA','RSI20','RSI30','CDLMARUBOZU',"CDL3WHITESOLDIERS","CDLENGULFING","CDLTAKURI","CDLMORNINGDOJISTAR","CDLMORNINGSTAR","CDLKICKING_INV"],
+                    'ex': ["CDLRISEFALL3METHODS","CDLABANDONEDBABY"]},
+           'bear': {'ent': ['STOCH','RSI20','RSI30',"CDLMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING","CDLTAKURI",
+                            "CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV"],
+                    'ex': ['SUPERTREND','BBANDS',"CDLBELTHOLD"]},
+           'uncertain': {'ent': ['STOCH','KAMA','RSI20','RSI30',"CDLMARUBOZU","CDLCLOSINGMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING",
+                                 "CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV","CDLKICKING_INV"],
+                         'ex': ["CDLHIKKAKE","CDL3LINESTRIKE","CDLBREAKAWAY"]}} 
         
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
+            strat_arr=a,
             **kwargs )  
+        
+class StratH(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield used alone on stocks
+    
+    In long/both/both, Optimized on 2007-2023, CAC40 7.58 (3.13 bench), DAX 2.31 (1.68), NASDAQ 19.88 (12.1), IT 15.69 (8.44)
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
+        
+        a={'bull': {'ent': ['BBANDS','RSI20','RSI30','ULTOSC20','CDLENGULFING','CDLMORNINGSTAR','CDLKICKING_INV','CDLINVERTEDHAMMER',
+   'CDLDARKCLOUDCOVER'],
+                    'ex': ['CDLRISEFALL3METHODS', 'CDL3LINESTRIKE','CDLDARKCLOUDCOVER','CDLHIKKAKEMOD', 'CDLMORNINGDOJISTAR']},
+ 'bear': {'ent': ['STOCH', 'RSI20','ULTOSC25','CDLMARUBOZU','CDL3WHITESOLDIERS','CDLLONGLINE','CDLTAKURI','CDLMORNINGDOJISTAR',
+   'CDLMORNINGSTAR','CDLHANGINGMAN','CDLKICKINGBYLENGTH_INV','CDLPIERCING','CDLHIKKAKEMOD','CDLTRISTAR','CDLDARKCLOUDCOVER',
+   'CDLINNECK'],
+  'ex': ['BBANDS','ULTOSC20','CDLRISEFALL3METHODS', 'CDL3LINESTRIKE', 'CDLABANDONEDBABY', 'CDL3BLACKCROWS','CDLUNIQUE3RIVER',
+   'CDLMORNINGDOJISTAR']},
+ 'uncertain': {'ent': ['RSI20','RSI30','CDLMARUBOZU','CDLCLOSINGMARUBOZU','CDL3WHITESOLDIERS','CDLLONGLINE','CDLENGULFING',
+   'CDLDRAGONFLYDOJI','CDLMORNINGDOJISTAR','CDLMORNINGSTAR','CDLHANGINGMAN','CDL3INSIDE','CDLKICKINGBYLENGTH_INV',
+   'CDLKICKING_INV','CDLINVERTEDHAMMER','CDLSTICKSANDWICH','CDL3LINESTRIKE','CDL3BLACKCROWS'],
+  'ex': ['ULTOSC20','CDLRISEFALL3METHODS','CDL3LINESTRIKE','CDLBREAKAWAY','CDLHIKKAKEMOD']}}
+        
+        super().__init__(
+            period,
+            strat_arr=a,
+            **kwargs )         
+       
+class StratDivSecond(UnderlyingStrat):    
+    '''
+    Strategy optimized to have the best yield with divergence preselection
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
+        
+        a={'bull': {'ent': ['CDLINNECK', 'CDL3BLACKCROWS'],
+                    'ex': ['WILLR','SUPERTREND','BBANDS','CDLBELTHOLD','CDLRISEFALL3METHODS','CDLEVENINGDOJISTAR',
+                           'CDLUNIQUE3RIVER','CDLCOUNTERATTACK','CDLMORNINGDOJISTAR']},
+            'bear': {'ent': ['CDL3BLACKCROWS'],
+             'ex': ['STOCH','SUPERTREND','ULTOSC20','CDLCLOSINGMARUBOZU','CDLRISEFALL3METHODS','CDLUNIQUE3RIVER',
+              'CDLCOUNTERATTACK']},
+            'uncertain': {'ent': ['CDL3BLACKCROWS'],
+             'ex': ['SUPERTREND','RSI20','ULTOSC20','ULTOSC25','CDLRISEFALL3METHODS','CDLABANDONEDBABY',
+              'CDLHIKKAKEMOD','CDLUNIQUE3RIVER']}}
+        
+        super().__init__(
+            period,
+            strat_arr=a,
+            **kwargs ) 
+
 
 class StratIndex(UnderlyingStrat):    
     '''
     Strategy optimized to have the best yield used alone on index
-    '''    
+    '''   
     def __init__(self,
                  period: numbers.Number,
-                 **kwargs):
-        a_bull=[1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 1., 1., 0., 0., 1.,
-       0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-       0., 1., 0., 0., 0., 0., 0., 1., 0., 0.]
-        a_bear=[1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0]
-        a_uncertain=[1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 0., 0.,
-       0., 1., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 1.,
-       0., 0., 1., 0., 0., 0., 1., 0., 0., 0.]
+        **kwargs):
         
+        a={'bull': 
+           {'ent':['MA','SUPERTREND','RSI30', "CDLLONGLINE","CDLENGULFING","CDLMORNINGDOJISTAR"],
+            'ex': ['MA', "CDL3LINESTRIKE","CDL3BLACKCROWS"]
+            },
+           'bear': 
+            {'ent':['MA','SUPERTREND','RSI20','RSI30',"CDLLONGLINE","CDLENGULFING","CDLMORNINGDOJISTAR"],
+             'ex': ['MA', "CDLEVENINGSTAR","CDLBREAKAWAY","CDL3BLACKCROWS","CDLDARKCLOUDCOVER"] 
+             },
+            'uncertain': 
+            {'ent': ['MA','STOCH',"CDLLONGLINE","CDLDRAGONFLYDOJI","CDLHANGINGMAN"],
+             'ex':['SUPERTREND',  "CDLHIKKAKE","CDLBREAKAWAY", "CDLEVENINGDOJISTAR"]}
+            }
+  
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
-            **kwargs ) 
+            strat_arr=a,
+            **kwargs )  
 
 class StratIndexB(UnderlyingStrat):    
     '''
     Strategy optimized to have the best yield used alone on index
-    
-    reoptimization with 2007-2023 FCHI 9.43 (0.15 for the benchmark), GDAXI 3.09 (0.7), IXIC 4.58 (3.31), DJI 1.5 (1.65)
     '''   
     def __init__(self,
                  period: numbers.Number,
-                 **kwargs):
-        a_bull=[1., 0., 0., 1., 1., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
-                1., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
-                0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 0.]
-        a_bear=[0., 0., 0., 1., 1., 1., 1., 0., 0., 0., 0., 0., 1., 1., 0., 0.,
-         1., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.,
-         0., 1., 0., 1., 0., 0., 1., 0., 0., 1., 1., 0.]
-        a_uncertain=[1., 1., 0., 1., 0., 0., 1., 0., 0., 0., 0., 0., 0., 1., 1., 0.,
-         1., 0., 1., 0., 0., 0., 1., 0., 0., 1., 0., 1., 0., 0., 0., 0.,
-         0., 1., 0., 1., 1., 0., 1., 1., 1., 1., 0., 0.] 
+        **kwargs):
+        
+        a={'bull': 
+           {'ent': ['KAMA',"CDLDRAGONFLYDOJI","CDL3INSIDE"],
+            'ex': ["CDLBREAKAWAY","CDLABANDONEDBABY","CDLEVENINGSTAR"]
+            },
+           'bear': 
+            {'ent':['KAMA','SUPERTREND','RSI30', "CDLMORNINGSTAR"],
+             'ex': ['MA',"CDLABANDONEDBABY", "CDLEVENINGSTAR", "CDLSEPARATINGLINES","CDLDARKCLOUDCOVER"]
+             },
+            'uncertain': 
+            {'ent': ['KAMA',"CDL3WHITESOLDIERS"],
+             'ex': ['SUPERTREND',"CDLABANDONEDBABY", "CDLEVENINGSTAR", "CDLSEPARATINGLINES"]}
+            }
         
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
+            strat_arr=a,
             **kwargs )     
+   
 
 class StratKamaStochMatrendBbands(UnderlyingStrat):  
     '''
@@ -1109,54 +1167,4 @@ STRATWRAPPER = vbt.IF(
      light=True
 )         
 
-class StratMorlet(UnderlyingStrat):
-    def __init__(
-            self,
-            period: numbers.Number,
-            positionSizingModel:str = 'percentage', # Choose the position sizing model ('percentage', 'fixed_ratio', 'secure_f', 'margin_based')
-            accountEquity: numbers.Number = 100000, # Account equity
-            riskPercentage: numbers.Number = 1.5, # Risk percentage per trade
-            stopLossPips: numbers.Number = 250, # Stop loss in pips
-            percentageVolatility: numbers.Number = 2.5, # Percentage volatility model
-            fixedRatio: numbers.Number = 0.02, # Fixed ratio model
-            secureF: numbers.Number = 0.01, # Secure (f) model
-            marginBasedSize: numbers.Number = 0.01, # Margin-based size mode
-            contractSize: numbers.Number = 5000,
-            **kwargs):
-        
-        super().__init__(period,**kwargs)
-        wavelet=ic.VBTMORLET(self.close)
-        price_diff=self.close.diff()
-        up=price_diff.clip(lower=0)
-        down=price_diff.clip(upper=0) * -1
-        #Compute ranks using the entire price data
-        up_norm=up.rank(pct=True)
-        down_norm = down.rank(pct=True)
-        #Calculate log returns
-        log_returns = np.log(self.close).diff()
-        
-        accountSize = accountEquity * riskPercentage / 100.0
-        
-        #Calculate position size
-        if positionSizingModel == 'percentage':
-            positionSize = accountSize * percentageVolatility / (stopLossPips * contractSize)
-        elif positionSizingModel == 'fixed_ratio':
-            positionSize = accountEquity * fixedRatio / (stopLossPips * contractSize)
-        elif positionSizingModel == 'secure_f':
-            positionSize = accountEquity * secureF / (stopLossPips * contractSize)
-        elif positionSizingModel == 'margin_based':
-            margin = accountEquity * marginBasedSize
-            positionSize = margin / stopLossPips
 
-        print("Position Size:", positionSize)
-        
-        #Define trading logic
-        position_size=np.where(up_norm > 0.95, positionSize, np.where(down_norm > 0.95, -positionSize, np.nan))
-        position_size=position_size.fillna(method='ffill')
-        
-        #Compute returns
-        returns= log_returns* position_size
-        
-        #Calculate equity curve
-        equity_curve = (returns + 1).cumprod() * accountEquity
-    

@@ -75,15 +75,8 @@ def retrieve_data_offline(
        symbol_index: YF ticker of the index
        period: period in which we want to have the data
     '''
-    
     data_all=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+symbol_index+'_' + period+'.h5'))
-    cols=list(data_all.get("Open").columns)
-    
-    o.data=data_all.select(cols[:-1]) #all columns except last one
-    o.data_ind=data_all.select(cols[-1]) #only last column
-    for l in ["Close","Open","High","Low","Volume"]:
-        setattr(o,l.lower(),o.data.get(l))
-        setattr(o,l.lower()+"_ind",o.data_ind.get(l))
+    retrieve_data_sub(o, data_all)
 
 ### Online retrieval for backtesting purpose, it is downloaded everytime then
 def retrieve_data_live(
@@ -103,13 +96,29 @@ def retrieve_data_live(
        stock_symbols: list of YF tickers to be downloaded for the stocks
        symbol_index: YF ticker of the index
        period: period in which we want to have the data
-       t_is_index: is it indexes that are provided
+       it_is_index: is it indexes that are provided
     '''
     symbols=stock_symbols+[symbol_index]
-    
-    cours=vbt.YFData.fetch(symbols, period=period,missing_index='drop')
-    o.data=cours.select(symbols)
-    o.data_ind=cours.select(symbol_index)
+    data_all=vbt.YFData.fetch(symbols, period=period,missing_index='drop')
+    retrieve_data_sub(o, data_all, it_is_index=it_is_index)
+
+def retrieve_data_sub(
+        o,
+        data_all,
+        it_is_index: bool=False
+        ):
+    '''
+    Sub function to retrieve data
+
+    Arguments
+    ----------
+        o: object where to put the data
+        data_all : all data, stocks and index
+        it_is_index: is it indexes that are provided
+    '''
+    cols=list(data_all.get("Open").columns)
+    o.data=data_all.select(cols[:-1]) #all columns except last one
+    o.data_ind=data_all.select(cols[-1]) #only last column
     
     for l in ["Close","Open","High","Low","Volume"]:
         setattr(o,l.lower(),o.data.get(l))
@@ -120,7 +129,33 @@ def retrieve_data_live(
     #If we want to optimize underlying strategies implying the main index
     if it_is_index:
         for l in ["close","open","high","low","volume","data"]:
-            setattr(o,l,getattr(o,l+"_ind"))
+            setattr(o,l,getattr(o,l+"_ind"))    
+
+def retrieve_debug(
+        stock_symbols: list,
+        symbol_index: str,
+        period: str,
+        it_is_index: bool=False
+        ):
+    '''
+    To find which stock was delisted
+    
+    Arguments
+    ----------
+       stock_symbols: list of YF tickers to be downloaded for the stocks
+       symbol_index: YF ticker of the index
+       period: period in which we want to have the data
+       it_is_index: is it indexes that are provided
+    '''    
+    symbols=stock_symbols+[symbol_index]
+    data_all=vbt.YFData.fetch(symbols, period=period)
+
+    nb_nan={}
+    for c in data_all.get('Open').columns:
+        nb_nan[c]=np.count_nonzero(np.isnan(data_all.get('Open')[c]))
+        
+    nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
+    print("Number of nan in each column: "+str(nb_nan))
 
 if __name__ == '__main__':
     '''
@@ -133,7 +168,7 @@ if __name__ == '__main__':
     '''
     import constants
     
-    selector="it"
+    selector="industry"
     start_date='2007-01-01'
     end_date='2023-08-01'
     

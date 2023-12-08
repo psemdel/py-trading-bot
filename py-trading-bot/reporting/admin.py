@@ -5,5 +5,4 @@ from reporting.models import *
 admin.site.register(Report)
 admin.site.register(ActionReport)
 admin.site.register(Alert)
-admin.site.register(ListOfActions)
-
+admin.site.register(OrderExecutionMsg)

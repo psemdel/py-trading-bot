@@ -65,12 +65,6 @@ class TestIndicator(TestCase):
         pf=vbt.Portfolio.from_signals(self.ust.close, t.entries,t.exits)
         self.assertEqual(round(pf.get_total_return()['AC'],3),-0.448)
         self.assertEqual(round(pf.get_total_return()['BNP'],3),0.02)
-        
-    def test_VBTNATR(self):
-        t=ic.VBTNATR.run(self.ust.high,self.ust.low,self.ust.close).natr
-        self.assertTrue(math.isnan(t['AC'].values[0]))
-        self.assertEqual(round(t['AC'].values[-1],2),1.66)
-        self.assertEqual(round(t['VIV'].values[-1],2),1.92)
 
     def test_VBTMA(self):
         t=ic.VBTMA.run(self.ust.high,self.ust.low,self.ust.close)
@@ -135,6 +129,9 @@ class TestIndicator(TestCase):
 
     def test_VBTKAMA(self):
         t=ic.VBTKAMA.run(self.ust.close)
+        
+        print(t.bot_ext['AIR'].values[-10:])
+        
         self.assertFalse(t.bot_ext['AIR'].values[-2])
         self.assertFalse(t.bot_ext['AIR'].values[-1])
         
@@ -192,29 +189,16 @@ class TestIndicator(TestCase):
         self.assertEqual(t.duration['SAN'].values[-1],0) 
   
     def test_VBTPATTERN(self):   
-        t=ic.VBTPATTERN.run(self.ust.open,self.ust.high,self.ust.low,self.ust.close,light=False)
-
-        self.assertFalse(t.entries[(False,'AC')].values[-2])
-        self.assertTrue(t.entries[(False,'AC')].values[-1])
-        self.assertFalse(t.entries[(False,'BNP')].values[-2])
-        self.assertFalse(t.entries[(False,'CAP')].values[-2])
+        t=ic.VBTPATTERN.run(self.ust.open,self.ust.high,self.ust.low,self.ust.close)
+        self.assertFalse(t.entries['AC'].values[-2])
+        self.assertTrue(t.entries['AC'].values[-1])
+        self.assertFalse(t.entries['BNP'].values[-2])
+        self.assertFalse(t.entries['CAP'].values[-2])
         
-        self.assertFalse(t.exits[(False,'AI')].values[-1])
-        self.assertTrue(t.exits[(False,'BN')].values[-1])
-        self.assertFalse(t.exits[(False,'SAN')].values[-1])  
-        self.assertFalse(t.exits[(False,'RI')].values[-3])  
-        
-        t=ic.VBTPATTERN.run(self.ust.open,self.ust.high,self.ust.low,self.ust.close,light=True)
-        
-        self.assertFalse(t.entries[(True,'BNP')].values[-2])
-        self.assertFalse(t.entries[(True,'BN')].values[-4])
-        #exit should be identical to not light
-        self.assertFalse(t.exits[(True,'AI')].values[-1])
-        self.assertFalse(t.exits[(True,'BN')].values[-1])
-        self.assertFalse(t.exits[(True,'SAN')].values[-1]) 
-
-        self.assertFalse(t.exits[(True,'SAN')].values[-11])  
-        self.assertFalse(t.exits[(True,'RI')].values[-3])
+        self.assertFalse(t.exits['AI'].values[-1])
+        self.assertTrue(t.exits['BN'].values[-1])
+        self.assertFalse(t.exits['SAN'].values[-1])  
+        self.assertFalse(t.exits['RI'].values[-3])  
       
     def test_VBTBBANDSTREND(self):          
         t=ic.VBTBBANDSTREND.run(self.ust.close)

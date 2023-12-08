@@ -15,15 +15,23 @@ import numbers
 import vectorbtpro as vbt
 from core.strat import UnderlyingStrat
 
-a_bull=[1., 0., 0., 1., 0., 1., 1., 0., 0., 1., 0., 1., 0., 0., 0., 1.,
-1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-a_bear=[0., 1., 0., 0., 0., 1., 1., 0., 0., 1., 0., 1., 1., 1., 1., 1.,
-1., 0., 1., 0., 1., 0., 0., 0., 0., 1., 0., 1., 0., 0., 0., 0.,
-1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
-a_uncertain=[0., 1., 1., 0., 0., 1., 1., 0., 0., 1., 1., 1., 1., 0., 0., 0.,
-0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+a={'bull': {'ent': ['RSI20','RSI30','CDLMARUBOZU',"CDL3WHITESOLDIERS","CDLENGULFING","CDLTAKURI",
+                    "CDLMORNINGDOJISTAR","CDLMORNINGSTAR","CDLKICKING_INV"],
+            'ex': ["CDLRISEFALL3METHODS","CDLABANDONEDBABY"]},
+   'bear': {'ent': ['STOCH','RSI20','RSI30',"CDLMARUBOZU","CDL3WHITESOLDIERS","CDLLONGLINE","CDLENGULFING","CDLTAKURI",
+                    "CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV"],
+            'ex': ['SUPERTREND','BBANDS',"CDLBELTHOLD"]},
+   'uncertain': {'ent': ['STOCH','RSI20','RSI30',"CDLMARUBOZU","CDLCLOSINGMARUBOZU","CDL3WHITESOLDIERS",
+                         "CDLLONGLINE","CDLENGULFING","CDLMORNINGDOJISTAR","CDLHANGINGMAN","CDLKICKINGBYLENGTH_INV",
+                         "CDLKICKING_INV"],
+                 'ex': ["CDLHIKKAKE","CDL3LINESTRIKE","CDLBREAKAWAY"]}}    
+
+a_simple={"simple":
+          {"ent":['STOCH','SUPERTREND','RSI20','RSI30',"CDLMARUBOZU","CDL3WHITESOLDIERS","CDLTAKURI","CDLMORNINGDOJISTAR",
+                             "CDLKICKINGBYLENGTH_INV","CDLKICKING_INV"],
+           "ex": ["CDLRISEFALL3METHODS"]}
+           
+  } 
 
 class StratT1(UnderlyingStrat):    
     def __init__(self,
@@ -32,7 +40,7 @@ class StratT1(UnderlyingStrat):
 
         super().__init__(
             period,
-            strat_arr_simple=a_bull,
+            strat_arr=a_simple,
             **kwargs ) 
         
 class StratT2(UnderlyingStrat):    
@@ -42,9 +50,7 @@ class StratT2(UnderlyingStrat):
 
         super().__init__(
             period,
-            strat_arr_bull=a_bull,
-            strat_arr_bear=a_bear,
-            strat_arr_uncertain=a_uncertain,
+            strat_arr=a,
             **kwargs ) 
 
 
@@ -56,11 +62,9 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=1,
-                         predefined=True,
-                         a_bull=a_bull,
+                         strat_arr=a_simple,
                          )
         
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         
@@ -93,7 +97,7 @@ class TestDefi(TestCase):
 
         self.assertEqual(rr1,rr2)
         self.assertEqual(rb1,rb2)
-        
+
     def test_defi_i2(self):
         '''
         Goal is to compare defi_i with defi_i_fast
@@ -101,14 +105,10 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=3,
-                         predefined=True,
-                         a_bull=a_bull,
-                         a_bear=a_bear,
-                         a_uncertain=a_uncertain, 
+                         strat_arr=a,
                          test_window_start_init=0,
                          )
 
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         
@@ -149,11 +149,9 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=1,
-                         predefined=True,
-                         a_bull=a_bull,
+                         strat_arr=a_simple,
                          )
         
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         self.o.macro_mode("total")
@@ -200,17 +198,13 @@ class TestDefi(TestCase):
         self.o=opt_main.OptMain("2007_2022_08",
                          loops=1, 
                          nb_macro_modes=3,
-                         predefined=True,
-                         a_bull=a_bull,
-                         a_bear=a_bear,
-                         a_uncertain=a_uncertain, 
+                         strat_arr=a, 
                          test_window_start_init=0,
                          dir_bull="long", 
                          dir_uncertain="both",
                          dir_bear="both"
                          )
 
-        self.o.defi_i("total")
         self.o.defi_ex("total")
         self.o.defi_ent("total")
         self.o.macro_mode("total")

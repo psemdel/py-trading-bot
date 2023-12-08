@@ -8,17 +8,18 @@ Created on Sun Jun 26 21:38:23 2022
 
 from django.test import TestCase
 from core import presel, strat
+from core.caller import name_to_ust_or_presel
 from orders.models import (Fees, StockEx, Action, ActionSector,
                           ActionCategory, Strategy, Currency, Candidates, Excluded,
                           get_exchange_actions, get_candidates)
 from reporting.models import Report
 
-class TestbtP(TestCase):
+class TestPreselP(TestCase):
     def setUp(self):
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         strategy=Strategy.objects.create(name="none")
-        self.strategy2=Strategy.objects.create(name="realmadrid", class_name="PreselRealMadrid")
+        self.strategy2=Strategy.objects.create(name="real_madrid", class_name="PreselRealMadrid")
         e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
         self.e=e
@@ -91,7 +92,7 @@ class TestbtP(TestCase):
         self.report1.save(testing=True)
         
         actions=get_exchange_actions("Paris")
-        self.ust=strat.StratDiv("1y",prd=True, actions=actions,exchange="Paris")
+        self.ust=strat.StratDiv("5y",prd=True, actions=actions,exchange="Paris")
         self.ust.run()
         
   #hist slow does not need code here
@@ -112,24 +113,24 @@ class TestbtP(TestCase):
         #cand=get_candidates("hist_slow","Paris")
         
     def test_actualize_realmadrid(self):
-        self.pr=presel.PreselRealMadrid("1y",prd=True,input_ust=self.ust,st=self.strategy2)
-        Excluded.objects.create(name="realmadrid", strategy=self.strategy2)
+        self.pr=presel.PreselRealMadrid("5y",prd=True,input_ust=self.ust,st=self.strategy2)
+        Excluded.objects.create(name="real_madrid", strategy=self.strategy2)
         Candidates.objects.create(strategy=self.strategy2,stock_ex=self.e)
         self.pr.actualize()
-        cand=get_candidates("realmadrid","Paris")
+        cand=get_candidates("real_madrid","Paris")
         self.assertEqual(len(cand.retrieve()),2)
     
     def test_actualize_realmadrid2(self):
-        self.pr=presel.PreselRealMadrid("1y",prd=True, input_ust=self.ust,st=self.strategy2)
-        Excluded.objects.create(name="realmadrid", strategy=self.strategy2)
+        self.pr=presel.PreselRealMadrid("5y",prd=True, input_ust=self.ust,st=self.strategy2)
+        Excluded.objects.create(name="real_madrid", strategy=self.strategy2)
         Candidates.objects.create(strategy=self.strategy2,stock_ex=self.e)
         self.pr.actualize()
-        cand=get_candidates("realmadrid","Paris")
-        self.assertEqual(len(cand.retrieve()),2)  
+        cand=get_candidates("real_madrid","Paris")
+        self.assertEqual(len(cand.retrieve()),2)    #"REALMADRID_MAX_CANDIDATES_NB"
         
     def test_realmadrid_perform(self):
-        self.pr=presel.PreselRealMadrid("1y",prd=True, input_ust=self.ust, st=self.strategy2)
-        Excluded.objects.create(name="realmadrid", strategy=self.strategy2)
+        self.pr=presel.PreselRealMadrid("5y",prd=True, input_ust=self.ust, st=self.strategy2)
+        Excluded.objects.create(name="real_madrid", strategy=self.strategy2)
         Candidates.objects.create(strategy=self.strategy2,stock_ex=self.e)
         self.pr.actualize()
         
@@ -143,7 +144,7 @@ class TestbtP(TestCase):
     def test_retard(self):
         st=Strategy.objects.create(name="retard", class_name="PreselRetard")
         
-        ust_or_pr=presel.name_to_ust_or_presel(
+        ust_or_pr=name_to_ust_or_presel(
             "PreselRetard",
             self.ust.period,
             input_ust=self.ust,
@@ -156,7 +157,7 @@ class TestbtP(TestCase):
     def test_divergence(self):
         st=Strategy.objects.create(name="divergence", class_name="PreselDivergence")
         
-        ust_or_pr=presel.name_to_ust_or_presel(
+        ust_or_pr=name_to_ust_or_presel(
             "PreselDivergence",
             self.ust.period,
             input_ust=self.ust,

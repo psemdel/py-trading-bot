@@ -19,7 +19,7 @@ Note: it is clearly imaginable to use the bot with the basic version of vbt, but
 It will install some other dependencies needed for the bot, for instance: pandas, numpy, python-telegram-bot and TA-Lib. 
 
 # Django
-Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt
+Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt. Note that you can comment out the keras installation, if you don't want to use the machine learning functions.
 
     sh
     pip install -r requirements.txt
@@ -133,7 +133,7 @@ When starting the bot, the message appearing will relate to Django, Redis, Teleg
      
 If everything goes well, your Telegram should display a message "I'm back online". If not, type "/start" in Telegram, it will add your chat_id to the list.
 
-Note the admin panel from Django that allows creating finance products.
+Note: the admin panel from Django that allows creating finance products.
 
 
 

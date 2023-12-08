@@ -25,14 +25,15 @@ if sys.version_info.minor>=9:
 else:
     from backports.zoneinfo import ZoneInfo
 
-from reporting.models import Report, Alert, ListOfActions
+from reporting.models import Report, Alert, OrderExecutionMsg 
+from telegram.ext import CommandHandler
 
 from orders.ib import actualize_ss, get_last_price, get_ratio
 from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
-                          get_exchange_actions, action_to_short, ActionSector 
+                          get_exchange_actions, action_to_short, ActionSector
                  
-from core import constants, presel
+from core import caller
 
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
@@ -46,7 +47,6 @@ This file contains the logic for:
  - Send message after each order
 '''
 logging.basicConfig(level=logging.INFO)  
-
 '''
 Start the bot in the background
 '''    
@@ -96,7 +96,7 @@ class MyScheduler():
                 self.do_weekday(start_check_time, self.check_pf, s_ex=s_ex, opening=True)
             if _settings["INDEX_CHECK"]:
                 self.do_weekday(start_check_time, self.check_pf, it_is_index=True,s_ex=s_ex, opening=True)
-            if _settings["REPORT"]:
+            if _settings["REPORT"] and s_ex.calc_report:
                 report_time=self.shift_time(s_ex.closing_time,-_settings["DAILY_REPORT_MINUTE_SHIFT"],s_ex.timezone) #write report 15 min before closing, so we have 15 min to calculate and pass the orders
                 self.do_weekday(report_time,self.daily_report,s_ex=s_ex) 
             if _settings["INTRADAY"]:
@@ -116,13 +116,13 @@ class MyScheduler():
             self.do_weekday(time(10,00,tzinfo=ZoneInfo('Europe/Paris')), self.update_slow_strat) #performed away from the opening
         if self.update_ss:
             self.manager.every(_settings["TIME_INTERVAL_UPDATE"], 'minutes').do(actualize_ss)
-                
+
         #the "background is created by celery"
         #OOTB vbt start_in_background does not seem to be compatible with django
         if not kwargs.get("test",False):
             self.manager.start() 
         self.telegram_bot.send_message_to_all("Scheduler started in background")   
-
+        
     def do_weekday(self, 
                    strh: str, 
                    f,
@@ -177,7 +177,8 @@ class MyScheduler():
                      ratio: numbers.Number, 
                      action: Action,
                      short: bool,
-                     opening: bool=False
+                     opening: bool=False,
+                     opportunity: bool=False
                      ):
         '''
         Check if the price variation for a product is within predefined borders
@@ -189,10 +190,9 @@ class MyScheduler():
            action: product concerned
            short: if the product is presently in a short direction
            opening: test at stock exchange opening (need to compare with the day before then)
+           opportunity: also alert when there is an opportunity
         '''
         try:
-            symbols_opportunity=constants.INDEXES+constants.RAW
-
             alerting_reco=False
             alerting=False
             alarming=False
@@ -210,7 +210,7 @@ class MyScheduler():
                     (not short and ratio > -(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])):
                     alerting_reco=True    
                     
-                if (action.symbol in symbols_opportunity and not short and ratio>_settings["ALERT_THRESHOLD"]):
+                if (opportunity and not short and ratio>_settings["ALERT_THRESHOLD"]):
                     alerting=True
                     opportunity=True
                     if ratio>_settings["ALARM_THRESHOLD"]:
@@ -298,9 +298,7 @@ class MyScheduler():
                 ratio=get_ratio(action)
                 short=action_to_short(action)
                 
-                self.check_change(ratio, action,short,opening=opening)
-                if both: #for index, we look also for opportunities. To be informed in case of great variation/events
-                    self.check_change(ratio, action,not short,opening=opening)
+                self.check_change(ratio, action,short,opening=opening, opportunity=both)
 
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
@@ -350,6 +348,10 @@ class MyScheduler():
                 today=timezone.now().strftime('%Y-%m-%d')
                 
                 if len(order)>0:
+                    if auto:
+                        txt="Sell order sent for "+action.symbol
+                    else:
+                        txt="Manual sell order requested for "+action.symbol
                     o=order[0]
                     e=o.entering_date.strftime('%Y-%m-%d')
                     if e<today: #avoid exiting order performed today
@@ -361,7 +363,7 @@ class MyScheduler():
                                 r=Report.objects.create()
                                 r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
                                 r.ss_m.resolve()
-                                self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="Stop loss")
+                                self.telegram_bot.send_message_to_all(txt+", stop loss")
                         
                         if o.daily_sl_threshold is not None:
                             ratio=get_ratio(action)
@@ -372,7 +374,7 @@ class MyScheduler():
                                 r=Report.objects.create()
                                 r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
                                 r.ss_m.resolve()
-                                self.send_entry_exit_msg(action.symbol,False,False,auto,suffix="daily stop loss")                        
+                                self.telegram_bot.send_message_to_all(txt+", daily stop loss")
            
     def send_order(self,
                    report: Report
@@ -384,17 +386,9 @@ class MyScheduler():
        	----------
            report: report for which the calculation happened
         '''   
-        for used_api in ["YF", "IB", "CCTX","MT5","TS"]:
-            for entry in [False, True]:
-                for buy in [False, True]:
-                    try:
-                        ent_ex_symbols=ListOfActions.objects.get(report=report,used_api=used_api,entry=entry,buy=buy)
-                        for a in ent_ex_symbols.actions.all():
-                            self.send_entry_exit_msg(a.symbol,None, buy,used_api) 
-                        self.telegram_bot.send_message_to_all(ent_ex_symbols.text)
-                    except:
-                        pass
-
+        oems=OrderExecutionMsg.objects.filter(report=report)
+        for oem in oems:
+            self.telegram_bot.send_message_to_all(oem.text)
         if report.text:
              self.telegram_bot.send_message_to_all(report.text)       
     
@@ -459,26 +453,6 @@ class MyScheduler():
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
             pass
-        
-    def send_entry_exit_msg(self,
-                            symbol:str,
-                            reverse: bool,
-                            buy: bool, 
-                            used_api: str,
-                            suffix: str=""
-                            ):
-        '''
-        Define the message for the Telegram depending on the arguments
-        
-        Arguments
-       	----------
-           symbol: YF ticker of the product for which the order was performed
-           reverse: was the order a reversion (from short to long or the other way around)
-           buy: was the order a buy order
-           auto: was the order automatic or not
-           suffix: some text that can be chosen
-        '''  
-        self.telegram_bot.send_message_to_all(send_entry_exit_txt(symbol, reverse, buy, used_api, suffix=suffix))
 
     def heartbeat_f(self):
         '''
@@ -505,7 +479,7 @@ class MyScheduler():
             if today>(timedelta(days=j.frequency_days)+j.last_execution):
                 actions=get_exchange_actions(j.stock_ex.name)
                 st=Strategy.objects.get(name=j.strategy.name)
-                pr=presel.name_to_ust_or_presel(
+                pr=caller.name_to_ust_or_presel(
                     st.class_name, 
                     str(j.period_year)+"y",
                     prd=True, 
@@ -533,43 +507,6 @@ class MyScheduler():
         tz: name of the timezone
         '''
         return (datetime.combine(date(1,1,1),d)+timedelta(minutes=m)).time().replace(tzinfo=ZoneInfo(tz))
-       
-def send_entry_exit_txt(
-        symbol: str,
-        reverse: bool,
-        buy: bool, 
-        used_api: str,
-        suffix: str="",
-        )-> str:
-    '''
-    Define the message for the Telegram depending on the arguments
-    
-    Arguments
-   	----------
-       symbol: YF ticker of the product for which the order was performed
-       reverse: was the order a reversion (from short to long or the other way around)
-       buy: was the order a buy order
-       auto: was the order automatic or not
-       suffix: some text that can be chosen
-    '''  
-    if used_api!="YF":
-        part1=""
-        part2=""
-    else:
-        part1="Manual "
-        part2="requested for "
-    
-    if reverse:
-        part1+="reverse "
-    else:
-        part1+=""
-        
-    if buy:
-        part3=" buy order"
-    else:
-        part3=" sell order"
-        
-    return part1+part2+symbol + " "+ part3+" " +suffix
 
 def cleaning_sub():
     alerts=Alert.objects.filter(active=True)

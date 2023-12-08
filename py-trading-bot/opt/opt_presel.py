@@ -1,5 +1,5 @@
 from core import presel
-from core.presel import name_to_ust_or_presel, PreselWQ
+from core.presel import PreselWQ
 
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import Config
@@ -36,10 +36,13 @@ class Opt(OptMain):
             class_name: str,
             period: str,
             filename:str="presel",
+            indexes: list=["CAC40","DAX","NASDAQ","FIN","HEALTHCARE","INDUSTRY"],
             **kwargs):
-        super().__init__(period,filename=filename,**kwargs)
+        super().__init__(period,filename=filename,
+                         indexes=indexes, #with only CAC40, DAX and Nasdaq it overfits 
+                         **kwargs)
         self.pr={}
-
+        
         for ind in self.indexes:
             if class_name[6:8].lower()=="wq":
                 nb=int(class_name[8:])
@@ -47,56 +50,74 @@ class Opt(OptMain):
             else:
                 PR=getattr(presel,class_name)
                 self.pr[ind]=PR(period, symbol_index=ind)
+                
+            #we create pr as an empty shell. The input comes from ust and are brought later in calculate_pf_sub
 
             #no run otherwise it will crash, as ust is not splited
 
-    def calculate_eq_ret(self,pf):
+    def calculate_eq_ret(self,pf,ind:str,dic:str):
         '''
         Calculate an equivalent score for a portfolio  
         
         Arguments
         ----------
            pf: vbt portfolio
+           ind: index
+           dic: train, test or total
         ''' 
         m_rb=pf.total_market_return
         m_rr=pf.get_total_return()
+        
+        self.row["return_"+ind+"_"+dic]=m_rr
+        self.row["delta_"+ind+"_"+dic]=m_rr-m_rb
         
         if abs(m_rb)<0.1: #avoid division by zero
             p=(m_rr)/ 0.1*np.sign(m_rb)   
         else:
             p=(m_rr- m_rb )/ abs(m_rb)
 
+        self.row["surperf_factor_"+ind]=p
         return 4*p*(p<0) + p*(p>0) #wrong direction for the return are penalyzed
     
-    def calculate_pf_sub(self,d):
-        pf_dic={}   
-        self.defi_ent(d)
-        self.defi_ex(d)
-        self.macro_mode(d)
-
+    def calculate_pf_sub(self,dic):
+        pf_dic={}
+        
+        #perform all call for total and later get other dics
+        self.defi_ent("total")
+        self.defi_ex("total")
+        self.macro_mode("total")
+       
         for ind in self.indexes: #CAC, DAX, NASDAQ
-            self.tested_arrs=[] #reset after each loop
-            
+            self.pr[ind].close=self.close_dic[ind]["total"]
+            self.pr[ind].reinit() #in case the function was called ealier
             self.pr[ind].ust.entries=self.ents[ind]
             self.pr[ind].ust.exits=self.exs[ind]
-            self.pr[ind].close=self.close_dic[ind][d]
+            self.pr[ind].ust.entries_short=self.ents_short[ind]
+            self.pr[ind].ust.exits_short=self.exs_short[ind]
             self.pr[ind].run(skip_underlying=True)
-            pf_dic[ind]=vbt.Portfolio.from_signals(self.data_dic[ind][d],
-                                          self.pr[ind].entries,
-                                          self.pr[ind].exits,
-                                          short_entries=self.pr[ind].entries_short,
-                                          short_exits=self.pr[ind].exits_short,
-                                          freq="1d",fees=self.fees,
-                                          call_seq='auto',cash_sharing=True
+
+        for ind in self.indexes: #CAC, DAX, NASDAQ
+            #restrain to size of total/learn/test
+            i=self.close_dic[ind][dic].index
+            self.ents[ind]=self.pr[ind].entries.loc[i]
+            self.exs[ind]=self.pr[ind].exits.loc[i]
+            self.ents_short[ind]=self.pr[ind].entries_short.loc[i]
+            self.exs_short[ind]=self.pr[ind].exits_short.loc[i]
+
+            pf_dic[ind]=vbt.Portfolio.from_signals(self.data_dic[ind][dic],
+                                          self.ents[ind],
+                                          self.exs[ind],
+                                          short_entries=self.ents_short[ind],
+                                          short_exits=self.exs_short[ind],
+                                          freq="1d",
+                                          fees=self.fees,
+                                          call_seq='auto',
+                                          cash_sharing=True
                                           ) #stop_exit_price="close"
-            
         return pf_dic
     
     def calculate_pf(
             self,
-            best_arrs_cand,
-            best_ret_cand,
-            best_arrs_ret,
             dic: str="learn",
             verbose: bool=False,
             bypass_tested_arrs: bool=False
@@ -111,24 +132,25 @@ class Opt(OptMain):
            best_arrs_ret: table containing the return of the best candidate by the strategy array of the whole loop
         '''
         if not self.check_tested_arrs() and not "test" in dic and not bypass_tested_arrs:
-            print("return tested _arrs")
-            return best_arrs_cand, best_ret_cand
+            return 0
         
         #create the underlying strategy
         ret=0
         ret_arr=[]
-        
+
         pf_dic=self.calculate_pf_sub(dic)
 
         for ind in self.indexes: #CAC, DAX, NASDAQ    
-            ret_arr.append(self.calculate_eq_ret(pf_dic[ind]))
+            ret_arr.append(self.calculate_eq_ret(pf_dic[ind],ind, dic))
+            
         ret=self.summarize_eq_ret(ret_arr)
-        trades =len(pf_dic[ind].get_trades().records_arr)
+
+        self.row["opt_return"]=ret
+
+        self.trades=len(pf_dic[ind].get_trades().records_arr)
         del pf_dic
 
-        if (ret> best_arrs_ret and ret>best_ret_cand and trades>50) or dic=="test":
-            return self.calc_arrs, ret
+        self.append_row()
+        return 1
 
-        return best_arrs_cand, best_ret_cand
-     
            
