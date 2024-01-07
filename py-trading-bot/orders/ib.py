@@ -619,8 +619,6 @@ class IBData(RemoteData):
 
             #check already in IB but not in pf, so bought manually
             for pos in self.client.positions():
-                print(pos)
-                
                 contract=pos.contract
                 actions=Action.objects.filter(symbol__contains=contract.localSymbol)
                 if len(actions)==0:
@@ -629,8 +627,10 @@ class IBData(RemoteData):
                     action=actions[0]
                 else:
                     for a in actions:
-                        if a.ib_ticker()==contract.localSymbol:
+                        if a.ib_ticker()==contract.localSymbol and a.stock_ex.ib_ticker==contract.exchange:
                             action=a
+                    if action is None:
+                        print("Combination, ticker: "+contract.localSymbol+" exchange: "+contract.exchange + " not found in database")
                             
                 if action is not None: 
                     if action in actions_in_pf:
@@ -670,6 +670,10 @@ class IBData(RemoteData):
             for pos in self.client.positions():
                 contract=pos.contract
                 if action.ib_ticker()==contract.localSymbol:
+                    print("position")
+                    print(pos.position)
+                    print(abs(pos.position))
+                    
                     return abs(pos.position), np.sign(pos.position), pos.position<0
         return 0, 0, False  
         
@@ -768,6 +772,8 @@ class IBData(RemoteData):
                         return 1.0, 0.0
                 else:
                     quantity=abs(quantity)
+                    print("quantity got from quantity")
+                    print(quantity)
                
                 if not testing:
                     if buy:

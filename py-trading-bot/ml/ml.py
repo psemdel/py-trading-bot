@@ -931,10 +931,26 @@ class PreselML(Presel):
             selector="total",
             prod=True
             )
-        self.yhat=pd.DataFrame(
-            data=np.transpose(yhat[:,:,0]),
-            columns=self.close.columns,
-            index=self.close.index[self.m.steps:])        
+        
+        #unflatten
+        if self.m.model_type=="LSTM":
+            self.yhat=pd.DataFrame(
+                data=np.transpose(yhat[:,:,0]),
+                columns=self.close.columns,
+                index=self.close.index[self.m.steps:])  
+        else:
+            out={}        
+            l=len(self.close.index)
+            
+            for k, s in enumerate(self.close.columns):
+                if len(yhat.shape)==1: #forest
+                    out[s]=yhat[k*l:(k+1)*l][:]
+                else: #MLP
+                    out[s]=yhat[k*l:(k+1)*l][:,0]
+
+            self.yhat=pd.DataFrame(
+                data=out,
+                index=self.close.index)       
 
     def sorting(
             self,
@@ -997,4 +1013,22 @@ class PreselLSTM_A(PreselML):
         self.strategy="lstm_A"
         self.end_init()
         
-         
+if __name__=="__main__":
+    period="2007_2023_08"
+    m=ML(period,indexes=['CAC40', "DAX", "NASDAQ"])  #,"NYSE",,"FIN","HEALTHCARE","IT", "DAX", "NASDAQ","FIN","HEALTHCARE", "DAX","NASDAQ"]
+    features_name=['STOCH', 'RSI',"WILLR","MFI",'BBANDS_BANDWIDTH','ULTOSC',"OBV","AD",
+               "GROW_30","GROW_30_RANK","GROW_30_MA","GROW_30_MA_RANK","GROW_30_DEMA","GROW_30_DEMA_RANK",
+               "GROW_50","GROW_50_RANK","GROW_50_MA","GROW_50_MA_RANK","GROW_50_DEMA","GROW_50_DEMA_RANK",
+               "GROW_200","GROW_200_RANK","GROW_200_MA","GROW_200_MA_RANK","GROW_200_DEMA","GROW_200_DEMA_RANK",
+               "KAMA_DURATION","KAMA_DURATION_RANK","NATR","HIST","MACD","DIVERGENCE","STD","MACRO_TREND","HT_TRENDMODE",
+               "PU_RESISTANCE","PU_SUPPORT"]
+    
+    m.prepare(preprocessing=True, 
+          next_day_price=False, 
+          distance=10,
+          model_type="MLP",
+          #steps=10,
+          features_name=features_name)
+    
+    m.train("231219_mlp_epoch1000_future10_CAC_DAX_NASDAQ",n_epochs=1000)
+             

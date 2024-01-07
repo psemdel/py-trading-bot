@@ -363,7 +363,8 @@ NASDAQ_INTRO={
 Delisting date of the stocks if relevant
 '''
 NASDAQ_DELIST={
-    "ATVI":"2023-10-20"
+    "ATVI":"2023-10-20",
+    "SGEN":"2023-12-15"
     }
 
 '''

@@ -199,12 +199,8 @@ class Action(models.Model):
         ordering = ["name"]
         
     def save(self, *args, **kwargs):
-        is_new=False
-        if "id" not in self.__dir__():
-            is_new = True
         super().save(*args, **kwargs)  
-        if is_new:
-            StockStatus.objects.create(action=self)        
+        StockStatus.objects.get_or_create(action=self) 
         
     def ib_ticker(self):
         if self.ib_ticker_explicit!="AAA" and self.ib_ticker_explicit is not None:
