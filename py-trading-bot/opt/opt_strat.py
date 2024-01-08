@@ -88,7 +88,7 @@ class Opt(OptMain):
                 ret_arr.append(t)
             else:
                 ret+=self.calculate_eq_ret(pf_dic[ind],ind)
-            self.row["trades_"+ind+"_"+dic]=len(pf_dic[ind].get_trades().records_arr)
+            self.row["trades_"+ind+"_"+dic]=len(pf_dic[ind].get_trades().records_arr)/len(pf_dic[ind].wrapper.columns)
 
         if self.it_is_index:
             self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_raw"]=np.mean(ret_arr)

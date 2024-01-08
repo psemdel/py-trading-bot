@@ -58,6 +58,8 @@ class OptMain():
             filename: str="main",
             testing: bool=False,
             opt_only_exit: bool=False,
+            proba_one: float=0.05,
+            minimum_trades: int=50
             ):
         '''
         Optimisation main class
@@ -85,9 +87,12 @@ class OptMain():
            testing: set to True to perform unittest on the function
            filename: name of the file where to solve the result
            opt_only_exit: optimize only the exits as the entries are fixed by another mechanism
+           proba_one: in the random array probability of having a 1 (other values are 0) in pu
+           minimum_trades: minimum number of trades for a strategy to be eligible. "Hold" strategies are not of interest
         '''
         for k in ["ratio_learn_train","split_learn_train", "indexes", "it_is_index","nb_macro_modes",
-                  "strat_arr","fees", "sl", "tsl", "filename","testing","opt_only_exit"]:
+                  "strat_arr","fees", "sl", "tsl", "filename","testing","opt_only_exit","proba_one",
+                  "minimum_trades"]:
             setattr(self,k,locals()[k])
         #init
         for key in ["close","open","low","high","data","volume"]:
@@ -568,7 +573,7 @@ class OptMain():
         #choose randomly 0 and 1. All zeros is not accepted. 90% chance 0, 10% chance 1
         s=0
         while s==0:
-            arr=np.random.choice(2,l, p=[0.9, 0.1]) 
+            arr=np.random.choice(2,l, p=[1-self.proba_one, self.proba_one]) 
             s=np.sum(arr)
         return arr
     
@@ -646,7 +651,7 @@ class OptMain():
             else:
                 sub_df=self.test_arrs.loc[self.variate_first_ind:]
 
-            if sub_df["opt_return"].max() > self.best_loop_ret and self.trades>50:
+            if sub_df["opt_return"].max() > self.best_loop_ret and self.trades>self.minimum_trades:
                 self.progression=True
                 self.best_loop_ret=sub_df["opt_return"].max()
                 self.log("Overall perf, "+dic+": " + str(round(self.best_loop_ret,3)),pr=True)
