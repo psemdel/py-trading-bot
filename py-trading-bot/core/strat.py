@@ -508,9 +508,8 @@ class UnderlyingStrat():
             r: report
             st_name: name of the strategy
         '''
-        from orders.models import Strategy, StratCandidates #needs to be loaded here, as it will work only if Django is loaded
-        st, _=Strategy.objects.get_or_create(name=st_name)
-        st_actions, _=StratCandidates.objects.get_or_create(strategy=st)  #.id
+        from orders.models import StratCandidates #needs to be loaded here, as it will work only if Django is loaded
+        st_actions, _=StratCandidates.objects.get_or_create(strategy=self.st)  #.id
         st_symbols=st_actions.retrieve()
         
         for symbol in intersection(self.symbols,st_symbols):

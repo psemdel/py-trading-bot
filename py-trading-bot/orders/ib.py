@@ -1131,7 +1131,7 @@ class OrderPerformer():
                             self.order.exiting_price=self.order.exiting_price
                             self.close_quantity()
                         else:
-                            logger_trade.info("Manual exit order symbol: "+self.symbol+" , strategy: " + self.st.name +  "which is in short position")
+                            logger_trade.info("Manual exit order symbol: "+self.symbol+" , strategy: " + self.st.name +  " which is in short position")
                             self.close_quantity()
                         self.calc_profit()
                         self.close_order()

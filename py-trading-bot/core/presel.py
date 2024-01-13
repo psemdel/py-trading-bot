@@ -651,7 +651,7 @@ class PreselRetard(Presel):
             self.dur=ic.VBTKAMATREND.run(self.close).duration
             #self.dur=ic.VBTSUPERTREND.run(self.high,self.low,self.close).duration
         self.no_ust=True
-        self.calc_all=True
+        self.calc_all=True #otherwise it is not possible to determine what is excluded
         self.last_short=False
 
     def sorting(

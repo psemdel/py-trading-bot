@@ -242,17 +242,8 @@ class ML():
         with open(os.path.dirname(__file__)+"/models/"+model_name+".json") as f:
             d = json.load(f)
             for k in d:
-                setattr(self,k,d[k])
-        
-        if "clf" in self.__dir__():
-            if self.clf.__class__ == Sequential:
-                self.model_type="LSTM"
-            elif self.clf.__class__ == MLPRegressor:
-                self.model_type="MLP"
-            else:
-                self.model_type="Forest"
-        else:
-            print("model type not loaded by docu loading, import the model first using load_model")
+                if k not in ["indexes"]:
+                    setattr(self,k,d[k])
         
     def save_model_docu(self,
                         model_name:str
@@ -302,6 +293,7 @@ class ML():
         
         for k in ["test_size","preprocessing","next_day_price","distance", "model_type","features_name","lag", "prod"]:
             setattr(self,k,locals()[k])
+            
         if  model_type=="LSTM":
             self.steps=steps
         else:
@@ -800,6 +792,11 @@ class ML():
             self.prod=False
         if selector=="total" and "x_df" not in self.__dir__():
             prepare=True 
+            
+        if "steps" in self.__dir__():
+            steps=self.steps
+        else:
+            steps=None   
         
         if prepare: 
             #prepare depending on the model parameters read in load_model
@@ -809,7 +806,7 @@ class ML():
                 distance=self.distance,
                 lag=self.lag,
                 model_type=self.model_type,
-                steps=self.steps,
+                steps=steps,
                 features_name=self.features_name,
                 prod=self.prod
                 )
@@ -821,13 +818,13 @@ class ML():
         else:
             x_df=self.x_df
 
-        if self.clf.__class__ == MLPRegressor:
+        if self.model_type=="MLP":
             scaled_x_df=self.scaler_x.transform(x_df)
-        elif self.clf.__class__ == Sequential:
+        elif self.model_type=="LSTM":
             #for LSTM we need to create a new model because the batch size must be equal to x_df.shape[1], otherwise it will crash
             model = Sequential()
-            model.add(LSTM(4,  batch_input_shape=(x_df.shape[1], x_df.shape[2], x_df.shape[3]), stateful=True))
-            model.add(Dense(1))
+            model.add(LSTM(self.n_neurons,  batch_input_shape=(x_df.shape[1], x_df.shape[2], x_df.shape[3]), stateful=True))
+            model.add(Dense(1, activation="tanh"))
             old_weights = self.clf.get_weights()
             model.set_weights(old_weights)
             #scaling in self.predict here
@@ -835,11 +832,12 @@ class ML():
             #no scaling for forest
             scaled_x_df=x_df
             
-        if self.clf.__class__ == Sequential:
+        if self.model_type=="LSTM":
             y=self.predict_lstm(x_df, model)
         else:
             y=self.clf.predict(scaled_x_df)
-            y=self.scaler_y.inverse_transform(np.reshape(y,(y.shape[0],1)))
+            if self.model_type=="MLP":
+                y=self.scaler_y.inverse_transform(np.reshape(y,(y.shape[0],1)))
         return y
 
 class MLLive(ML):
@@ -904,8 +902,8 @@ class PreselML(Presel):
             self,
             period:str,
             **kwargs):
+
         super().__init__(period,**kwargs)
-        
         self.m=MLforPresel(
             self.data,
             self.open,
@@ -915,12 +913,11 @@ class PreselML(Presel):
             self.close_ind,
             self.volume
             )
-
         self.max_candidates_nb=1
         self.no_ust=True
-        self.strategy="ml"
         self.reduce_trades_number=True
         self.threshold_cand=1 #percent
+        self.calc_all=self.reduce_trades_number
         
     def end_init(self):
         if "model_name" not in self.__dir__():
@@ -950,7 +947,7 @@ class PreselML(Presel):
 
             self.yhat=pd.DataFrame(
                 data=out,
-                index=self.close.index)       
+                index=self.close.index)  
 
     def sorting(
             self,
@@ -965,14 +962,15 @@ class PreselML(Presel):
         if self.reduce_trades_number: #otherwise use sorting_g
             present_index_nb=self.close.index.get_loc(i)
         
-            if present_index_nb<self.m.steps: #steps that cannot be calculated, as too soon
+            if self.m.steps is not None and present_index_nb<self.m.steps: #steps that cannot be calculated, as too soon
                 p=self.yhat.columns[0] #convention
                 v=0
                 self.sorted=[(p, v)]
             else:
                 p=self.yhat.loc[i].idxmax() #potential candidate
                 v=self.yhat.loc[i].max()
-                if present_index_nb==self.m.steps:
+                if (self.m.steps is None and present_index_nb==0) or \
+                   (self.m.steps is not None and present_index_nb==self.m.steps):
                     self.sorted=[(p, v)]
                 else:
                     previous_index=self.close.index[present_index_nb-1]
@@ -988,9 +986,9 @@ class PreselML(Presel):
             self.sorted_rank=self.yhat.rank(axis=1, ascending=False)
             self.sorting_criterium=self.yhat
 
-    def perform(self, r, **kwargs):
+    def perform(self,r, **kwargs):
         candidates, _=self.get_candidates()
-        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.strategy, False,keep=False)
+        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.st.name, False,keep=False)
 
 class PreselMLCustom(PreselML):
     def __init__(
@@ -1002,15 +1000,22 @@ class PreselMLCustom(PreselML):
         self.model_name=model_name
         self.end_init()
 
-class PreselLSTM_A(PreselML):
+class PreselML_MLP_A(PreselML):
     def __init__(
             self,
             period:str,
             **kwargs):    
         super().__init__(period,**kwargs)    
-    
-        self.model_name="lstm_new"
-        self.strategy="lstm_A"
+        self.model_name="240107_mlp_future10_neuron40_keras_CAC_DAX_NASDAQ_FIN_HEALTH"
+        self.end_init()
+
+class PreselML_LSTM_A(PreselML):
+    def __init__(
+            self,
+            period:str,
+            **kwargs):    
+        super().__init__(period,**kwargs)    
+        self.model_name="240104_lstm_epoch1000_future10_steps25_neuron8_CAC"
         self.end_init()
         
 if __name__=="__main__":
