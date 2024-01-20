@@ -498,17 +498,20 @@ class UnderlyingStrat():
         #benchmark_return makes sense only for bull
         delta=pf.total_return().values[0]
         return delta
-                
-    def perform_StratCandidates(self, r, st_name):
+    
+    def perform(self, r): 
         '''
         Perform during the report an underlying strategy on the candidates belonging to StratCandidates
 
         Arguments
         ----------
             r: report
-            st_name: name of the strategy
         '''
         from orders.models import StratCandidates #needs to be loaded here, as it will work only if Django is loaded
+        
+        if self.st is None:
+            raise ValueError("st should be defined to use perform on underlying strategy")
+        
         st_actions, _=StratCandidates.objects.get_or_create(strategy=self.st)  #.id
         st_symbols=st_actions.retrieve()
         
@@ -519,17 +522,9 @@ class UnderlyingStrat():
                 symbol_complex_ent_normal=self.symbols_simple_to_complex(symbol,"ent")
                 symbol_complex_ex_normal=self.symbols_simple_to_complex(symbol,"ex")
                 target_order=self.get_last_decision(symbol_complex_ent_normal,symbol_complex_ex_normal)
-                r.display_last_decision(symbol,target_order, st_name)      
+                r.display_last_decision(symbol,target_order, self.st.name)      
                 
-                r.ss_m.add_target_quantity(symbol, st_name, target_order)
-    
-    def perform(self, r, st_name:str=None): #default
-        '''
-        See perform_StratCandidates
-        '''
-        if st_name is None:
-            raise ValueError("perform for underlying strategy should have an argument st_name")
-        self.perform_StratCandidates(r, st_name) 
+                r.ss_m.add_target_quantity(symbol, self.st.name, target_order)
         
 ###production functions        
     def get_last_decision(self, symbol_complex_ent: str, symbol_complex_ex: str) -> int:

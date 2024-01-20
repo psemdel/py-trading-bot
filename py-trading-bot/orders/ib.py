@@ -621,17 +621,17 @@ class IBData(RemoteData):
             for pos in self.client.positions():
                 contract=pos.contract
                 actions=Action.objects.filter(symbol__contains=contract.localSymbol)
-                if len(actions)==0:
-                    action=None
-                elif len(actions)==1:
+                action=None
+                
+                if len(actions)==1:
                     action=actions[0]
-                else:
+                elif len(actions)>1:
                     for a in actions:
                         if a.ib_ticker()==contract.localSymbol and a.stock_ex.ib_ticker==contract.exchange:
                             action=a
                     if action is None:
-                        print("Combination, ticker: "+contract.localSymbol+" exchange: "+contract.exchange + " not found in database")
-                            
+                        logger.info("Combination, ticker: "+contract.localSymbol+" exchange: "+contract.exchange + " not found in database")
+
                 if action is not None: 
                     if action in actions_in_pf:
                         actions_in_pf.remove(action)
@@ -639,9 +639,9 @@ class IBData(RemoteData):
                     present_ss=StockStatus.objects.get(action=action)
                     if present_ss.quantity!=pos.position:
                         if pos.position==0:
-                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", strategy set to none")
+                            logger.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", strategy set to none")
                         else:
-                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", update manually the strategy")
+                            logger.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", update manually the strategy")
                         present_ss.quantity=pos.position
                         present_ss.strategy=Strategy.objects.get(name="none")
                         present_ss.order_in_ib=True

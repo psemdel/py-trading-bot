@@ -226,15 +226,16 @@ def filter_intro_sub(
     '''  
     td=datetime.datetime.today()
     if y_period is None:
-        limit_date=td
+        limit_date_intro=td
     else:
-        limit_date=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here but otherwise bug
+        limit_date_intro=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here but otherwise bug
+        limit_date_delisted=datetime.datetime(td.year,td.month,td.day,tzinfo=tz_Paris) #today tz aware
 
     if a.intro_date is not None: #should come from database
-        if a.intro_date>limit_date :
+        if a.intro_date>limit_date_intro :
            return False
     if a.delisting_date is not None:
-        if a.delisting_date<limit_date :
+        if a.delisting_date<limit_date_delisted :
            return False
     return True
 
