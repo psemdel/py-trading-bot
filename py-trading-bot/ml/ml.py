@@ -5,6 +5,10 @@ Created on Wed Aug 30 20:28:39 2023
 
 @author: maxime
 """
+if __name__=="__main__":
+    import sys
+    sys.path.append("..")
+
 from core.data_manager import retrieve_data_offline 
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
 from core.common import candidates_to_YF, remove_multi
@@ -25,7 +29,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn import metrics
 from sklearn.ensemble import RandomForestRegressor
 
-from keras import Sequential
+from keras import Sequential, callbacks
 from keras.layers import LSTM, Dense
 
 #Object to train the models offline
@@ -212,7 +216,7 @@ class ML():
            period: period of time for which we shall retrieve the data
            indexes: main indexes used to download local data
         '''
-        for k in ["indexes"]:
+        for k in ["period","indexes"]:
             setattr(self,k,locals()[k])
         
         for key in ["close","open","low","high","data","volume"]:
@@ -220,15 +224,14 @@ class ML():
             setattr(self,key+"_ind_dic",{})
 
         #len_min save the minimum length for all data 
-        len_min=None 
+        self.len_min=None 
         for ind in self.indexes:
             retrieve_data_offline(self,ind,period)                
             self.data_dic[ind]=self.data
             for d in ["Close","Open","Low","High","Volume"]:
                 getattr(self,d.lower()+"_dic")[ind]=self.data_dic[ind].get(d)   
                 getattr(self,d.lower()+"_ind_dic")[ind]=self.data_ind.get(d) 
-            self.len_min=len(self.close_dic[ind]) if len_min is None else min(self.close_dic[ind], self.len_min) 
-            
+            self.len_min=len(self.close_dic[ind]) if self.len_min is None else min(len(self.close_dic[ind]), self.len_min) 
         self.features_name=[]
         self.prod=False
         self.steps=None
@@ -249,7 +252,8 @@ class ML():
                         model_name:str
                         ):
         d={}
-        for k in ["features_name","model_type", "preprocessing", "next_day_price","distance","lag"]:
+        for k in ["features_name","model_type", "preprocessing", "next_day_price","distance","lag",
+                  "indexes","period","n_neurons","activation"]:
             try:
                 d[k]=getattr(self,k)
             except:
@@ -271,7 +275,8 @@ class ML():
                model_type:str="MLP",
                steps:int=200,
                features_name:list=None,
-               prod:bool=False
+               prod:bool=False,
+               reduce_memory_usage: bool=True
                ):
         '''
         Prepare the data for the training, or load it
@@ -288,12 +293,13 @@ class ML():
            model_type: what kind of model should be trained?
            steps: similar to lag but for LSTM model. So number of timesteps to consider for the training of the model
            features_name: explicit features name list
-           prod: to be used for production
+           prod: to be used for production,
+           reduce_memory_usage: use a method to reduce how much memory we use, is against performance. Concretely create a 4th dimension, and we optimized for each symbol separately
         '''
         
-        for k in ["test_size","preprocessing","next_day_price","distance", "model_type","features_name","lag", "prod"]:
+        for k in ["test_size","preprocessing","next_day_price","distance", "model_type","features_name","lag", "prod","reduce_memory_usage"]:
             setattr(self,k,locals()[k])
-            
+
         if  model_type=="LSTM":
             self.steps=steps
         else:
@@ -301,9 +307,11 @@ class ML():
 
         if data_name is None:
             self.defi_x()
-            self.x_df, self.x_train, self.x_test, self.x_scaling=self.flatten(self.all_x)
+            self.x_df, self.x_train, self.x_test=self.flatten(self.all_x)
             self.defi_y()
-            self.y_df, self.y_train, self.y_test, self.y_scaling=self.flatten(self.all_y, y_bool=True)
+            self.y_df, self.y_train, self.y_test=self.flatten(self.all_y, y_bool=True)
+            print(self.x_train.shape)
+            print(self.y_train.shape)
         else:
             self.x_df=pd.read_csv("x_"+data_name+".csv",index_col=[0,1,2],parse_dates=True)
             self.y_df=pd.read_csv("y_"+data_name+".csv",index_col=[0,1,2],parse_dates=True)
@@ -385,7 +393,8 @@ class ML():
     
     def create_timesteps(self, arr_total, df, y_bool:bool=False):
         '''
-        Function for LSTM to create the timesteps, it means slide a window over the signal
+        Function for LSTM to create the timesteps, it means slide a window over the signal.
+        Return an array of dimension 4 for x [symbol, batch, timesteps, features]
         
         Arguments
         ---------- 
@@ -394,15 +403,20 @@ class ML():
             y_bool: is it for the output?                   
         '''
         arr_total_3d=None
-        
         if y_bool:
-            arr_temp_total=np.reshape(df.values[self.steps:],(1,df[self.steps:].shape[0], df[self.steps:].shape[1]))
+            if self.reduce_memory_usage:
+                arr_temp_total=np.reshape(df.values[self.steps:],(1,df[self.steps:].shape[0], df[self.steps:].shape[1]))
+            else:
+                arr_temp_total=df.values[self.steps:]
         else:
             for ii in range(df.shape[0]-self.steps):
                 arr_temp_total=np.reshape(df.values[ii:ii+self.steps],(1, self.steps, df.shape[1]))
                 arr_total_3d = np.vstack((arr_total_3d,arr_temp_total)) if arr_total_3d is not None else arr_temp_total
-            arr_temp_total=np.reshape(arr_total_3d,(1,arr_total_3d.shape[0],arr_total_3d.shape[1],arr_total_3d.shape[2]))
-            
+            if self.reduce_memory_usage:
+                arr_temp_total=np.reshape(arr_total_3d,(1,arr_total_3d.shape[0],arr_total_3d.shape[1],arr_total_3d.shape[2]))
+            else:
+                arr_temp_total=arr_total_3d
+
             del arr_total_3d
         arr_total= np.vstack((arr_total, arr_temp_total)) if arr_total is not None else arr_temp_total
 
@@ -418,7 +432,7 @@ class ML():
         Function to put the input in the right shape for the training.
         
         For MLP, it means in the shape (batch, features)
-        For LSTM, it means in the shape (batch, time steps, features). In this case we also create a different arr_scaling
+        For LSTM, it means in the shape (batch, time steps, features).
         as the scaler needs a 2d array.
         
         Arguments
@@ -429,7 +443,6 @@ class ML():
         arr_total=None
         arr_train=None
         arr_test=None
-        arr_scaling=None
         ts={}
         
         if "window_start" not in self.__dir__():
@@ -448,6 +461,7 @@ class ML():
         
         #somehow vbt is designed with the columns in the other orders so to say, which lead to this very computer intensive function
         for ind in self.indexes: #CAC, DAX, NASDAQ
+            print("flattening: "+ind)
             total_len=len(self.close_dic[ind].index)
             
             if not self.prod:
@@ -488,22 +502,18 @@ class ML():
                     if not self.prod:
                         arr_test=self.create_timesteps(arr_test, df_temp_test,  y_bool=y_bool)
                         arr_train=self.create_timesteps(arr_train, df_temp_train, y_bool=y_bool)
-                        arr_scaling=np.vstack((arr_scaling,df.values)) if arr_scaling is not None else df.values
                 else:
                     #for MLP, there is dependency between the steps, so we can put all indexes together in one df
                     arr_total=np.vstack((arr_total,df.values)) if arr_total is not None else df.values
                     if not self.prod:
                         arr_test=np.vstack((arr_test,df_temp_test.values)) if arr_test is not None else df_temp_test.values
                         arr_train=np.vstack((arr_train,df_temp_train.values)) if arr_train is not None else df_temp_train.values
-
-            if self.model_type!="LSTM":
-                arr_scaling=arr_total
               
         del df
         if not self.prod:
             df_temp_test, df_temp_train
         
-        return arr_total, arr_train, arr_test, arr_scaling
+        return arr_total, arr_train, arr_test
     
     def unflatten(self, 
                   df: pd.DataFrame, 
@@ -519,7 +529,7 @@ class ML():
         out={}
         out2={}
         
-        if self.clf.__class__ == Sequential:
+        if self.clf.__class__ == Sequential and self.model_type=="LSTM":
             for ind in self.indexes:
                 out[ind]={}
                 for i, s in enumerate(self.close_dic[ind].columns):
@@ -546,64 +556,12 @@ class ML():
                 out2[ind]=pd.DataFrame(data=out[ind],index=pd.unique(sub_df.index.get_level_values(0)))  
         return out2
 
-    def scale(
-        self,
-        input_arr,
-        y_bool:bool=False,
-        inverse: bool=False,
-        predict: bool=False,
-        model=None
-        ):
-        '''
-        Scale or descaled arrays that are in dimension 3 or 4
-        
-        Arguments
-        ----------
-           input_arr: array to scale/unscale
-           y_bool: is this array for the output?
-           inverse: should we unscale instead of scale?
-           predict: should we make a prediction?
-           model: model to be used for the prediction
-        '''
-        scaled=None
-        
-        if y_bool or predict:
-            scaler=self.scaler_y    
-            
-            for j in range(input_arr.shape[0]):  
-                if inverse or predict:
-                    if predict:
-                        arr=model.predict(input_arr[j,:,:,:],batch_size=input_arr.shape[1])
-                        t=scaler.inverse_transform(arr)
-                    else:
-                        t=scaler.inverse_transform(input_arr[j,:,:])
-                else:
-                    t=scaler.transform(input_arr[j,:,:])
-                t=np.reshape(t, (1, t.shape[0], t.shape[1]))
-                scaled=np.vstack((scaled,t)) if scaled is not None else t 
-            del t
-        else:
-            scaler=self.scaler_x        
-        
-            for i in range(input_arr.shape[0]):       
-                scaled_3d=None                  
-                for j in range(input_arr.shape[1]):
-                    if inverse:
-                        t=scaler.inverse_transform(input_arr[i,j,:,:])
-                    else:
-                        t=scaler.transform(input_arr[i,j,:,:])
-                    t=np.reshape(t, (1, t.shape[0], t.shape[1]))
-                    scaled_3d=np.vstack((scaled_3d,t)) if scaled_3d is not None else t
-                scaled_3d=np.reshape(scaled_3d,(1,scaled_3d.shape[0], scaled_3d.shape[1], scaled_3d.shape[2]))                       
-                scaled=np.vstack((scaled,scaled_3d)) if scaled is not None else scaled_3d
-            del scaled_3d, t
-        
-        return scaled
-
     def train(
         self,
         model_name:str,
-        n_epochs: int=100
+        n_epochs: int=100,
+        n_neurons: int=32,
+        activation: str=None
         ):
         '''
         Train and save the machine learning model
@@ -611,62 +569,92 @@ class ML():
         Arguments
         ----------
            model_name: how do we want to name the model?
-           n_epochs: number of epochs for the training        
+           n_epochs: number of epochs for the training
+           activation: name of the activation function
         '''
-        self.model_name=model_name
-        
+        for k in ["model_name","n_neurons","activation"]:
+            setattr(self,k,locals()[k])
+
         if self.model_type in ["MLP","LSTM"]:
             self.scaler_x = StandardScaler()  
-            self.scaler_x.fit(self.x_scaling)
-
-            if self.model_type=="LSTM":
-                scaled_x_train=self.scale(self.x_train)
-            else:
-                scaled_x_train=self.scaler_x.transform(self.x_train)    
+            print(self.x_train.shape)
+            print(self.y_train.shape)
+            
+            scaled_x_train=self.scaler_x.fit_transform(self.x_train.reshape(-1,self.x_train.shape[-1])).reshape(self.x_train.shape)  #transform above dim 2
 
             self.scaler_y = StandardScaler()  
-            self.scaler_y.fit(self.y_scaling)
-              
-            if self.model_type=="LSTM":   
-                scaled_y_train=self.scale(self.y_train, y_bool=True)     
-            else:                                 
-                scaled_y_train=self.scaler_y.transform(self.y_train)
-          
-            #free memory
-            self.x_scaling=None
-            self.y_scaling=None
+            scaled_y_train=self.scaler_y.fit_transform(self.y_train.reshape(-1,self.y_train.shape[-1])).reshape(self.y_train.shape) #transform above dim 2
         
         if self.model_type=="MLP":
+            #Kera
+            self.clf = Sequential()
+            self.clf.add(Dense(self.n_neurons, input_shape=(scaled_x_train.shape[1],), activation=activation))
+            self.clf.add(Dense(self.n_neurons, activation=activation))
+            self.clf.add(Dense(self.n_neurons, activation=activation))
+            self.clf.add(Dense(self.n_neurons, activation=activation))
+            self.clf.add(Dense(1, activation=activation))
+            self.clf.compile(loss='mean_squared_error', optimizer='adam')
+            print(self.clf.summary())
+            '''
+            #Same with sklearn, use whatever you want
             self.clf =  MLPRegressor(
                                 #activation="tanh",
                                 # solver='lbfgs',
                                 alpha=1e-5,
-                                hidden_layer_sizes=(40, 4), 
+                                hidden_layer_sizes=(self.n_neurons, 4), 
                                 #activation{‘identity’, ‘logistic’, ‘tanh’, ‘relu’}, default=’relu’
                                 #random_state=1,
-                                max_iter=10000)
+                                max_iter=n_epochs
+                                )
+            '''
+
         elif self.model_type=="LSTM":
             self.clf = Sequential()
-            self.clf.add(LSTM(4,  batch_input_shape=(scaled_x_train.shape[1], scaled_x_train.shape[2], scaled_x_train.shape[3]), stateful=True))
-            self.clf.add(Dense(1))
+            
+            offset=0
+            if self.reduce_memory_usage:
+                offset=1
+            
+            self.clf.add(LSTM(
+                self.n_neurons, 
+                batch_input_shape=(scaled_x_train.shape[0+offset], scaled_x_train.shape[1+offset], scaled_x_train.shape[2+offset]), 
+                stateful=True,
+                return_sequences=False,
+                ))
+            self.clf.add(Dense(1, activation=activation))
             self.clf.compile(loss='mean_squared_error', optimizer='adam')
+            print(self.clf.summary())
         else:
             self.model_type="Forest"
             scaled_x_train=self.x_train
             scaled_y_train=self.y_train
             self.clf= RandomForestRegressor(max_depth=10)
-        
+
         print("starting the fitting")
+        
         if self.model_type=="LSTM":
-            for i in range(n_epochs):
-                if i%100==0:
-                    print("n_epochs: "+str(i))
-                for k in range(self.x_train.shape[0]): #for each symbol
-                    self.clf.fit(scaled_x_train[k,:,:,:], scaled_y_train[k,:,:], batch_size=self.x_train.shape[1],epochs=1, shuffle=False, verbose=0) #
-                    self.clf.reset_states()
-        else:
+            print(scaled_x_train.shape)
+            print(scaled_y_train.shape)
+            if self.reduce_memory_usage:
+                for i in range(n_epochs):
+                    if i%100==0:
+                        print("n_epochs: "+str(i))
+                    for k in range(self.x_train.shape[0]): #for each symbol
+                        self.clf.fit(scaled_x_train[k,:,:,:], scaled_y_train[k,:,:], batch_size=self.x_train.shape[1],epochs=1, shuffle=False, 
+                                     verbose=0) #
+                        self.clf.reset_states()
+            else: 
+                callback = callbacks.EarlyStopping(monitor='loss',patience=3)
+                self.clf.fit(scaled_x_train, scaled_y_train, batch_size=self.x_train.shape[0],epochs=n_epochs, shuffle=False, 
+                             verbose=1,callbacks=callback)
+
+        elif self.model_type=="MLP" and self.clf.__class__ == Sequential: #keras 
+            callback = callbacks.EarlyStopping(monitor='loss',patience=3)
+            self.clf.fit(scaled_x_train, scaled_y_train, epochs=n_epochs,callbacks=callback)
+        else: #sklearn
             self.clf.fit(scaled_x_train, scaled_y_train)
         
+        print(type(self.clf))
         with open(os.path.dirname(__file__)+"/models/"+self.model_name+".pickle", "wb") as f:
             pickle.dump(self.clf, f)
         self.save_model_docu(self.model_name)
@@ -698,24 +686,30 @@ class ML():
         self.yhat_test = self.use(self.model_name, selector="test")
         self.yhat_train=self.use(self.model_name, selector="train")
         self.yhat_total=self.use(self.model_name, selector="total")
-        if self.clf.__class__ == Sequential:
+        if self.model_type=="LSTM":
             r2_score_test=[]
             r2_score_train=[] 
             r2_score_total=[] 
-
-            for k in range(self.x_test.shape[0]):
-                r2_score_test.append(metrics.r2_score(self.yhat_test[k,:,:],self.y_test[k,:,:]))
-            for k in range(self.x_train.shape[0]):    
-                r2_score_train.append(metrics.r2_score(self.yhat_train[k,:,:],self.y_train[k,:,:]))
-            for k in range(self.x_df.shape[0]):    
-                r2_score_total.append(metrics.r2_score(self.yhat_total[k,:,:],self.y_df[k,:,:]))    
+            
+            if self.reduce_memory_usage:
+                for k in range(self.x_test.shape[0]):
+                    r2_score_test.append(metrics.r2_score(self.y_test[k,:,:],self.yhat_test[k,:,:]))
+                for k in range(self.x_train.shape[0]):    
+                    r2_score_train.append(metrics.r2_score(self.y_train[k,:,:],self.yhat_train[k,:,:]))
+                for k in range(self.x_df.shape[0]):    
+                    r2_score_total.append(metrics.r2_score(self.y_df[k,:,:],self.yhat_total[k,:,:]))    
+            else:
+                r2_score_test.append(metrics.r2_score(self.y_test,self.yhat_test))
+                r2_score_train.append(metrics.r2_score(self.y_train,self.yhat_train))
+                r2_score_total.append(metrics.r2_score(self.y_df,self.yhat_total)) 
+                
             print("mean r2 score test: "+str(np.mean(r2_score_test)))
             print("mean r2 score train: "+str(np.mean(r2_score_train)))
             print("mean r2 score total: "+str(np.mean(r2_score_total)))                
         else:
-            r2_score_test = metrics.r2_score(self.yhat_test, self.y_test)
-            r2_score_train = metrics.r2_score(self.yhat_train, self.y_train)
-            r2_score_total = metrics.r2_score(self.yhat_total, self.y_df)
+            r2_score_test = metrics.r2_score(self.y_test, self.yhat_test)
+            r2_score_train = metrics.r2_score(self.y_train, self.yhat_train)
+            r2_score_total = metrics.r2_score( self.y_df, self.yhat_total)
             print("r2 score test: "+str(r2_score_test))
             print("r2 score train: "+str(r2_score_train))
             print("r2 score total: "+str(r2_score_total))
@@ -735,15 +729,12 @@ class ML():
         '''        
         self.model_name=model_name
         
-        import os
-        print(os.getcwd())
-        
         if "clf" not in self.__dir__() or force:   
             with open(os.path.dirname(__file__)+"/models/"+self.model_name+".pickle", 'rb') as pickle_file:
                 self.clf = pickle.load(pickle_file)
             #must be after loading clf
             self.load_model_docu(model_name)
-        if self.clf.__class__ in [MLPRegressor,Sequential]  and "scaler_x" not in self.__dir__():
+        if self.clf.__class__ in [MLPRegressor,Sequential]  and ("scaler_x" not in self.__dir__() or force):
             self.scaler_x = joblib.load(os.path.dirname(__file__)+"/models/scaler_x_"+self.model_name+".save")
             self.scaler_y = joblib.load(os.path.dirname(__file__)+"/models/scaler_y_"+self.model_name+".save")
             
@@ -796,7 +787,7 @@ class ML():
         if "steps" in self.__dir__():
             steps=self.steps
         else:
-            steps=None   
+            steps=None
         
         if prepare: 
             #prepare depending on the model parameters read in load_model
@@ -810,34 +801,54 @@ class ML():
                 features_name=self.features_name,
                 prod=self.prod
                 )
-            
+
         if selector=="test":
             x_df=self.x_test
         elif selector=="train":
             x_df=self.x_train
         else:
             x_df=self.x_df
-
-        if self.model_type=="MLP":
-            scaled_x_df=self.scaler_x.transform(x_df)
-        elif self.model_type=="LSTM":
-            #for LSTM we need to create a new model because the batch size must be equal to x_df.shape[1], otherwise it will crash
-            model = Sequential()
-            model.add(LSTM(self.n_neurons,  batch_input_shape=(x_df.shape[1], x_df.shape[2], x_df.shape[3]), stateful=True))
-            model.add(Dense(1, activation="tanh"))
-            old_weights = self.clf.get_weights()
-            model.set_weights(old_weights)
-            #scaling in self.predict here
+            
+        #scale
+        if self.model_type in ["MLP","LSTM"]:
+            scaled_x_df=self.scaler_x.fit_transform(x_df.reshape(-1,x_df.shape[-1])).reshape(x_df.shape)  #transform above dim 2    
         else:
             #no scaling for forest
             scaled_x_df=x_df
-            
+           
+        #create new model
         if self.model_type=="LSTM":
-            y=self.predict_lstm(x_df, model)
+            #for LSTM we need to create a new model because the batch size must be equal to x_df.shape[1], otherwise it will crash
+            model = Sequential()
+            offset=0
+            if self.reduce_memory_usage:
+                offset=1
+                
+            model.add(LSTM(self.n_neurons, 
+                           batch_input_shape=(x_df.shape[0+offset], x_df.shape[1+offset], x_df.shape[2+offset]), 
+                           stateful=True, 
+            ))
+            model.add(Dense(1, activation=self.activation))
+            old_weights = self.clf.get_weights()
+            model.set_weights(old_weights)
+
+        if self.model_type=="LSTM":
+            if self.reduce_memory_usage:
+                scaled_yhat=None
+                for j in range(scaled_x_df.shape[0]):  
+                    t=model.predict(scaled_x_df[j,:,:,:],batch_size=scaled_x_df.shape[1])
+                    t=np.reshape(t, (1, t.shape[0], t.shape[1]))
+                    scaled_yhat=np.vstack((scaled_yhat,t)) if scaled_yhat is not None else t 
+            else:
+                scaled_yhat=model.predict(scaled_x_df,batch_size=scaled_x_df.shape[0])
         else:
-            y=self.clf.predict(scaled_x_df)
-            if self.model_type=="MLP":
-                y=self.scaler_y.inverse_transform(np.reshape(y,(y.shape[0],1)))
+            scaled_yhat=self.clf.predict(scaled_x_df)
+            
+        #inverse scale
+        if self.model_type in ["MLP","LSTM"]:
+            y=self.scaler_y.inverse_transform(scaled_yhat.reshape(-1,scaled_yhat.shape[-1])).reshape(scaled_yhat.shape)
+        else:
+            y=scaled_yhat
         return y
 
 class MLLive(ML):
@@ -901,9 +912,10 @@ class PreselML(Presel):
     def __init__(
             self,
             period:str,
+            reduce_trades_number:bool=True,
             **kwargs):
-
         super().__init__(period,**kwargs)
+        
         self.m=MLforPresel(
             self.data,
             self.open,
@@ -913,11 +925,12 @@ class PreselML(Presel):
             self.close_ind,
             self.volume
             )
+
         self.max_candidates_nb=1
         self.no_ust=True
-        self.reduce_trades_number=True
+        self.strategy="ml"
+        self.reduce_trades_number=reduce_trades_number
         self.threshold_cand=1 #percent
-        self.calc_all=self.reduce_trades_number
         
     def end_init(self):
         if "model_name" not in self.__dir__():
@@ -928,7 +941,7 @@ class PreselML(Presel):
             selector="total",
             prod=True
             )
-        
+
         #unflatten
         if self.m.model_type=="LSTM":
             self.yhat=pd.DataFrame(
@@ -947,7 +960,7 @@ class PreselML(Presel):
 
             self.yhat=pd.DataFrame(
                 data=out,
-                index=self.close.index)  
+                index=self.close.index)
 
     def sorting(
             self,
@@ -986,9 +999,9 @@ class PreselML(Presel):
             self.sorted_rank=self.yhat.rank(axis=1, ascending=False)
             self.sorting_criterium=self.yhat
 
-    def perform(self,r, **kwargs):
+    def perform(self, r, **kwargs):
         candidates, _=self.get_candidates()
-        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.st.name, False,keep=False)
+        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.strategy, False,keep=False)
 
 class PreselMLCustom(PreselML):
     def __init__(
@@ -1020,20 +1033,25 @@ class PreselML_LSTM_A(PreselML):
         
 if __name__=="__main__":
     period="2007_2023_08"
-    m=ML(period,indexes=['CAC40', "DAX", "NASDAQ"])  #,"NYSE",,"FIN","HEALTHCARE","IT", "DAX", "NASDAQ","FIN","HEALTHCARE", "DAX","NASDAQ"]
+    m=ML(period,indexes=['NASDAQ']) #,"DAX", "NASDAQ","FIN","HEALTHCARE"
     features_name=['STOCH', 'RSI',"WILLR","MFI",'BBANDS_BANDWIDTH','ULTOSC',"OBV","AD",
                "GROW_30","GROW_30_RANK","GROW_30_MA","GROW_30_MA_RANK","GROW_30_DEMA","GROW_30_DEMA_RANK",
                "GROW_50","GROW_50_RANK","GROW_50_MA","GROW_50_MA_RANK","GROW_50_DEMA","GROW_50_DEMA_RANK",
                "GROW_200","GROW_200_RANK","GROW_200_MA","GROW_200_MA_RANK","GROW_200_DEMA","GROW_200_DEMA_RANK",
                "KAMA_DURATION","KAMA_DURATION_RANK","NATR","HIST","MACD","DIVERGENCE","STD","MACRO_TREND","HT_TRENDMODE",
                "PU_RESISTANCE","PU_SUPPORT"]
-    
+
+
     m.prepare(preprocessing=True, 
           next_day_price=False, 
           distance=10,
-          model_type="MLP",
-          #steps=10,
+          #model_type="Forest",
+          model_type="LSTM",
+          #model_type="MLP",
+          steps=40,
+          reduce_memory_usage=False,
           features_name=features_name)
-    
-    m.train("231219_mlp_epoch1000_future10_CAC_DAX_NASDAQ",n_epochs=1000)
-             
+
+    m.train("240115_lstm_no_memory_steps40_future10_n16_tanh_NASDAQ",n_epochs=1000,n_neurons=16, activation="tanh")
+
+    #m.test("240115_lstm_no_memory_steps25_future10_tanh_CAC")
