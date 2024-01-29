@@ -308,9 +308,9 @@ class StockStatusManager():
 
         #clean old candidates
         for s in df.index:
-            if s not in candidates and self.target_ss_by_st.loc[s,strategy]!=0: #if already cleanup for direction, should not be put in sold_symbols
+            if s not in candidates and df.loc[s,"quantity"]!=0: #if already cleanup for direction, should not be put in sold_symbols
                 self.target_ss_by_st.loc[s,strategy]=0
-                sold_symbols[s]=df.loc[s,"quantity"]
+                sold_symbols[s]=df.loc[s,"quantity"] #save the present quantity to keep it with the same quantity
         
         #add candidates
         self.cand_to_quantity_entry(candidates, strategy, short)
@@ -364,10 +364,14 @@ class StockStatusManager():
     	"""        
         if len(candidates)==0:
             self.report.concat(strategy +" no candidates")
-        
+
         self.clean_wrong_direction(strategy, short)
         
         sold_symbols=self.cand_to_quantity(candidates, strategy, short)
+        
+        if keep:
+            print("sold symbols")
+            print(sold_symbols)
         
         if keep and not short: #no keep short
             for s, v in sold_symbols.items():

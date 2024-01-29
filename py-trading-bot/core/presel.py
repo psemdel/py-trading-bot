@@ -171,8 +171,6 @@ class Presel():
         '''
         if "entries" not in self.ust.__dir__():
             self.ust.run()
-        
-        
 
         return self.ust.symbols_simple_to_complex(symbol_simple,ent_or_ex)
         #UnderlyingStrat
@@ -686,7 +684,8 @@ class PreselRetard(Presel):
 
         r.concat(self.st.name.capitalize()+", " + "direction " + direction + ", stockex: " + self.ust.exchange +\
                     ", action duration: " +str(self.out))
-  
+        r.concat("Present "+ self.st.name + " candidates: "+str(candidates) + " hold since: "+ str(self.hold_dur) + " days")
+
         r.ss_m.clean_excluded(self.st.name, self.excluded)
         r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.st.name, self.last_short,keep=keep)
               

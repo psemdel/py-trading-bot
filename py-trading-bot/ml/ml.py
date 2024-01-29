@@ -253,7 +253,7 @@ class ML():
                         ):
         d={}
         for k in ["features_name","model_type", "preprocessing", "next_day_price","distance","lag",
-                  "indexes","period","n_neurons","activation"]:
+                  "indexes","period","n_neurons","activation","reduce_memory_usage"]:
             try:
                 d[k]=getattr(self,k)
             except:
@@ -310,8 +310,6 @@ class ML():
             self.x_df, self.x_train, self.x_test=self.flatten(self.all_x)
             self.defi_y()
             self.y_df, self.y_train, self.y_test=self.flatten(self.all_y, y_bool=True)
-            print(self.x_train.shape)
-            print(self.y_train.shape)
         else:
             self.x_df=pd.read_csv("x_"+data_name+".csv",index_col=[0,1,2],parse_dates=True)
             self.y_df=pd.read_csv("y_"+data_name+".csv",index_col=[0,1,2],parse_dates=True)
@@ -463,7 +461,6 @@ class ML():
         for ind in self.indexes: #CAC, DAX, NASDAQ
             print("flattening: "+ind)
             total_len=len(self.close_dic[ind].index)
-            
             if not self.prod:
                 learn_len=int(math.floor((1-self.test_size)*total_len))
                 test_len=total_len-learn_len
@@ -577,9 +574,6 @@ class ML():
 
         if self.model_type in ["MLP","LSTM"]:
             self.scaler_x = StandardScaler()  
-            print(self.x_train.shape)
-            print(self.y_train.shape)
-            
             scaled_x_train=self.scaler_x.fit_transform(self.x_train.reshape(-1,self.x_train.shape[-1])).reshape(self.x_train.shape)  #transform above dim 2
 
             self.scaler_y = StandardScaler()  
@@ -654,7 +648,6 @@ class ML():
         else: #sklearn
             self.clf.fit(scaled_x_train, scaled_y_train)
         
-        print(type(self.clf))
         with open(os.path.dirname(__file__)+"/models/"+self.model_name+".pickle", "wb") as f:
             pickle.dump(self.clf, f)
         self.save_model_docu(self.model_name)
@@ -734,6 +727,7 @@ class ML():
                 self.clf = pickle.load(pickle_file)
             #must be after loading clf
             self.load_model_docu(model_name)
+
         if self.clf.__class__ in [MLPRegressor,Sequential]  and ("scaler_x" not in self.__dir__() or force):
             self.scaler_x = joblib.load(os.path.dirname(__file__)+"/models/scaler_x_"+self.model_name+".save")
             self.scaler_y = joblib.load(os.path.dirname(__file__)+"/models/scaler_y_"+self.model_name+".save")
@@ -788,7 +782,7 @@ class ML():
             steps=self.steps
         else:
             steps=None
-        
+
         if prepare: 
             #prepare depending on the model parameters read in load_model
             self.prepare(
@@ -799,7 +793,8 @@ class ML():
                 model_type=self.model_type,
                 steps=steps,
                 features_name=self.features_name,
-                prod=self.prod
+                prod=self.prod,
+                reduce_memory_usage=self.reduce_memory_usage
                 )
 
         if selector=="test":
@@ -928,9 +923,9 @@ class PreselML(Presel):
 
         self.max_candidates_nb=1
         self.no_ust=True
-        self.strategy="ml"
         self.reduce_trades_number=reduce_trades_number
         self.threshold_cand=1 #percent
+        self.calc_all=True 
         
     def end_init(self):
         if "model_name" not in self.__dir__():
@@ -943,15 +938,25 @@ class PreselML(Presel):
             )
 
         #unflatten
-        if self.m.model_type=="LSTM":
+        if self.m.model_type=="LSTM" and self.m.reduce_memory_usage:
             self.yhat=pd.DataFrame(
                 data=np.transpose(yhat[:,:,0]),
                 columns=self.close.columns,
                 index=self.close.index[self.m.steps:])  
+        elif self.m.model_type=="LSTM":    
+            out={}  
+            l=len(self.close.index)-self.m.steps
+            for k, s in enumerate(self.close.columns):
+                out[s]=yhat[k*l:(k+1)*l][:,0]
+                
+            self.yhat=pd.DataFrame(
+                data=out,
+                index=self.close.index[self.m.steps:])
         else:
             out={}        
             l=len(self.close.index)
-            
+
+            #The results are all listed one after the other, we need to bring it back to a vbt structure            
             for k, s in enumerate(self.close.columns):
                 if len(yhat.shape)==1: #forest
                     out[s]=yhat[k*l:(k+1)*l][:]
@@ -969,30 +974,42 @@ class PreselML(Presel):
             **kwargs
             ):
         
-        if "yhat" not in self.__dir__():
-            raise ValueError("PreselML is an abstract class, it cannot be used directly")
-        
-        if self.reduce_trades_number: #otherwise use sorting_g
-            present_index_nb=self.close.index.get_loc(i)
-        
-            if self.m.steps is not None and present_index_nb<self.m.steps: #steps that cannot be calculated, as too soon
-                p=self.yhat.columns[0] #convention
-                v=0
-                self.sorted=[(p, v)]
-            else:
-                p=self.yhat.loc[i].idxmax() #potential candidate
-                v=self.yhat.loc[i].max()
-                if (self.m.steps is None and present_index_nb==0) or \
-                   (self.m.steps is not None and present_index_nb==self.m.steps):
+        try:
+            if "yhat" not in self.__dir__():
+                raise ValueError("PreselML is an abstract class, it cannot be used directly")
+            
+            if self.reduce_trades_number: #otherwise use sorting_g
+                present_index_nb=self.close.index.get_loc(i)
+            
+                if self.m.steps is not None and present_index_nb<self.m.steps: #steps that cannot be calculated, as too soon
+                    p=self.yhat.columns[0] #convention
+                    v=0
                     self.sorted=[(p, v)]
                 else:
-                    previous_index=self.close.index[present_index_nb-1]
-                    pres_cand=self.candidates['long'][previous_index][0]
-                    pres_cand_v=self.yhat[pres_cand].loc[i]
-                    if v-pres_cand_v>=self.threshold_cand: #change candidate only if the difference is significative
+                    p=self.yhat.loc[i].idxmax() #potential candidate
+                    v=self.yhat.loc[i].max()
+                    if (self.m.steps is None and present_index_nb==0) or \
+                       (self.m.steps is not None and present_index_nb==self.m.steps):
                         self.sorted=[(p, v)]
                     else:
-                        self.sorted=[(pres_cand, pres_cand_v)]
+                        previous_index=self.close.index[present_index_nb-1]
+                        if len(self.candidates['long'][previous_index])==0:
+                            self.sorted=[(p, v)]
+                            print(previous_index)
+                            print("no candidate")
+                        else:
+                            pres_cand=self.candidates['long'][previous_index][0]
+                            pres_cand_v=self.yhat[pres_cand].loc[i]
+                            if v-pres_cand_v>=self.threshold_cand: #change candidate only if the difference is significative
+                                self.sorted=[(p, v)]
+                            else:
+                                self.sorted=[(pres_cand, pres_cand_v)]
+        except:
+            import traceback
+            print(traceback.format_exc())
+            print(previous_index)
+            print(self.candidates['long'][previous_index])
+            print(len(self.candidates['long'][previous_index]))
 
     def sorting_g(self):
         if not self.reduce_trades_number: #otherwise use sorting
@@ -1001,7 +1018,9 @@ class PreselML(Presel):
 
     def perform(self, r, **kwargs):
         candidates, _=self.get_candidates()
-        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.strategy, False,keep=False)
+        print(candidates)
+        
+        r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.st.name, False,keep=False)
 
 class PreselMLCustom(PreselML):
     def __init__(
@@ -1028,12 +1047,12 @@ class PreselML_LSTM_A(PreselML):
             period:str,
             **kwargs):    
         super().__init__(period,**kwargs)    
-        self.model_name="240104_lstm_epoch1000_future10_steps25_neuron8_CAC"
+        self.model_name="240123_lstm_epoch1000_future10_steps25_neuron8_CAC"
         self.end_init()
         
 if __name__=="__main__":
     period="2007_2023_08"
-    m=ML(period,indexes=['NASDAQ']) #,"DAX", "NASDAQ","FIN","HEALTHCARE"
+    m=ML(period,indexes=['CAC40',"DAX", "NASDAQ"]) #,"DAX", "NASDAQ","FIN","HEALTHCARE"
     features_name=['STOCH', 'RSI',"WILLR","MFI",'BBANDS_BANDWIDTH','ULTOSC',"OBV","AD",
                "GROW_30","GROW_30_RANK","GROW_30_MA","GROW_30_MA_RANK","GROW_30_DEMA","GROW_30_DEMA_RANK",
                "GROW_50","GROW_50_RANK","GROW_50_MA","GROW_50_MA_RANK","GROW_50_DEMA","GROW_50_DEMA_RANK",
@@ -1048,10 +1067,10 @@ if __name__=="__main__":
           #model_type="Forest",
           model_type="LSTM",
           #model_type="MLP",
-          steps=40,
+          steps=20,
           reduce_memory_usage=False,
           features_name=features_name)
 
-    m.train("240115_lstm_no_memory_steps40_future10_n16_tanh_NASDAQ",n_epochs=1000,n_neurons=16, activation="tanh")
+    m.train("240115_lstm_no_memory_steps20_future10_n16_tanh_CAC_DAX_NASDAQ",n_epochs=1000,n_neurons=16, activation="tanh")
 
     #m.test("240115_lstm_no_memory_steps25_future10_tanh_CAC")
