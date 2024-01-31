@@ -642,11 +642,19 @@ class StratDiv(UnderlyingStrat):
     def __init__(self,
                  period: numbers.Number,
                  **kwargs):
-        a={'simple': 
-         {'ent': ['RSI20'],
-          'ex':  ['KAMA','SUPERTREND','BBANDS',"CDLBELTHOLD","CDLHIKKAKE","CDLRISEFALL3METHODS","CDLBREAKAWAY",
-                  "CDL3BLACKCROWS"]
-          }}
+        a={'bull': {
+            'ent': ['BBANDS', 'CDL3BLACKCROWS'],
+            'ex': ['ULTOSC20', 'CDLHIKKAKE','CDLABANDONEDBABY', 'CDL3BLACKCROWS','CDLHIKKAKEMOD']
+            },
+            'bear': {
+            'ent': ['CDLHANGINGMAN', 'CDLSTICKSANDWICH', 'CDL3LINESTRIKE'],
+            'ex': ['STOCH', 'BBANDS', 'CDLBELTHOLD', 'CDLXSIDEGAP3METHODS']
+            },
+            'uncertain': {
+            'ent': ['KAMA'],
+            'ex': ['WILLR','ULTOSC20','ULTOSC25','CDL3LINESTRIKE','CDLDARKCLOUDCOVER', 'CDL3INSIDE']
+            }
+          }
 
         super().__init__(period,strat_arr=a,**kwargs )
 
