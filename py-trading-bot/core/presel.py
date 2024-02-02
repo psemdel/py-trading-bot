@@ -345,6 +345,8 @@ class Presel():
         ((not self.blocked and not self.blocked_im) or 
         ((self.blocked or self.blocked_im) and not short))):
             self.candidates[short_to_str[short]][i].append(symbol_simple)
+            return True
+        return False        
 
     def sub(
             self, 
@@ -359,6 +361,7 @@ class Presel():
             i: index
             short: order direction        
         '''
+       
         self.sorting(i, short=short)
         if self.sorted is not None:
             for e in self.sorted:
@@ -372,7 +375,11 @@ class Presel():
                     if len(t)>0:
                         symbol=t.index[0] 
                         v=self.sorting_criterium.loc[i,symbol]
-                        self.sub_sub(i, symbol,v, short)
+                        pursue=self.sub_sub(i, symbol,v, short)
+                        if not pursue:
+                            break
+                else:
+                    break
         else:
             raise ValueError("both sorted and sorted_df are None")
     
