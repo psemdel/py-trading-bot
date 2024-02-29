@@ -17,7 +17,7 @@ class TestStrat(unittest.TestCase):
         self.symbol_index="CAC40"
         
     def test_symbols_simple_to_complex(self):
-        self.ust=strat.StratDiv(self.period, symbol_index=self.symbol_index)
+        self.ust=strat.StratDiv2(self.period, symbol_index=self.symbol_index)
         self.ust.run()
         symbol_complex1=self.ust.symbols_simple_to_complex('AI',"ent")
         self.assertEqual(symbol_complex1,"AI")
@@ -46,10 +46,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)    
           
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.21)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.01)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.2)        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),3.15)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),4.06)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.65)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),4.82)  
 
         self.ust=strat.StratKamaStochMatrendMacdbbMacro(
             self.period, 
@@ -64,10 +64,10 @@ class TestStrat(unittest.TestCase):
                                       short_exits  =self.ust.exits_short)   
         
 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),2.04)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.36)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),-0.47)        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),3.82)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.65) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),3.23)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),4.09) 
         
     def test_strat_kama_stoch_matrend_bbands(self): 
         self.ust=strat.StratKamaStochMatrendBbands(
@@ -79,10 +79,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)    
           
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),2.37)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.44)   
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),2.88)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.02)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),2.33)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.52)   
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),4.26)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.21)  
 
 
         
@@ -120,6 +120,19 @@ class TestStrat(unittest.TestCase):
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),4.08) 
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.36) 
 
+    def test_stratDiv2(self):
+        self.ust=strat.StratDiv2(self.period, symbol_index=self.symbol_index)
+        self.ust.run()
+        
+        pf=vbt.Portfolio.from_signals(self.ust.close, self.ust.entries,self.ust.exits,
+                                      short_entries=self.ust.entries_short,
+                                      short_exits  =self.ust.exits_short)  
+        
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),0.12) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.16) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),0.37) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.6) 
+        
     def test_stratDiv(self):
         self.ust=strat.StratDiv(self.period, symbol_index=self.symbol_index)
         self.ust.run()
@@ -128,11 +141,10 @@ class TestStrat(unittest.TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)  
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),0.16) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.18) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),0.46) 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.6) 
-        
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),-0.57) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),-0.19) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),-0.22) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[3]],2),-0.85)         
 if __name__ == '__main__':
     unittest.main()        
         

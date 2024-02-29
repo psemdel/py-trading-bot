@@ -228,7 +228,11 @@ def filter_intro_sub(
     if y_period is None:
         limit_date_intro=td
     else:
-        limit_date_intro=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here but otherwise bug
+        if td.month==2 and td.day==29: #29th feb
+            tdday=28
+        else:
+            tdday=td.day
+        limit_date_intro=datetime.datetime(td.year-y_period,td.month,tdday,tzinfo=tz_Paris) #time zone not important here but otherwise bug
         limit_date_delisted=datetime.datetime(td.year,td.month,td.day,tzinfo=tz_Paris) #today tz aware
 
     if a.intro_date is not None: #should come from database

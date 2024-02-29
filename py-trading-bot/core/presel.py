@@ -231,7 +231,7 @@ class Presel():
                 if ((not self.no_ust and not short and self.ust.exits.loc[i, symbol_complex]) or  #not short and 
                    (not self.no_ust and short and self.ust.exits_short.loc[i, symbol_complex]) or
                     (self.no_ust and symbol_simple not in self.candidates[short_to_str[short]][i])):
-       
+                    
                     self.pf[short_to_str[short]].remove(symbol_simple)
                     self.capital+=self.order_size
                     
@@ -817,11 +817,7 @@ class PreselDivergence(PreselOnlyExit):
     def sorting_g(self):
         self.sorted_rank=self.divergence.rank(axis=1, ascending=True) #small divergence better
         self.sorting_criterium=self.divergence
-
-class PreselDivergenceSecond(PreselDivergence):
-    def underlying(self):
-        self.underlying_creator("StratDiv")  
-        
+      
 class PreselDivergenceBlocked(PreselDivergence):
     '''
     Like preselect_divergence, but the mechanism is blocked when macro_trend is bear

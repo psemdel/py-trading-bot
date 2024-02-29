@@ -478,6 +478,7 @@ class ML():
                 learn_range=[i for i in range(0,test_window_start)]+[i for i in range(test_window_end,self.len_min)]
             
             for s in self.close_dic[ind].columns:
+                print("flattening: "+s)                
                 dfs=[]
                 for col in input_arr[ind]:
                     dfs.append(ts[ind][col][s].rename(col))
@@ -495,7 +496,6 @@ class ML():
                 if self.model_type=="LSTM":
                     #the different symbols needs to be separated to avoid that the last samples of one symbol are used for the next symbol eval
                     arr_total=self.create_timesteps(arr_total, df, y_bool=y_bool)
-
                     if not self.prod:
                         arr_test=self.create_timesteps(arr_test, df_temp_test,  y_bool=y_bool)
                         arr_train=self.create_timesteps(arr_train, df_temp_train, y_bool=y_bool)
@@ -1063,14 +1063,14 @@ if __name__=="__main__":
 
     m.prepare(preprocessing=True, 
           next_day_price=False, 
-          distance=10,
+          distance=10, 
           #model_type="Forest",
           model_type="LSTM",
           #model_type="MLP",
-          steps=20,
-          reduce_memory_usage=False,
+          #steps=20,
+          reduce_memory_usage=True,
           features_name=features_name)
 
-    m.train("240115_lstm_no_memory_steps20_future10_n16_tanh_CAC_DAX_NASDAQ",n_epochs=1000,n_neurons=16, activation="tanh")
+    m.train("240218_lstm_test_reduced_memory",n_epochs=1000,n_neurons=40, activation="tanh")
 
     #m.test("240115_lstm_no_memory_steps25_future10_tanh_CAC")

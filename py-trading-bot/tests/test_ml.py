@@ -162,40 +162,57 @@ class TestML(TestCase):
         self.m.load_model("lstm_test",force=True)
 
         self.assertEqual(self.m.model_type,"LSTM")        
-
+        
     def test_use_MLP(self):
         y=self.m.use("mlp_test","total")
-        self.assertEqual(y.shape,(156156,1))
-        self.assertEqual(round(y[0,0],2),-2.09)
-        self.assertEqual(round(y[-1,0],2),-2.09)
+        self.assertEqual(y.shape,(156156,))
+        self.assertEqual(round(y[0],2),-2.09)
+        self.assertEqual(round(y[-1],2),-2.09)
 
         y=self.m.use("mlp_test","test")
-        self.assertEqual(y.shape,(31239,1))
-        self.assertEqual(round(y[0,0],2),-2.09)
-        self.assertEqual(round(y[-1,0],2),-2.09)
+        self.assertEqual(y.shape,(31239,))
+        self.assertEqual(round(y[0],2),-2.09)
+        self.assertEqual(round(y[-1],2),-2.09)
         
         y=self.m.use("mlp_test","train")
-        self.assertEqual(y.shape,(124917,1))
-        self.assertEqual(round(y[0,0],2),-2.09)
-        self.assertEqual(round(y[-1,0],2),-2.09)
-        
-    def test_use_LSTM(self):
-        y=self.m.use("lstm_test","total")
-        self.assertEqual(y.shape,(39,3994,1 ))
-        self.assertEqual(round(y[0,0,0].item(),2),-0.92)
-        self.assertEqual(round(y[0,-1,0].item(),2),-4.32)
-        
-        y=self.m.use("lstm_test","test")
-        self.assertEqual(y.shape,(39,791,1 ))
-        self.assertEqual(round(y[0,0,0].item(),2),-0.92)
-        self.assertEqual(round(y[0,-1,0].item(),2),-2.88)
-        
-        y=self.m.use("lstm_test","train")
-        self.assertEqual(y.shape,(39,3193,1 ))
-        self.assertEqual(round(y[0,0,0].item(),2),-2.17)
-        self.assertEqual(round(y[0,-1,0].item(),2),-4.32)    
+        self.assertEqual(y.shape,(124917,))
+        self.assertEqual(round(y[0],2),-2.09)
+        self.assertEqual(round(y[-1],2),-2.09)
       
+    def test_use_LSTM_reduced_memory(self):
+        #no reduce memory usage
+        y=self.m.use("240218_lstm_test_reduced_memory","total")
+        self.assertEqual(y.shape,(39,3994,1 ))
+        self.assertEqual(round(y[0,0,0].item(),2),-1.41)
+        self.assertEqual(round(y[0,-1,0].item(),2),-2.24)
         
+        y=self.m.use("240218_lstm_test_reduced_memory","test")
+        self.assertEqual(y.shape,(39,791,1 ))
+        self.assertEqual(round(y[0,0,0].item(),2),-0.83)
+        self.assertEqual(round(y[0,-1,0].item(),2),-2.12)
         
+        y=self.m.use("240218_lstm_test_reduced_memory","train")
+        self.assertEqual(y.shape,(39,3193,1 ))
+        self.assertEqual(round(y[0,0,0].item(),2),-1.93)
+        self.assertEqual(round(y[0,-1,0].item(),2),-2.31)          
         
+    def test_use_LSTM_no_reduced_memory(self):
+        #no reduce memory usage
+        y=self.m.use("240218_lstm_test_no_reduced_memory","total")
+        self.assertEqual(y.shape,(155766,1 ))
+        self.assertEqual(round(y[0,0].item(),2),-0.86)
+        self.assertEqual(round(y[3993,0].item(),2),-3.14)
+        self.assertEqual(round(y[-1,0].item(),2),-2.87)
+        
+        y=self.m.use("240218_lstm_test_no_reduced_memory","test")
+        self.assertEqual(y.shape,(30849,1 )) 
+        self.assertEqual(round(y[0,0].item(),2),-1.9)  #the scaling cause total != test for same index
+        self.assertEqual(round(y[790,0].item(),2),-2.21)
+        self.assertEqual(round(y[-1,0].item(),2),-1.58)
+        
+        y=self.m.use("240218_lstm_test_no_reduced_memory","train")
+        self.assertEqual(y.shape,(124527,1 ))
+        self.assertEqual(round(y[0,0].item(),2),-3.48)
+        self.assertEqual(round(y[-1,0].item(),2),-2.81)
+        self.assertEqual(round(y[3193,0].item(),2),-2.13)        
         

@@ -160,6 +160,8 @@ class Report(models.Model):
               _, e_, exc_tb = sys.exc_info()
               print(e)
               print("line " + str(exc_tb.tb_lineno) + " for strategy: "+str(st.name))
+              logger.info("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
+              logger.error("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
       
     def perform(
             self,

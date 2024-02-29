@@ -107,9 +107,7 @@ def check_enough_cash(
     excess_money_engaged=False
     out_order_size=0
     base_out_order_size=0
-    
-    logger.info("base_cash:"+str(base_cash))
-    logger.info("money_engaged:"+str(money_engaged))
+
     if base_cash is not None: 
         if base_cash>=base_order_size:
             enough_cash=True
@@ -430,8 +428,8 @@ class IBData(RemoteData):
         cls.resolve_client(client=None)
         m_data = cls.client.reqMktData(contract)
         while (m_data.last != m_data.last) and (m_data.bid != m_data.bid) and t<timeout:  #Wait until data is in. 
-            t+=0.01
-            cls.client.sleep(0.01)
+            t+=0.1
+            cls.client.sleep(0.1)
         
         if np.isnan(m_data.last):
             if not np.isnan(m_data.bid):
@@ -1019,13 +1017,7 @@ class OrderPerformer():
         else:
             self.present_size=0
         
-        logger.info(self.present_size)
-        logger.info(self.target_size)
-        
-        
         self.delta_size=self.target_size-self.present_size 
-        logger.info(self.reverse)
-        logger.info(self.delta_size)
 
     def close_order(self):
         """
@@ -1117,9 +1109,9 @@ class OrderPerformer():
                 excess_money_engaged=False    
 
             if not enough_cash:
-                logger.info(str(self.symbol) + " order not executed, not enough cash available")
+                logger_trade.info(str(self.symbol) + " order not executed, not enough cash available")
             elif excess_money_engaged:
-                logger.info(str(self.symbol) + " order not executed, maximum money engaged for one strategy exceeded")
+                logger_trade.info(str(self.symbol) + " order not executed, maximum money engaged for one strategy exceeded")
             else:
                 if self.new_order_bool: #we open a new long order
                     self.reverse=False
@@ -1132,8 +1124,6 @@ class OrderPerformer():
                     if order_size>0 and self.present_size<=0:
                         #if reverse but excluded then close without further conditions
                         if self.reverse and self.symbol not in self.excluded.retrieve():
-                            logger.info("entry place")
-                            
                             self.entry_place(True, order_size=order_size)
                             self.order.exiting_price=self.new_order.entering_price
                         elif _settings["USED_API"]["orders"]=="IB" :

@@ -634,7 +634,22 @@ class StratRSIeq(UnderlyingStrat):
           }
 
         super().__init__(period,strat_arr=a,**kwargs )
-        
+ 
+class StratDiv2(UnderlyingStrat):    
+    '''
+    Underlying strategy for divergence preselection
+    '''
+    def __init__(self,
+                 period: numbers.Number,
+                 **kwargs):
+        a={'simple': 
+         {'ent': ['RSI20'],
+          'ex':  ['KAMA','SUPERTREND','BBANDS',"CDLBELTHOLD","CDLHIKKAKE","CDLRISEFALL3METHODS","CDLBREAKAWAY",
+                  "CDL3BLACKCROWS"]
+          }}
+
+        super().__init__(period,strat_arr=a,**kwargs ) 
+    
 class StratDiv(UnderlyingStrat):    
     '''
     Underlying strategy for divergence preselection
