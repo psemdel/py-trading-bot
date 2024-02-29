@@ -299,6 +299,17 @@ class TestIB(TestCase):
         op.get_delta_size()
         self.assertTrue(op.reverse)
         self.assertTrue(op.delta_size>0)
+        
+        op.target_size=0
+        op.get_delta_size()
+        self.assertFalse(op.reverse)      
+        
+        op.ss.quantity=0
+        op.ss.save()
+        op.target_size=10000
+        op.get_delta_size()
+        self.assertFalse(op.reverse)    
+        self.assertTrue(op.delta_size>0)
 
     def test_entry_place(self):
 

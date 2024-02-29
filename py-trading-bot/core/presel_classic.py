@@ -120,20 +120,24 @@ class PreselClassic(Presel):
 
         #transform the entries and exits in 1 and 0
         t=SIGNALTOSIZE.run(
-            self.ust.entries,
-            self.ust.exits,
-            self.ust.entries_short,
-            self.ust.exits_short,
+            self.ust_classic.entries,
+            self.ust_classic.exits,
+            self.ust_classic.entries_short,
+            self.ust_classic.exits_short,
             idx_arr=[idx_arr]
             )
 
         self.expanded_allocations= self.expand_alloc(idx_arr, self.pf_opt._allocations) #add the weight
         self.used_allocations=remove_multi(t.bought-t.sold)*remove_multi(self.expanded_allocations)
         self.max_alloc()
-        self.size=self.new_alloc #remove_multi(self.new_alloc)* remove_multi(size_underlying)
+        self.size=self.new_alloc
 
     def apply_underlying_strat(self, strat_name):
-        self.ust=name_to_ust_or_presel(strat_name,self.period, symbol_index=self.symbol_index)
+        if "ust" in self.__dir__(): #for handle "live" strategy
+            self.ust_classic=name_to_ust_or_presel(strat_name,self.period, input_ust=self.ust)
+        else:
+            self.ust_classic=name_to_ust_or_presel(strat_name,self.period, symbol_index=self.symbol_index)
+
         self.fill_allocations_underlying()
         
         #as function from_optimizer

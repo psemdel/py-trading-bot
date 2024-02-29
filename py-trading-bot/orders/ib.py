@@ -107,9 +107,7 @@ def check_enough_cash(
     excess_money_engaged=False
     out_order_size=0
     base_out_order_size=0
-    
-    print("base_cash:"+str(base_cash))
-    print("money_engaged:"+str(money_engaged))
+
     if base_cash is not None: 
         if base_cash>=base_order_size:
             enough_cash=True
@@ -121,7 +119,7 @@ def check_enough_cash(
             base_out_order_size=base_cash
         
         if st.maximum_money_engaged is not None and (money_engaged+base_out_order_size>st.maximum_money_engaged):
-            print("excess_money_engaged for strategy: "+st.name+" candidate: "+action.name)
+            logger.info("excess_money_engaged for strategy: "+st.name+" candidate: "+action.name)
             excess_money_engaged=True
             
     return enough_cash, out_order_size, excess_money_engaged
@@ -154,7 +152,7 @@ def get_money_engaged(
             price_base=convert_to_base(action.currency.symbol,price)
             total_money_engaged+=ss.quantity*price_base
         else:
-            print("price for "+symbol+" is nan")
+            logger.info("price for "+symbol+" is nan")
         
     return total_money_engaged
 
@@ -278,7 +276,7 @@ def place(
             if last_price!=0:
                 quantity=math.floor(order_size/last_price)
             else:
-                print("last price is zero for "+action.symbol)
+                logger.info("last price is zero for "+action.symbol)
                 return 1.0, 0.0
             
             if not testing:
@@ -430,8 +428,8 @@ class IBData(RemoteData):
         cls.resolve_client(client=None)
         m_data = cls.client.reqMktData(contract)
         while (m_data.last != m_data.last) and (m_data.bid != m_data.bid) and t<timeout:  #Wait until data is in. 
-            t+=0.01
-            cls.client.sleep(0.01)
+            t+=0.1
+            cls.client.sleep(0.1)
         
         if np.isnan(m_data.last):
             if not np.isnan(m_data.bid):
@@ -586,7 +584,7 @@ class IBData(RemoteData):
             contract=self.get_contract(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action),action.currency.symbol)
             if contract is not None:
                 return self.get_last_price_sub(contract)
-        print("return 0")
+        logger.info("return 0")
         return 0
 
     def cash_balance(
@@ -615,23 +613,30 @@ class IBData(RemoteData):
         actions_in_pf=pf_retrieve_all(only_in_ib=True)
         if self.client and ib_global["connected"]:
             print("myIB retrieve")
-            action=None
 
             #check already in IB but not in pf, so bought manually
             for pos in self.client.positions():
-                print(pos)
-                
                 contract=pos.contract
                 actions=Action.objects.filter(symbol__contains=contract.localSymbol)
-                if len(actions)==0:
-                    action=None
-                elif len(actions)==1:
+                action=None
+                action_back_up=None
+                actions_back_up=[]
+                
+                if len(actions)==1:
                     action=actions[0]
-                else:
+                elif len(actions)>1:
                     for a in actions:
-                        if a.ib_ticker()==contract.localSymbol:
+                        if a.ib_ticker()==contract.localSymbol and a.stock_ex.ib_ticker==contract.exchange:
                             action=a
-                            
+                        elif a.ib_ticker()==contract.localSymbol:
+                            action_back_up=a
+                            actions_back_up.append(action_back_up)
+                        
+                    if action is None:
+                        logger.info("Combination, ticker: "+contract.localSymbol+" exchange: "+contract.exchange + " not found in database")
+                        if action_back_up is not None:
+                            logger.info("But combination, ticker: "+contract.localSymbol+" exchange: "+action_back_up.stock_ex.ib_ticker + " found in database")
+
                 if action is not None: 
                     if action in actions_in_pf:
                         actions_in_pf.remove(action)
@@ -639,21 +644,22 @@ class IBData(RemoteData):
                     present_ss=StockStatus.objects.get(action=action)
                     if present_ss.quantity!=pos.position:
                         if pos.position==0:
-                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", strategy set to none")
+                            logger.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", strategy set to none")
                         else:
-                            logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", update manually the strategy")
+                            logger.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to " + str(pos.position) + ", update manually the strategy")
                         present_ss.quantity=pos.position
                         present_ss.strategy=Strategy.objects.get(name="none")
                         present_ss.order_in_ib=True
                         present_ss.save() 
             #in pf but not anymore in IB, so sold manually
             for action in actions_in_pf: #only those remaining
-                logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to 0")
-                present_ss=StockStatus.objects.get(action=action)
-                present_ss.quantity=0
-                present_ss.strategy=Strategy.objects.get(name="none")
-                present_ss.order_in_ib=False
-                present_ss.save() 
+                if action not in actions_back_up: #to avoid the case of ISLAND exchange used outside of business hours
+                    logger_trade.info(action.symbol+" quantity actualized from "+ str(present_ss.quantity) +" to 0")
+                    present_ss=StockStatus.objects.get(action=action)
+                    present_ss.quantity=0
+                    present_ss.strategy=Strategy.objects.get(name="none")
+                    present_ss.order_in_ib=False
+                    present_ss.save() 
 
     def retrieve_quantity(
             self,
@@ -670,6 +676,10 @@ class IBData(RemoteData):
             for pos in self.client.positions():
                 contract=pos.contract
                 if action.ib_ticker()==contract.localSymbol:
+                    logger.info("position")
+                    logger.info(pos.position)
+                    logger.info(abs(pos.position))
+                    
                     return abs(pos.position), np.sign(pos.position), pos.position<0
         return 0, 0, False  
         
@@ -768,6 +778,8 @@ class IBData(RemoteData):
                         return 1.0, 0.0
                 else:
                     quantity=abs(quantity)
+                    logger.info("quantity got from quantity")
+                    logger.info(quantity)
                
                 if not testing:
                     if buy:
@@ -865,7 +877,6 @@ class OrderPerformer():
         orders=Order.objects.filter(c1 & c2)
 
         if len(orders)>1:
-            print("several active orders have been found for: "+self.action.symbol+", check the database")
             logger.error("several active orders have been found for: "+self.action.symbol+", check the database")      
 
         if len(orders)==0:
@@ -997,12 +1008,15 @@ class OrderPerformer():
             self.order.quantity=present_quantity
             self.order.save()
         self.reverse=False    
+        
         if present_quantity!=0:
             self.present_size= present_sign*present_quantity*get_last_price(self.action)
-            if present_sign!= np.sign(self.target_size):
+
+            if present_sign !=0 and np.sign(self.target_size)!=0 and present_sign!= np.sign(self.target_size):
                 self.reverse=True
         else:
             self.present_size=0
+        
         self.delta_size=self.target_size-self.present_size 
 
     def close_order(self):
@@ -1015,6 +1029,7 @@ class OrderPerformer():
     
     def close_quantity(self):        
         self.ss.quantity=0
+        self.ss.strategy=Strategy.objects.get(name="none")
         self.ss.save()
     
     def sell_order_sub(self):
@@ -1094,9 +1109,9 @@ class OrderPerformer():
                 excess_money_engaged=False    
 
             if not enough_cash:
-                logger.info(str(self.symbol) + " order not executed, not enough cash available")
+                logger_trade.info(str(self.symbol) + " order not executed, not enough cash available")
             elif excess_money_engaged:
-                logger.info(str(self.symbol) + " order not executed, maximum money engaged for one strategy exceeded")
+                logger_trade.info(str(self.symbol) + " order not executed, maximum money engaged for one strategy exceeded")
             else:
                 if self.new_order_bool: #we open a new long order
                     self.reverse=False
@@ -1109,8 +1124,6 @@ class OrderPerformer():
                     if order_size>0 and self.present_size<=0:
                         #if reverse but excluded then close without further conditions
                         if self.reverse and self.symbol not in self.excluded.retrieve():
-                            print("entry place")
-                            
                             self.entry_place(True, order_size=order_size)
                             self.order.exiting_price=self.new_order.entering_price
                         elif _settings["USED_API"]["orders"]=="IB" :
@@ -1125,7 +1138,7 @@ class OrderPerformer():
                             self.order.exiting_price=self.order.exiting_price
                             self.close_quantity()
                         else:
-                            logger_trade.info("Manual exit order symbol: "+self.symbol+" , strategy: " + self.st.name +  "which is in short position")
+                            logger_trade.info("Manual exit order symbol: "+self.symbol+" , strategy: " + self.st.name +  " which is in short position")
                             self.close_quantity()
                         self.calc_profit()
                         self.close_order()

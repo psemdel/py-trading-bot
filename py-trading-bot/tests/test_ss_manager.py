@@ -307,13 +307,21 @@ class TestSSManager(TestCase):
         cands=["AC.PA"]
         self.ss_m.cand_to_quantity(cands,"none",False)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],1)
-        self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","none"],0)
+        self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AI.PA","none"]))
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
+        
+        self.ss_m.present_ss.loc["AC.PA","quantity"]=1
+        
         cands=["AI.PA"]
+        
         self.ss_m.cand_to_quantity(cands,"none",False)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],0)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","none"],1)
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
+        
+        self.ss_m.present_ss.loc["AC.PA","quantity"]=0
+        self.ss_m.present_ss.loc["AI.PA","quantity"]=1
+        
         cands=["AIR.PA"]
         self.ss_m.cand_to_quantity(cands,"none",True)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],0)
@@ -348,7 +356,7 @@ class TestSSManager(TestCase):
         cands=["AC.PA"]
         self.ss_m.order_nosubstrat(cands,"Paris","none",False,keep=True)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","none"],1)
-        self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","none"],0)
+        self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AI.PA","none"]))
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
         self.ss_m.present_ss.loc["AC.PA","quantity"]=1
         cands=["AI.PA"]
@@ -357,7 +365,6 @@ class TestSSManager(TestCase):
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","retard_keep"],1)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","none"],1)
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
-        self.ss_m.present_ss.loc["AC.PA","quantity"]=0
         self.ss_m.present_ss.loc["AI.PA","quantity"]=1
         cands=["AIR.PA"]
         self.ss_m.order_nosubstrat(cands,"Paris","none",True,keep=True)
@@ -365,7 +372,8 @@ class TestSSManager(TestCase):
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","none"],0)
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AIR.PA","none"],-1)   
         self.assertEqual(self.ss_m.target_ss_by_st.loc["AC.PA","retard_keep"],1)
-        self.assertEqual(self.ss_m.target_ss_by_st.loc["AI.PA","retard_keep"],0) 
+        self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AI.PA","retard_keep"]))
+
          
     def test_cand_to_quantity_entry(self):
         self.ss_m.cand_to_quantity_entry([],"none", False)

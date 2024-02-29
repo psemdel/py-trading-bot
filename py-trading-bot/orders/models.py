@@ -199,12 +199,8 @@ class Action(models.Model):
         ordering = ["name"]
         
     def save(self, *args, **kwargs):
-        is_new=False
-        if "id" not in self.__dir__():
-            is_new = True
         super().save(*args, **kwargs)  
-        if is_new:
-            StockStatus.objects.create(action=self)        
+        StockStatus.objects.get_or_create(action=self) 
         
     def ib_ticker(self):
         if self.ib_ticker_explicit!="AAA" and self.ib_ticker_explicit is not None:
@@ -230,15 +226,20 @@ def filter_intro_sub(
     '''  
     td=datetime.datetime.today()
     if y_period is None:
-        limit_date=td
+        limit_date_intro=td
     else:
-        limit_date=datetime.datetime(td.year-y_period,td.month,td.day,tzinfo=tz_Paris) #time zone not important here but otherwise bug
+        if td.month==2 and td.day==29: #29th feb
+            tdday=28
+        else:
+            tdday=td.day
+        limit_date_intro=datetime.datetime(td.year-y_period,td.month,tdday,tzinfo=tz_Paris) #time zone not important here but otherwise bug
+        limit_date_delisted=datetime.datetime(td.year,td.month,td.day,tzinfo=tz_Paris) #today tz aware
 
     if a.intro_date is not None: #should come from database
-        if a.intro_date>limit_date :
+        if a.intro_date>limit_date_intro :
            return False
     if a.delisting_date is not None:
-        if a.delisting_date<limit_date :
+        if a.delisting_date<limit_date_delisted :
            return False
     return True
 

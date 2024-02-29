@@ -9,7 +9,7 @@ from django.test import TestCase
 from opt import opt_main
 from opt import opt_strat 
 import numpy as np
-from core import strat
+from core import strat, common
 import numbers
 
 import vectorbtpro as vbt
@@ -92,8 +92,14 @@ class TestDefi(TestCase):
         self.assertEqual(np.shape(self.o.ents["CAC40"]),np.shape(ust.entries))
         self.assertEqual(np.shape(self.o.exs["CAC40"]),np.shape(ust.exits))
         
-        self.assertTrue(np.equal(self.o.ents["CAC40"], ust.entries).all().all())
-        self.assertTrue(np.equal(self.o.exs["CAC40"], ust.exits).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.ents["CAC40"]), 
+            common.remove_multi(ust.entries)
+            ).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.exs["CAC40"]), 
+            common.remove_multi(ust.exits)
+            ).all().all())
 
         self.assertEqual(rr1,rr2)
         self.assertEqual(rb1,rb2)
@@ -136,8 +142,14 @@ class TestDefi(TestCase):
         self.assertEqual(np.shape(self.o.ents["CAC40"]),np.shape(ust.entries))
         self.assertEqual(np.shape(self.o.exs["CAC40"]),np.shape(ust.exits))
 
-        self.assertTrue(np.equal(self.o.ents["CAC40"], ust.entries).all().all())
-        self.assertTrue(np.equal(self.o.exs["CAC40"], ust.exits).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.ents["CAC40"]), 
+            common.remove_multi(ust.entries)
+            ).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.exs["CAC40"]), 
+            common.remove_multi(ust.exits)
+            ).all().all())
 
         self.assertEqual(rr1,rr2)
         self.assertEqual(rb1,rb2)
@@ -180,13 +192,26 @@ class TestDefi(TestCase):
         rr2=round(np.mean(pf2.get_total_return().values),3)
         rb2=round(np.mean(pf2.total_market_return.values),3)  
         
+        
         self.assertEqual(np.shape(self.o.ents["CAC40"]),np.shape(ust.entries))
         self.assertEqual(np.shape(self.o.exs["CAC40"]),np.shape(ust.exits))
         
-        self.assertTrue(np.equal(self.o.ents["CAC40"], ust.entries).all().all())
-        self.assertTrue(np.equal(self.o.exs["CAC40"], ust.exits).all().all())
-        self.assertTrue(np.equal(self.o.ents_short["CAC40"], ust.entries_short).all().all())
-        self.assertTrue(np.equal(self.o.exs_short["CAC40"], ust.exits_short).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.ents["CAC40"]), 
+            common.remove_multi(ust.entries)
+            ).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.exs["CAC40"]), 
+            common.remove_multi(ust.exits)
+            ).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.ents_short["CAC40"]), 
+            common.remove_multi(ust.entries_short)
+            ).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.exs_short["CAC40"]), 
+            common.remove_multi(ust.exits_short)
+            ).all().all())
         
         self.assertEqual(rr1,rr2)
         self.assertEqual(rb1,rb2)
@@ -236,12 +261,28 @@ class TestDefi(TestCase):
         self.assertEqual(np.shape(self.o.ents["CAC40"]),np.shape(ust.entries))
         self.assertEqual(np.shape(self.o.exs["CAC40"]),np.shape(ust.exits))
 
-        self.assertTrue(np.equal(self.o.ents["CAC40"], ust.entries).all().all())
-        self.assertTrue(np.equal(self.o.exs["CAC40"], ust.exits).all().all())
-        self.assertTrue(np.equal(self.o.macro_trend["CAC40"]["total"], ust.macro_trend).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.ents["CAC40"]), 
+            common.remove_multi(ust.entries)
+            ).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.exs["CAC40"]), 
+            common.remove_multi(ust.exits)
+            ).all().all())
+        
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.macro_trend["CAC40"]["total"]), 
+            common.remove_multi(ust.macro_trend)
+            ).all().all())
 
-        self.assertTrue(np.equal(self.o.ents_short["CAC40"], ust.entries_short).all().all())
-        self.assertTrue(np.equal(self.o.exs_short["CAC40"], ust.exits_short).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.ents_short["CAC40"]), 
+            common.remove_multi(ust.entries_short)
+            ).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.o.exs_short["CAC40"]), 
+            common.remove_multi(ust.exits_short)
+            ).all().all())
 
         self.assertEqual(rr1,rr2)
         self.assertEqual(rb1,rb2)        

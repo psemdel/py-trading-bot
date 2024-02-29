@@ -43,8 +43,11 @@ If you want to read the logs of the bot:
     kubectl logs <name of the worker pod>
  
 Optional: Go in the admin panel and delete the user admin and testdb, that are completely unnecessary.
+Note: The 
 
-#Troubleshooting 
+#Troubleshooting
+If kubectl command is not found replace in the script the "kubectl" by "minikube kubectl -- ".
+ 
 If for any reason the sequence_start_first_time.sh lead to an error, you need to clean properly Kubernetes before repeating the step. It means obviously removing the deployments with
 
     kubectl delete deployment <name of the deployment>
@@ -64,6 +67,7 @@ In addition, in kubernetes/postgres.yml, the hostPath under PersistentVolume
       path: /data/py-trading-bot-postgres-pv
       
 Needs to be changed, otherwise the same data will be loaded again when the permanent volumes are recreated.
+ 
     
 ## Error auth_user_username_key
 In the logs of py-trading-bot pod (kubectl logs <name of py-trading-bot>) you find:

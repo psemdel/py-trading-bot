@@ -60,7 +60,7 @@ def save_data(
     data=vbt.YFData.fetch(symbols,start=start_date,end=end_date,\
                                  timeframe='1d',missing_index="drop")   
     BASE_DIR = Path(__file__).resolve().parent.parent
-    data.to_hdf(file_path=os.path.join(BASE_DIR,'saved_cours/'+selector.upper()+'_period.h5'))
+    data.to_hdf(path_or_buf=os.path.join(BASE_DIR,'saved_cours/'+selector.upper()+'_period.h5'))
 
 def retrieve_data_offline(
              o, 
@@ -168,9 +168,9 @@ if __name__ == '__main__':
     '''
     import constants
     
-    selector="industry"
+    selector="NASDAQ"
     start_date='2007-01-01'
-    end_date='2023-08-01'
+    end_date='2024-01-03'
     
     if selector=="CAC40":
         all_symbols=constants.CAC40

@@ -77,7 +77,7 @@ def daily_report(
         for sec in ActionSector.objects.all():
             strats=getattr(sec,a).all()
             if len(strats)!=0: #some strategy is activated for this sector
-                print("starting report " + sec)
+                print("starting report " + sec.name)
                 daily_report_sub(s_ex.name,sec=sec)
     else:
         strats=getattr(s_ex,a).all()

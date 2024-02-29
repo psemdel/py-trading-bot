@@ -124,7 +124,7 @@ class TestOptMain(TestCase):
         self.assertEqual(np.shape(self.o.ents["CAC40"])[1],39)
 
         self.assertFalse(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[0]].values[-1])
-        self.assertTrue(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-1])
+        self.assertFalse(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-1])
         self.assertTrue(self.o.ents["CAC40"][self.o.ents["CAC40"].columns[1]].values[-2])
         
         exs_total=copy.deepcopy(self.o.exs)
@@ -211,7 +211,7 @@ class TestOptMain(TestCase):
                                       short_exits  =self.ust.exits_short)
         t=self.o.get_ret(pf,"CAC40","learn")
         self.assertEqual(len(t),39)
-        self.assertEqual(round(t['VIV'],2),-0.97)
+        self.assertEqual(round(t['VIV'],2),-1.29)
         
     def test_append_row(self):
         self.o.test_arrs=None

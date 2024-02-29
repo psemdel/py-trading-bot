@@ -8,7 +8,7 @@ from opt.opt_main import OptMain
 Script to optimize the combination of patterns/signals used for a given strategy
 
 The optimization takes place on the actions from CAC40, DAX and Nasdaq
-Parameters very good on some actions but very bad for others should not be selected
+Parameters very good on some stocks but very bad for others should not be selected
 
 The optimization algorithm calculates one point, look for the points around it and select the best one
 As it can obviously lead to local maximum, the starting point is selected in a random manner
@@ -88,7 +88,7 @@ class Opt(OptMain):
                 ret_arr.append(t)
             else:
                 ret+=self.calculate_eq_ret(pf_dic[ind],ind)
-            self.row["trades_"+ind+"_"+dic]=len(pf_dic[ind].get_trades().records_arr)
+            self.row["trades_"+ind+"_"+dic]=len(pf_dic[ind].get_trades().records_arr)/len(pf_dic[ind].wrapper.columns)
 
         if self.it_is_index:
             self.row["mean_surperf_factor_w_"+ind+"_"+dic+"_raw"]=np.mean(ret_arr)

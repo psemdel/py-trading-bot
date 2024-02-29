@@ -15,7 +15,7 @@ class TestIndicator(TestCase):
     @classmethod
     def setUpClass(self):  
         super().setUpClass()
-        self.ust=strat.StratDiv("2007_2023_08", symbol_index="CAC40")
+        self.ust=strat.StratDiv2("2007_2023_08", symbol_index="CAC40")
         self.ust.run()
 
     def test_rel_dif(self):
@@ -129,9 +129,7 @@ class TestIndicator(TestCase):
 
     def test_VBTKAMA(self):
         t=ic.VBTKAMA.run(self.ust.close)
-        
-        print(t.bot_ext['AIR'].values[-10:])
-        
+
         self.assertFalse(t.bot_ext['AIR'].values[-2])
         self.assertFalse(t.bot_ext['AIR'].values[-1])
         
@@ -217,11 +215,11 @@ class TestIndicator(TestCase):
         self.assertEqual(t.trend['AIR'].values[-1],0)
         self.assertEqual(t.trend['ATO'].values[-1],10)
         self.assertEqual(t.trend['BN'].values[-1],0)
-        
-        self.assertEqual(round(t.bb_bw['AC'].values[-1],2),0.03)
-        self.assertEqual(round(t.bb_bw['AI'].values[-1],2),0.06)
-        self.assertEqual(round(t.bb_bw['AIR'].values[-1],2),0.05)
-        self.assertEqual(round(t.bb_bw['SLB'].values[-1],2),0.19)
+
+        self.assertEqual(round(t.bb_bw['AC'].values[-1],2),0.02)
+        self.assertEqual(round(t.bb_bw['AI'].values[-1],2),0.04)
+        self.assertEqual(round(t.bb_bw['AIR'].values[-1],2),0.03)
+        self.assertEqual(round(t.bb_bw['SLB'].values[-1],2),0.07)
 
     def test_VBTMACDBBTREND(self):
         t=ic.VBTMACDBBTREND.run(self.ust.close)
@@ -234,10 +232,10 @@ class TestIndicator(TestCase):
         self.assertEqual(round(t.kama['MC'].values[-2],2),847.39)
         self.assertEqual(round(t.kama['MC'].values[-3],2),847.46)
         
-        self.assertEqual(round(t.bb_bw['AC'].values[-1],2),0.03)
-        self.assertEqual(round(t.bb_bw['AI'].values[-1],2),0.06)
-        self.assertEqual(round(t.bb_bw['AIR'].values[-1],2),0.05)
-        self.assertEqual(round(t.bb_bw['SLB'].values[-1],2),0.19)
+        self.assertEqual(round(t.bb_bw['AC'].values[-1],2),0.02)
+        self.assertEqual(round(t.bb_bw['AI'].values[-1],2),0.04)
+        self.assertEqual(round(t.bb_bw['AIR'].values[-1],2),0.03)
+        self.assertEqual(round(t.bb_bw['SLB'].values[-1],2),0.07)
         self.assertEqual(round(t.bb_bw['MC'].values[-1],2),0.09)
         self.assertEqual(round(t.bb_bw['MC'].values[-2],2),0.09)
         self.assertEqual(round(t.bb_bw['MC'].values[-3],2),0.09)

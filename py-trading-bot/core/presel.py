@@ -171,8 +171,6 @@ class Presel():
         '''
         if "entries" not in self.ust.__dir__():
             self.ust.run()
-        
-        
 
         return self.ust.symbols_simple_to_complex(symbol_simple,ent_or_ex)
         #UnderlyingStrat
@@ -233,7 +231,7 @@ class Presel():
                 if ((not self.no_ust and not short and self.ust.exits.loc[i, symbol_complex]) or  #not short and 
                    (not self.no_ust and short and self.ust.exits_short.loc[i, symbol_complex]) or
                     (self.no_ust and symbol_simple not in self.candidates[short_to_str[short]][i])):
-       
+                    
                     self.pf[short_to_str[short]].remove(symbol_simple)
                     self.capital+=self.order_size
                     
@@ -347,6 +345,8 @@ class Presel():
         ((not self.blocked and not self.blocked_im) or 
         ((self.blocked or self.blocked_im) and not short))):
             self.candidates[short_to_str[short]][i].append(symbol_simple)
+            return True
+        return False        
 
     def sub(
             self, 
@@ -361,6 +361,7 @@ class Presel():
             i: index
             short: order direction        
         '''
+       
         self.sorting(i, short=short)
         if self.sorted is not None:
             for e in self.sorted:
@@ -374,7 +375,11 @@ class Presel():
                     if len(t)>0:
                         symbol=t.index[0] 
                         v=self.sorting_criterium.loc[i,symbol]
-                        self.sub_sub(i, symbol,v, short)
+                        pursue=self.sub_sub(i, symbol,v, short)
+                        if not pursue:
+                            break
+                else:
+                    break
         else:
             raise ValueError("both sorted and sorted_df are None")
     
@@ -651,7 +656,7 @@ class PreselRetard(Presel):
             self.dur=ic.VBTKAMATREND.run(self.close).duration
             #self.dur=ic.VBTSUPERTREND.run(self.high,self.low,self.close).duration
         self.no_ust=True
-        self.calc_all=True
+        self.calc_all=True #otherwise it is not possible to determine what is excluded
         self.last_short=False
 
     def sorting(
@@ -686,7 +691,8 @@ class PreselRetard(Presel):
 
         r.concat(self.st.name.capitalize()+", " + "direction " + direction + ", stockex: " + self.ust.exchange +\
                     ", action duration: " +str(self.out))
-  
+        r.concat("Present "+ self.st.name + " candidates: "+str(candidates) + " hold since: "+ str(self.hold_dur) + " days")
+
         r.ss_m.clean_excluded(self.st.name, self.excluded)
         r.ss_m.order_nosubstrat(candidates_to_YF(self.ust.symbols_to_YF,candidates), self.ust.exchange, self.st.name, self.last_short,keep=keep)
               
@@ -811,11 +817,7 @@ class PreselDivergence(PreselOnlyExit):
     def sorting_g(self):
         self.sorted_rank=self.divergence.rank(axis=1, ascending=True) #small divergence better
         self.sorting_criterium=self.divergence
-
-class PreselDivergenceSecond(PreselDivergence):
-    def underlying(self):
-        self.underlying_creator("StratDiv")  
-        
+      
 class PreselDivergenceBlocked(PreselDivergence):
     '''
     Like preselect_divergence, but the mechanism is blocked when macro_trend is bear

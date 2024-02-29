@@ -151,15 +151,17 @@ class Report(models.Model):
                             for st1 in strats: #if retard_keep is also active, keep.
                                 if st1.name=="retard_keep":
                                     keep=True
-                            ust_or_pr.perform(self, st_name=st.name,keep=keep)
+                            ust_or_pr.perform(self, keep=keep)
                         else:
-                            ust_or_pr.perform(self, st_name=st.name)
+                            ust_or_pr.perform(self)
                     
         except Exception as e:
               import sys
               _, e_, exc_tb = sys.exc_info()
               print(e)
               print("line " + str(exc_tb.tb_lineno) + " for strategy: "+str(st.name))
+              logger.info("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
+              logger.error("line " + str(exc_tb.tb_lineno), stack_info=True, exc_info=True)
       
     def perform(
             self,
@@ -267,9 +269,9 @@ class Report(models.Model):
                         if ar.kama_ex:
                             self.concat(" Index " + symbol + " KAMA top detected!")
                         if ust_trend is not None:   
-                            if ust_trend.max_ind[symbol_complex_ent][-1]!=0:
+                            if ust_trend.max_ind[symbol_complex_ent].values[-1]!=0:
                                 self.concat(" Index " + symbol + " V maximum detected!")
-                            if ust_trend.min_ind[symbol_complex_ent][-1]!=0:
+                            if ust_trend.min_ind[symbol_complex_ent].values[-1]!=0:
                                 self.concat(" Index " + symbol + " V minimum detected!")                            
                     ar.save()  
         

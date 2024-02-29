@@ -205,7 +205,11 @@ class TestOrders(TestCase):
             "alerting": "IB", 
             "reporting": "YF", 
             }
-        
+        _settings["USED_API"]={
+            "orders": "", 
+            "alerting": "", 
+            "reporting": "", 
+            }
         m.check_ib_permission(None)    
         self.assertEqual(_settings["USED_API"]["orders"],"IB")
         self.assertEqual(_settings["USED_API"]["alerting"],"IB")
@@ -216,6 +220,11 @@ class TestOrders(TestCase):
             "orders": "CCXT", 
             "alerting": "MT5", 
             "reporting": "TS", 
+            }
+        _settings["USED_API"]={
+            "orders": "", 
+            "alerting": "", 
+            "reporting": "", 
             }
         
         m.check_ib_permission(["AI","AC"])    

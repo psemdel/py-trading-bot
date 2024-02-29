@@ -8,17 +8,25 @@ Created on Sun Aug 27 09:27:58 2023
 
 from django.test import TestCase
 from opt import opt_presel, opt_keep
-from core import presel
+from core import presel, common
 import vectorbtpro as vbt
 import numpy as np
 
 class TestOptPresel(TestCase):
     def test_div(self):
-        a={'simple': 
-         {'ent': ['RSI20'],
-          'ex':  ['KAMA','SUPERTREND','BBANDS',"CDLBELTHOLD","CDLHIKKAKE","CDLRISEFALL3METHODS","CDLBREAKAWAY",
-                  "CDL3BLACKCROWS"]
-          }}
+        a={'bull': {
+            'ent': ['BBANDS', 'CDL3BLACKCROWS'],
+            'ex': ['ULTOSC20', 'CDLHIKKAKE','CDLABANDONEDBABY', 'CDL3BLACKCROWS','CDLHIKKAKEMOD']
+            },
+            'bear': {
+            'ent': ['CDLHANGINGMAN', 'CDLSTICKSANDWICH', 'CDL3LINESTRIKE'],
+            'ex': ['STOCH', 'BBANDS', 'CDLBELTHOLD', 'CDLXSIDEGAP3METHODS']
+            },
+            'uncertain': {
+            'ent': ['KAMA'],
+            'ex': ['WILLR','ULTOSC20','ULTOSC25','CDL3LINESTRIKE','CDLDARKCLOUDCOVER', 'CDL3INSIDE']
+            }
+          }
         
         self.o=opt_presel.Opt("PreselDivergence",
                               "2007_2022_08",
@@ -127,7 +135,10 @@ class TestOptPresel(TestCase):
                              )
 
         self.assertTrue(np.equal(self.bti.entries, self.o.ents["CAC40"]).all().all())
-        self.assertTrue(np.equal(self.bti.exits, self.o.exs["CAC40"]).all().all())
+        self.assertTrue(np.equal(common.remove_multi(self.bti.exits)
+                                , common.remove_multi(self.o.exs["CAC40"])
+                                ).all().all()
+                        )
 
         self.bti2=presel.PreselRetardMacro(self.period,symbol_index=self.symbol_index)
         self.bti2.run()
@@ -143,7 +154,10 @@ class TestOptPresel(TestCase):
         
         #calculate_pf_sub should also have calculated DAX correctly the first time
         self.assertTrue(np.equal(self.bti3.entries, self.o.ents["DAX"]).all().all())
-        self.assertTrue(np.equal(self.bti3.exits, self.o.exs["DAX"]).all().all())
+        self.assertTrue(np.equal(
+            common.remove_multi(self.bti3.exits), 
+            common.remove_multi(self.o.exs["DAX"])
+            ).all().all())
 
         pf3=vbt.Portfolio.from_signals(self.bti3.close,
                                       self.bti3.entries,
@@ -171,7 +185,10 @@ class TestOptPresel(TestCase):
                              )
         
         self.assertTrue(np.equal(self.bti.entries.loc[i], self.o.ents["CAC40"]).all().all())
-        self.assertTrue(np.equal(self.bti.exits.loc[i], self.o.exs["CAC40"]).all().all())
+        self.assertTrue(np.equal(
+                common.remove_multi(self.bti.exits.loc[i]), 
+                common.remove_multi(self.o.exs["CAC40"])
+            ).all().all())
         self.assertTrue(np.equal(pf.get_total_return(), pf_dic["CAC40"].get_total_return()).all())                                          
         
         pf_dic=self.o.calculate_pf_sub(dic="test")
@@ -186,4 +203,4 @@ class TestOptPresel(TestCase):
                                       call_seq='auto',
                                       cash_sharing=True,
                              )  
-        self.assertTrue(np.equal(pf.get_total_return(), pf_dic["CAC40"].get_total_return()).all())  
+        self.assertTrue(np.equal(pf.get_total_return(), pf_dic["CAC40"].get_total_return()).all())

@@ -68,26 +68,28 @@ class TestMacro(TestCase):
         self.ust.run()
         
         t=macro.VBTMACROTREND.run(self.ust.close)
-        
-        self.assertEqual(self.ust.entries['AC'].values[0],False)
+
+        self.assertEqual(self.ust.entries[self.ust.entries.columns[0]].values[0],False)
         self.assertEqual(t.macro_trend['AC'].values[0],0)
         
         t2=macro.VBTMACROFILTER.run(self.ust.entries,t.macro_trend, mode=0 )
         
         self.assertEqual(t.macro_trend['AC'].values[0],t2.out[t2.out.columns[0]].values[0])
-        self.assertEqual(self.ust.entries['AC'].values[-1],True)
-        self.assertEqual(t.macro_trend['AC'].values[-1],1)
-        self.assertFalse(t2.out[t2.out.columns[0]].values[-1])
+        self.assertEqual(self.ust.entries[self.ust.entries.columns[0]].values[-12],True)
+        self.assertEqual(t.macro_trend['AC'].values[-12],1)
+        self.assertFalse(t2.out[t2.out.columns[0]].values[-12])
         
-        self.assertEqual(self.ust.entries['ATO'].values[-1],True)
-        self.assertEqual(t.macro_trend['ATO'].values[-1],1)
-        self.assertFalse(t2.out[t2.out.columns[4]].values[-1])
+        self.assertEqual(self.ust.entries[self.ust.entries.columns[11]].values[-6],True)
+        self.assertEqual(t.macro_trend['DSY'].values[-6],-1)
+        self.assertFalse(t2.out[t2.out.columns[11]].values[-6])
         
-        self.assertEqual(self.ust.entries['BNP'].values[-34],True)
-        self.assertEqual(t.macro_trend['BNP'].values[-34],0)
-        self.assertTrue(t2.out[t2.out.columns[6]].values[-34])
+        self.assertEqual(self.ust.entries[self.ust.entries.columns[5]].values[-11],True) 
+        self.assertEqual(t.macro_trend['BN'].values[-11],0)
+        self.assertTrue(t2.out[t2.out.columns[5]].values[-11])
         
-        
+        self.assertEqual(self.ust.entries[self.ust.entries.columns[8]].values[-5],True)
+        self.assertEqual(t.macro_trend['CAP'].values[-5],0)
+        self.assertTrue(t2.out[t2.out.columns[8]].values[-5])        
         
         
         

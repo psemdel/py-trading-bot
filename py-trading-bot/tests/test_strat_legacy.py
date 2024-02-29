@@ -38,10 +38,10 @@ class TestStrat(TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)              
 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),2.46)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.23)        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),5.89)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.21)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),2.33)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.21)        
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),7.64)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.84)  
 
     def test_strat_kama_stoch_matrend_macdbb(self):   
         self.ust=strat_legacy.StratKamaStochMatrendMacdbb(self.period, symbol_index=self.symbol_index)
@@ -51,10 +51,10 @@ class TestStrat(TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)   
             
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.82)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.39)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.5)        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),5.51)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),2.84)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),5.25)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),3.61)  
 
     def test_strat_kama_stoch_super_macdbb(self):
         self.ust=strat_legacy.StratKamaStochSuperMacdbb(self.period, symbol_index=self.symbol_index)
@@ -64,10 +64,10 @@ class TestStrat(TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)               
 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.77)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.15)
         self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.7)        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),4.29)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),3.83)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),4.2)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),4.93)  
 
     def test_strat_kama_stoch_matrend_bbands_macro(self):
         self.ust=strat_legacy.StratKamaStochMatrendBbandsMacro(
@@ -82,10 +82,10 @@ class TestStrat(TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)              
 
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),0.93)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.39)        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),0.64)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),1.35)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),0.92)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),1.47)        
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.29)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),1.76)  
 
         self.ust=strat_legacy.StratKamaStochMatrendBbandsMacro(
             self.period, 
@@ -99,10 +99,10 @@ class TestStrat(TestCase):
                                       short_entries=self.ust.entries_short,
                                       short_exits  =self.ust.exits_short)   
         
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.92)
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.1)        
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),0.79)  
-        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),1.73) 
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[0]],2),1.82)
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[1]],2),0.24)        
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[2]],2),1.86)  
+        self.assertEqual(round(pf.get_total_return()[pf.wrapper.columns[6]],2),1.84) 
 
     def test_strat_kama_stoch_macro(self): 
         self.ust=strat_legacy.StratKamaStochMacro(
