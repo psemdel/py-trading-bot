@@ -268,3 +268,20 @@ class TestIndicator(TestCase):
         self.assertEqual(round(t.out['AC'].values[-1],3),-0.002)
         self.assertEqual(round(t.out['AI'].values[-1],3),-0.000)
         self.assertEqual(round(t.out['SLB'].values[-1],3),0.003)
+        
+    def test_VBTMINMAX(self):
+        t=ic.VBTMINMAX.run(self.ust.close,distance=10)
+        self.assertTrue(t.maximum[t.maximum.columns[0]].values[0]>t.minimum[t.minimum.columns[0]].values[0])
+        self.assertTrue(t.maximum[t.maximum.columns[0]].values[1]>t.minimum[t.minimum.columns[0]].values[1])
+        self.assertTrue(t.maximum[t.maximum.columns[0]].values[2]>t.minimum[t.minimum.columns[0]].values[2])
+        self.assertTrue(t.maximum[t.maximum.columns[0]].values[-10]>t.minimum[t.minimum.columns[0]].values[-10])
+        
+        self.assertEqual(round(t.minimum[t.minimum.columns[0]].values[0],2),-0.59)
+        self.assertEqual(round(t.minimum[t.minimum.columns[0]].values[1],2),0.0)
+        self.assertEqual(round(t.minimum[t.minimum.columns[0]].values[2],2),-0.17)
+        self.assertEqual(round(t.minimum[t.minimum.columns[0]].values[3],2),-0.17)
+        
+        self.assertEqual(round(t.maximum[t.maximum.columns[0]].values[0],2),6.4)
+        self.assertEqual(round(t.maximum[t.maximum.columns[0]].values[1],2),7.03)
+        self.assertEqual(round(t.maximum[t.maximum.columns[0]].values[2],2),6.85)
+        self.assertEqual(round(t.maximum[t.maximum.columns[0]].values[3],2),7.35)           

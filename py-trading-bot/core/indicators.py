@@ -854,7 +854,8 @@ def min_max_sub(
         close: np.array,
         distance: numbers.Number,
         )-> np.array:
-    minimum=maximum=np.full(close.shape, 0.0)
+    minimum=np.full(close.shape, 0.0)
+    maximum=np.full(close.shape, 0.0)
     for ii in range(len(close)-1):
         maximum[ii]=rel_dif(close[ii+1:ii+distance].max(),close[ii])*100
         minimum[ii]=rel_dif(close[ii+1:ii+distance].min(),close[ii])*100
