@@ -5,6 +5,8 @@ metadata:
 data:
   postgres_db: "testdb"
   ib_port: "4001"
-  use_ib_for_data : "false"
+  used_api_for_order_perf : "IB"
+  used_api_for_data_alerting : "IB"
+  used_api_for_data_reporting : "YF"
 
 

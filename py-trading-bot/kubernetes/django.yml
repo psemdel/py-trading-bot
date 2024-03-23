@@ -23,6 +23,8 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            - name: DEBUG
+              value: "False"
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -65,11 +67,21 @@ spec:
                   name: py-trading-bot-configmap
                   key: ib_port
                   
-            - name: USE_IB_FOR_DATA
+            - name: USED_API_FOR_ORDER_PERF
               valueFrom:
                 configMapKeyRef:
                   name: py-trading-bot-configmap
-                  key: use_ib_for_data                                   
+                  key: used_api_for_order_perf
+            - name: USED_API_FOR_DATA_ALERTING
+              valueFrom:
+                configMapKeyRef:
+                  name: py-trading-bot-configmap
+                  key: used_api_for_data_alerting    
+            - name: USED_API_FOR_DATA_REPORTING
+              valueFrom:
+                configMapKeyRef:
+                  name: py-trading-bot-configmap
+                  key: used_api_for_data_reporting                                         
                                               
 ---
 kind: Service

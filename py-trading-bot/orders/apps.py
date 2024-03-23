@@ -10,6 +10,9 @@ class OrdersConfig(AppConfig):
         from orders.models import StockStatus
         from reporting.views import create_ss_sub
         
-        if len(StockStatus.objects.all())==0:
-            create_ss_sub()
+        try:
+            if len(StockStatus.objects.all())==0:
+                create_ss_sub()
+        except:
+            pass
         

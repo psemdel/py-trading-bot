@@ -104,7 +104,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG',True)
 
-if DEBUG and DEBUG!="False":
+if DEBUG and not (isinstance(DEBUG,str) and DEBUG.lower()=="false"):
     with open(os.path.join(BASE_DIR, 'trading_bot/etc/DJANGO_SECRET')) as f:
         SECRET_KEY = f.read().strip()
     with open(os.path.join(BASE_DIR, 'trading_bot/etc/DB_SECRET')) as f:
@@ -172,7 +172,7 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb2023'),
+        'NAME':  os.getenv('POSTGRES_DB','migdb'),
         'USER': DB_USER,
         'PASSWORD': DB_SECRET_KEY,
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
