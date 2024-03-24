@@ -134,11 +134,12 @@ class Report(models.Model):
         '''
         try:
             for st in strats:
-                if st.class_name is None:
-                    print("define class_name for strategy "+str(st.name))
+                if st.class_name is None and st.ml_model_name is None:
+                    print("define class_name or ml_model_name for strategy "+str(st.name))
                 else:
                     ust_or_pr=name_to_ust_or_presel(
                         st.class_name,
+                        st.ml_model_name,
                         ust.period,
                         input_ust=ust,
                         prd=True,
@@ -313,6 +314,7 @@ class Report(models.Model):
         '''
         return name_to_ust_or_presel(
                 "StratHold",
+                None,
                 str(_settings["DAILY_REPORT_PERIOD"])+"y",
                 prd=True,
                 actions=actions,
@@ -376,6 +378,7 @@ class Report(models.Model):
                     if _settings["CALCULATE_TREND"]:
                         ust_trend=name_to_ust_or_presel(
                             "StratKamaStochMatrendMacdbbMacro",
+                            None,
                             ust_hold.period,
                             input_ust=ust_hold,
                             prd=True

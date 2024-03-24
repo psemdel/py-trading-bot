@@ -15,7 +15,7 @@ You can operate the bot in Docker and Kubernetes. Instruction were tested with L
 
     docker build . -t py-trading-bot --build-arg GH_TOKEN=<your Github Token\>
 
-6. Change the password. Go in py-trading-bot/secret.yml and replace the items, especially the token for Telegram, with your values coded in base64, as it is the standard for secrets in Kubernetes.
+6. Change the password. Go in py-trading-bot/kubernetes/secret.yml and replace the items, especially the token for Telegram, with your values coded in base64, as it is the standard for secrets in Kubernetes.
 7. Run 
 
     py-trading-bot/kubernetes/sequence_start_first_time.sh 

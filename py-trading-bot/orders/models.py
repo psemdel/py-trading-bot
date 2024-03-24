@@ -395,7 +395,8 @@ class Strategy(models.Model):
     option_max_strike_distance_per: maximum difference between present stock price and option strike price
     '''
     name=models.CharField(max_length=100, blank=False)
-    class_name=models.CharField(max_length=100, blank=False, null=True)
+    class_name=models.CharField(max_length=100, blank=True, null=True)
+    ml_model_name=models.CharField(max_length=100, blank=True, null=True)
     perform_order=models.BooleanField(blank=False,default=False)
     priority=models.IntegerField(null=False, blank=False, default=1000)
     target_order_size=models.FloatField(blank=True,null=True)
