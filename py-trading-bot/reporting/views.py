@@ -3,8 +3,10 @@ from django.http import HttpResponse
 from reporting.telegram import start, cleaning_sub
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, OrderExecutionMsg 
-from orders.models import Action, StockStatus, exchange_to_index_symbol, ActionSector, StockEx
+from orders.models import Action, StockStatus, exchange_to_index_symbol, ActionSector, StockEx, get_exchange_actions, filter_intro_action
 from orders.ib import actualize_ss
+from core import data_manager
+from trading_bot.settings import _settings
 
 from .filter import ReportFilter
 
@@ -86,6 +88,20 @@ def daily_report(
 
     daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
     return render(request, 'reporting/success_report.html')
+
+def check_nan(request,exchange:str):
+    if exchange is not None:
+        s_ex=StockEx.objects.get(name=exchange)
+        actions=get_exchange_actions(exchange)
+        actions=filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
+        actions_list=[a.symbol for a in actions]
+
+        problem_txt=data_manager.retrieve_debug( 
+            actions_list,
+            s_ex.main_index.symbol,
+            str(_settings["DAILY_REPORT_PERIOD"])+"y")
+        
+        return HttpResponse(problem_txt)
 
 def cleaning(request):
     '''

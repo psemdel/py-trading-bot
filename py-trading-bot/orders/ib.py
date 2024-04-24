@@ -843,14 +843,14 @@ class OrderPerformer():
             logger.error("action: " + str(symbol)+ ", strat: " + str(strategy_id) + " not found")
     
     @connect_ib    
-    def check_auto_manual(self,**kwargs):
+    def check_auto_manual(self,PERFORM_ORDER, **kwargs):
         """
         Check if an order should be performed automatically (in IB) or manually (here noted as YF, but you cannot perform orders with YF)
         
         Similar to check_ib_permission
         """
         _settings["USED_API"]["orders"]="YF" #default
-        if self.action.stock_ex.perform_order and self.st.perform_order and _settings["PERFORM_ORDER"]: #auto
+        if self.action.stock_ex.perform_order and self.st.perform_order and PERFORM_ORDER: #auto
             if _settings["USED_API_DEFAULT"]["orders"] in ["IB","CCXT","MT5","TS"]:
                 
                 _settings["USED_API"]["orders"]=_settings["USED_API_DEFAULT"]["orders"]
@@ -1155,7 +1155,7 @@ class OrderPerformer():
         '''
         Main function to place a buy order
         '''
-        self.check_auto_manual(**kwargs)
+        self.check_auto_manual( _settings["PERFORM_ORDER"]["buy"],**kwargs)
         return self.buy_order_sub()
     
     @connect_ib     
@@ -1163,7 +1163,7 @@ class OrderPerformer():
         '''
         Main function to place a sell order
         '''
-        self.check_auto_manual(**kwargs)
+        self.check_auto_manual(_settings["PERFORM_ORDER"]["sell"],**kwargs)
         return self.sell_order_sub()
 
 

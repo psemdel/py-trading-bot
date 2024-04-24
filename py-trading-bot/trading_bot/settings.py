@@ -11,6 +11,7 @@ _settings={
 "HEARTBEAT":False, # to test telegram
 "HEARTBEAT_IB":False, # to test telegram, note ["USED_API_DEFAULT"]["alerting] must be set to IB otherwise, it makes no sense.
 "UPDATE_SLOW_STRAT":True, 
+"CHECK_DELISTED":True, #check if some tickers have been delisted
 
 "ALERT_THRESHOLD":3, #in %
 "ALARM_THRESHOLD":5, #in %
@@ -37,13 +38,15 @@ _settings={
     },
 "IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
 
-"PERFORM_ORDER":True, #test or use IB to perform orders
+"PERFORM_ORDER":{ #test or use IB to perform orders
+    "buy":False,
+    "sell":True
+     },
 ## Configuration of the strategies ##
 
 # Frequency is the number of days between successive candidates actualisation
 "DAILY_REPORT_PERIOD":3, #in year
 
-"VOL_MAX_CANDIDATES_NB":1,
 "MACD_VOL_MAX_CANDIDATES_NB":1,
 "HIST_VOL_MAX_CANDIDATES_NB":1,
 "DIVERGENCE_THRESHOLD":0.005,
@@ -69,7 +72,8 @@ _settings={
 "FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
 
 "STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
-          "PreselDivergenceBlocked","PreselWQ7","PreselWQ19","PreselWQ21","PreselWQ31","PreselWQ53","PreselWQ54"],
+          "PreselDivergenceBlocked","PreselWQ7","PreselWQ19","PreselWQ21","PreselWQ31","PreselWQ53","PreselWQ54",
+          "PreselML_MLP_A","PreselML_LSTM_A"],
 
 ## API configurations
 "IB_LOCALHOST":'127.0.0.1',
@@ -104,7 +108,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG',True)
 
-if DEBUG and not (isinstance(DEBUG,str) and DEBUG.lower()=="false"):
+if DEBUG and DEBUG!="False":
     with open(os.path.join(BASE_DIR, 'trading_bot/etc/DJANGO_SECRET')) as f:
         SECRET_KEY = f.read().strip()
     with open(os.path.join(BASE_DIR, 'trading_bot/etc/DB_SECRET')) as f:
@@ -172,7 +176,7 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':  os.getenv('POSTGRES_DB','migdb'),
+        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb2024'),
         'USER': DB_USER,
         'PASSWORD': DB_SECRET_KEY,
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
@@ -308,4 +312,5 @@ LOGGING = {
     },
 }
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 100000
 

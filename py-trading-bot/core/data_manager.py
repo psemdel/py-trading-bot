@@ -134,28 +134,43 @@ def retrieve_data_sub(
 def retrieve_debug(
         stock_symbols: list,
         symbol_index: str,
-        period: str,
-        it_is_index: bool=False
+        period: str
         ):
     '''
-    To find which stock was delisted
+    To find which stock was delisted, by checking the last values
     
     Arguments
     ----------
        stock_symbols: list of YF tickers to be downloaded for the stocks
        symbol_index: YF ticker of the index
        period: period in which we want to have the data
-       it_is_index: is it indexes that are provided
     '''    
-    symbols=stock_symbols+[symbol_index]
-    data_all=vbt.YFData.fetch(symbols, period=period)
-
-    nb_nan={}
-    for c in data_all.get('Open').columns:
-        nb_nan[c]=np.count_nonzero(np.isnan(data_all.get('Open')[c]))
+    try:
+        symbols=stock_symbols+[symbol_index]
+        data_all=vbt.YFData.fetch(symbols, period=period)
+        threshold=2
+        nb_nan={}
+        problem_txt=""
         
-    nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
-    print("Number of nan in each column: "+str(nb_nan))
+        for c in data_all.get('Open').columns:
+            nb_nan[c]=np.count_nonzero(np.isnan(data_all.get('Open')[c])[-20:])  
+            
+            if nb_nan[c]>threshold:
+                problem_txt+=c+" data contains "+str(nb_nan[c])+" nan, check if it has been delisted!"
+            
+        nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
+        print("Number of nan in each column: "+str(nb_nan))
+        return problem_txt
+    except:
+        print("exception")
+        symbols=stock_symbols+[symbol_index]
+        for s in symbols:
+            try:
+               data_all=vbt.YFData.fetch(s, period=period) 
+            except:
+               return "problem by downloading "+s
+        return ""
+   
 
 if __name__ == '__main__':
     '''

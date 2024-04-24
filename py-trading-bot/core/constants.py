@@ -364,7 +364,8 @@ Delisting date of the stocks if relevant
 '''
 NASDAQ_DELIST={
     "ATVI":"2023-10-20",
-    "SGEN":"2023-12-15"
+    "SGEN":"2023-12-15",
+    "SPLK":"2024-03-19"
     }
 
 '''

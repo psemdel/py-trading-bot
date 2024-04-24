@@ -33,7 +33,7 @@ from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,
                           pf_retrieve_all,exchange_to_index_symbol,\
                           get_exchange_actions, action_to_short, ActionSector
                  
-from core import caller
+from core import caller, data_manager
 
 from trading_bot.settings import _settings
 from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
@@ -47,6 +47,15 @@ This file contains the logic for:
  - Send message after each order
 '''
 logging.basicConfig(level=logging.INFO)  
+
+class TelegramBotCustom(telegram_sub.TelegramBot):
+    def __init__(self, giphy_kwargs= None, **kwargs) -> None:
+        super().__init__(giphy_kwargs=giphy_kwargs,**kwargs)
+            
+    @property
+    def custom_handlers(self):
+        return (CommandHandler('test', self.send_message_to_all("test")),)
+
 '''
 Start the bot in the background
 '''    
@@ -66,10 +75,11 @@ def async_sched(self,
                 ): 
     #note: only serializable data can be sent to async task
     #TelegramBot without change here
-    bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN) #normally vbt.TelegramBot should be sufficient
+    bot=TelegramBotCustom(token=TELEGRAM_TOKEN)
+    #bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN) #normally vbt.TelegramBot should be sufficient
     bot.start(in_background=True)
     MyScheduler(bot)
-
+    
 def stop(bot, sched):
     bot.stop()
     sched.stop()    
@@ -85,7 +95,6 @@ class MyScheduler():
         '''
         self.manager = vbt.ScheduleManager()
         self.telegram_bot=telegram_bot
-        
         #Settings
         self.update_ss=True
         self.cleaning=True
@@ -101,6 +110,9 @@ class MyScheduler():
                 self.do_weekday(report_time,self.daily_report,s_ex=s_ex) 
             if _settings["INTRADAY"]:
                 self.manager.every(_settings["TIME_INTERVAL_INTRADAY"], 'minutes').do(self.daily_report,s_ex=s_ex,intraday=True)
+            if _settings["CHECK_DELISTED"]:
+                report_time=self.shift_time(s_ex.closing_time,-(_settings["DAILY_REPORT_MINUTE_SHIFT"]+5),s_ex.timezone) #5 minutes before writting report
+                self.do_weekday(report_time,self.check_nan,s_ex=s_ex) 
                 
         if _settings["PF_CHECK"]:
             self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf)
@@ -481,6 +493,7 @@ class MyScheduler():
                 st=Strategy.objects.get(name=j.strategy.name)
                 pr=caller.name_to_ust_or_presel(
                     st.class_name, 
+                    st.ml_model_name,
                     str(j.period_year)+"y",
                     prd=True, 
                     actions=actions,
@@ -507,6 +520,32 @@ class MyScheduler():
         tz: name of the timezone
         '''
         return (datetime.combine(date(1,1,1),d)+timedelta(minutes=m)).time().replace(tzinfo=ZoneInfo(tz))
+
+    def check_nan(
+            self,
+            s_ex: StockEx,
+            **kwargs):
+            '''
+            Check if symbol have been delisted
+            
+            Arguments
+           	----------
+               s_ex: stock exchange from which the stocks need to be covered
+            '''  
+            exchange=s_ex.name
+            
+            if exchange is not None:
+                s_ex=StockEx.objects.get(name=exchange)
+                actions=get_exchange_actions(exchange)
+                actions_list=[a.symbol for a in actions]
+                
+                problem_txt=data_manager.retrieve_debug( 
+                    actions_list,
+                    s_ex.main_index.symbol,
+                    "3y")
+                
+                if problem_txt!="":
+                    self.telegram_bot.send_message_to_all(problem_txt)
 
 def cleaning_sub():
     alerts=Alert.objects.filter(active=True)
