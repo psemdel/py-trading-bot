@@ -246,7 +246,26 @@ def get_ratio(action):
         return rel_dif(cours_pres,cours_ref)*100
     else:
         return 0
-         
+
+def get_VIX():
+    '''
+    Return the last version of the VIX index, which should not evolve so quickly, there is no point fetching it every 2 min
+    It is saved as global
+    '''
+    if _settings["LAST_VIX"] is None:
+        update_VIX()
+    return _settings["LAST_VIX"]
+
+def update_VIX():
+    '''
+    Update the VIX index value
+    '''
+    try:
+        data=vbt.YFData.fetch(["^VIX"], period="1d")
+        _settings["LAST_VIX"]=data.get("Close")["^VIX"].values[0]
+    except Exception as e:
+        logger.error(e, stack_info=True, exc_info=True)
+
 #Place order
 def place(
         buy: bool,
@@ -1155,8 +1174,11 @@ class OrderPerformer():
         '''
         Main function to place a buy order
         '''
-        self.check_auto_manual( _settings["PERFORM_ORDER"]["buy"],**kwargs)
-        return self.buy_order_sub()
+        if get_VIX()>_settings["VIX_SELL_ALL_THRESHOLD"]:
+            return False
+        else:
+            self.check_auto_manual( _settings["PERFORM_ORDER"]["buy"],**kwargs)
+            return self.buy_order_sub()
     
     @connect_ib     
     def sell_order(self,**kwargs):

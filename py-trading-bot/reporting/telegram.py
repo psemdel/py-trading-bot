@@ -28,10 +28,11 @@ else:
 from reporting.models import Report, Alert, OrderExecutionMsg 
 from telegram.ext import CommandHandler
 
-from orders.ib import actualize_ss, get_last_price, get_ratio
+from orders.ib import actualize_ss, get_last_price, get_ratio, get_VIX, update_VIX
 from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,\
                           pf_retrieve_all,exchange_to_index_symbol,\
-                          get_exchange_actions, action_to_short, ActionSector
+                          get_exchange_actions, action_to_short, ActionSector,\
+                          filter_intro_action
                  
 from core import caller, data_manager
 
@@ -118,6 +119,9 @@ class MyScheduler():
             self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf)
         if _settings["INDEX_CHECK"]:
             self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf,it_is_index=True)
+        if _settings["CHECK_VIX"]:
+            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_VIX)
+            
         if _settings["HEARTBEAT"]: # to test if telegram is working ok
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
         if _settings["HEARTBEAT_IB"]:
@@ -355,16 +359,16 @@ class MyScheduler():
             if self.check_stock_ex_open_from_action(action):
                 c1 = Q(action=action)
                 c2 = Q(active=True)
-                order=Order.objects.filter(c1 & c2)
+                orders=Order.objects.filter(c1 & c2)
                 auto=True
                 today=timezone.now().strftime('%Y-%m-%d')
                 
-                if len(order)>0:
+                if len(orders)>0:
                     if auto:
                         txt="Sell order sent for "+action.symbol
                     else:
                         txt="Manual sell order requested for "+action.symbol
-                    o=order[0]
+                    o=orders[0]
                     e=o.entering_date.strftime('%Y-%m-%d')
                     if e<today: #avoid exiting order performed today
                         if o.sl_threshold is not None:
@@ -387,7 +391,62 @@ class MyScheduler():
                                 r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
                                 r.ss_m.resolve()
                                 self.telegram_bot.send_message_to_all(txt+", daily stop loss")
-           
+                                
+    def check_VIX(self):
+        try:
+            update_VIX()
+            a=Action.objects.get(symbol="^VIX")
+            c1 = Q(action=a)
+            c2 = Q(active=True)
+            alerts=Alert.objects.filter(c1 & c2)
+            alerting=False
+            if get_VIX()>_settings["VIX_ALERT_THRESHOLD"]:
+                alerting=True
+                
+            if len(alerts)==0:
+                if alerting:
+                    alert=Alert(action=a,alarm=True, short=False,\
+                                trigger_date=timezone.now(),\
+                                opportunity=False)
+                    alert.save()
+                    self.telegram_bot.send_message_to_all("VIX index exceeds "+str(_settings["VIX_ALERT_THRESHOLD"])+"! There may be a crash")
+            else:
+                if not alerting:
+                    this_alert=alerts[0]
+                    this_alert.active=False
+                    this_alert.alarm=False
+                    this_alert.recovery_date=timezone.now()
+                    this_alert.save()
+                    self.telegram_bot.send_message_to_all("Recovery, VIX index")
+  
+            if get_VIX()>_settings["VIX_SELL_ALL_THRESHOLD"]:
+                self.telegram_bot.send_message_to_all("VIX index exceeds "+str(_settings["VIX_SELL_ALL_THRESHOLD"])+"! All positions will be closed.")
+                self.sell_all()
+    
+        except Exception as e:
+            logger.error(e, stack_info=True, exc_info=True)
+            pass
+        
+    def sell_all(self):
+        '''
+        Sell all stocks
+        '''
+        r=Report.objects.create()
+        actions=pf_retrieve_all()
+        for a in actions:
+            c1 = Q(action=a)
+            c2 = Q(active=True)
+            orders=Order.objects.filter(c1 & c2)            
+            if len(orders)>0:
+                o=orders[0]
+                strategy=o.strategy
+            else:
+                print("no order found fallback on none")
+                strategy="none"
+            
+            r.ss_m.add_target_quantity(a.symbol, strategy, 0)
+        r.ss_m.resolve()
+    
     def send_order(self,
                    report: Report
                    ):
@@ -533,19 +592,21 @@ class MyScheduler():
                s_ex: stock exchange from which the stocks need to be covered
             '''  
             exchange=s_ex.name
-            
+
             if exchange is not None:
                 s_ex=StockEx.objects.get(name=exchange)
                 actions=get_exchange_actions(exchange)
+                actions=filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
                 actions_list=[a.symbol for a in actions]
                 
-                problem_txt=data_manager.retrieve_debug( 
-                    actions_list,
-                    s_ex.main_index.symbol,
-                    "3y")
-                
-                if problem_txt!="":
-                    self.telegram_bot.send_message_to_all(problem_txt)
+                if s_ex.main_index is not None:
+                    problem_txt=data_manager.retrieve_debug( 
+                        actions_list,
+                        s_ex.main_index.symbol,
+                        "3y")
+                    
+                    if problem_txt!="":
+                        self.telegram_bot.send_message_to_all(problem_txt)
 
 def cleaning_sub():
     alerts=Alert.objects.filter(active=True)

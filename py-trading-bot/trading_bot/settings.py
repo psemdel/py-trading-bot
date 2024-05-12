@@ -12,6 +12,7 @@ _settings={
 "HEARTBEAT_IB":False, # to test telegram, note ["USED_API_DEFAULT"]["alerting] must be set to IB otherwise, it makes no sense.
 "UPDATE_SLOW_STRAT":True, 
 "CHECK_DELISTED":True, #check if some tickers have been delisted
+"CHECK_VIX":True,
 
 "ALERT_THRESHOLD":3, #in %
 "ALARM_THRESHOLD":5, #in %
@@ -64,6 +65,9 @@ _settings={
 "STOCH_LL":20,
 "STOCH_LU":80,
 "BBAND_THRESHOLD":0.15,
+"VIX_ALERT_THRESHOLD":40,
+"VIX_SELL_ALL_THRESHOLD":45,
+"LAST_VIX":None,
 
 "CALCULATE_PATTERN":True, #pattern calculation is time consuming
 "CALCULATE_TREND":True,   #trend calculation is time consuming
