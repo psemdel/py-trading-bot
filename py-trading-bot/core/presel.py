@@ -8,6 +8,7 @@ Created on Sat May 14 22:36:16 2022
 import vectorbtpro as vbt
 import pandas as pd
 import numpy as np
+import numbers
 
 from core import strat
 from core.strat import StratHold
@@ -15,7 +16,7 @@ from core.macro import VBTMACROTREND, VBTMACROTRENDPRD
 import core.indicators as ic
 #from core.common import save_vbt_both
 from core.constants import short_to_sign, short_to_str
-from core.common import candidates_to_YF, remove_multi
+from core.common import candidates_to_YF, remove_multi, vix_blocked_interval
 
 from trading_bot.settings import _settings
 import logging
@@ -55,6 +56,7 @@ class Presel():
             grow=None,
             exchange:str=None,
             st=None,
+            vix_threshold: numbers.Number=None,
             ):
         """
         Strategies on one action, no preselection. For production and non production, to make the strats as child of the main one.
@@ -80,14 +82,15 @@ class Presel():
             divergence: divergence signal
             rsi: RSI signal
             exchange: stock exchange name
-            st: strategy associated
+            st: strategy associated,
+            vix_threshold: threshold of the VIX index that if exceeded should lead to selling (blocking)
         """
         self.suffix=suffix
         if self.suffix!="":
             self.suffix="_" + self.suffix
             
         for k in ["prd","symbol_index","period","vol","actions","symbols","macd_tot","macro_trend_ind","macro_trend_ind_mod",
-                  "macro_trend_select", "dur", "divergence", "rsi", "grow","exchange","st"]:
+                  "macro_trend_select", "dur", "divergence", "rsi", "grow","exchange","st","vix_threshold"]:
             setattr(self,k,locals()[k])
 
         if input_ust is not None:
@@ -383,6 +386,14 @@ class Presel():
         else:
             raise ValueError("both sorted and sorted_df are None")
     
+    def vix_block(self):
+        '''
+        If the VIX index is above a certain value, all stocks are sold
+        '''
+        if self.vix_threshold is not None:           
+            intervals=vix_blocked_interval(self.vix_threshold)
+            for inter in intervals:
+                self.exits[(self.exits.index>=inter["start"])&(self.exits.index<=inter["end"])]=True #for all symbols
     def run(self,skip_underlying:bool=False,**kwargs):
         '''
         Main function for presel
@@ -405,7 +416,8 @@ class Presel():
                     self.presub(i)
                     self.out=self.sub(i,**kwargs)
                     self.calculate(i,**kwargs)
-            
+            self.vix_block()
+   
         except:
               print(traceback.format_exc())
               
@@ -545,7 +557,8 @@ class PreselMacro(Presel):
                     self.calculate(i,short=False,**kwargs)
                 else: #self.blocked_im
                     self.calculate(i,short=short,**kwargs)
-                    
+            self.vix_block()
+   
         return short #to be removed later
 
 class PreselVol(Presel):

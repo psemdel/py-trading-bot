@@ -9,7 +9,7 @@ import vectorbtpro as vbt
 import numpy as np
 import numbers
 
-from core.common import save_vbt_both, remove_multi, intersection
+from core.common import save_vbt_both, remove_multi, intersection,  vix_blocked_interval
 import core.indicators as ic
 from core.macro import VBTMACROFILTER, VBTMACROMODE, VBTMACROTREND, VBTMACROTRENDPRD, major_int
 from core.constants import BEAR_PATTERNS, BULL_PATTERNS
@@ -349,6 +349,8 @@ class UnderlyingStrat():
                  strat_arr: dict=None,
                  exchange:str=None,
                  st=None,
+                 vix_threshold: numbers.Number=None,
+                 vix_short_threshold: numbers.Number=None,
                  ):
         """
         Strategies on one action, no preselection. For production and non production, to make the strats as child of the main one.
@@ -370,11 +372,13 @@ class UnderlyingStrat():
             strat_arr: dict of the strategy combination to use
             exchange: stock exchange, only for saving
             st: strategy associated
+            vix_threshold: threshold of the VIX index that if exceeded should lead to selling
+            vix_short_threshold: threshold of the VIX index that if exceeded should lead to buying stocks in short
         """
         self.suffix=suffix
         if self.suffix!="":
             self.suffix="_" + self.suffix
-        for k in ["prd","period","symbol_index", "actions","symbols","exchange","st"]:
+        for k in ["prd","period","symbol_index", "actions","symbols","exchange","st","vix_threshold","vix_short_threshold"]:
             if locals()[k] is None and input_ust is not None:
                 setattr(self,k, getattr(input_ust,k))
             else:
@@ -593,7 +597,16 @@ class UnderlyingStrat():
         if "bull" in self.strat_arr:
             self.run_macro()
         else:
-            self.run_simple()        
+            self.run_simple()       
+        
+        if self.vix_threshold is not None:           
+            intervals=vix_blocked_interval(self.vix_threshold)
+            for inter in intervals:
+                self.exits[(self.exits.index>=inter["start"])&(self.exits.index<=inter["end"])]=True
+        if self.vix_short_threshold is not None:           
+            intervals=vix_blocked_interval(self.vix_short_threshold)
+            for inter in intervals:
+                self.entries_short[(self.entries_short.index>=inter["start"])&(self.entries_short.index<=inter["end"])]=True
 ########## Strats ##############
 # Example of simple strategy for pedagogic purposes
 class StratHold(UnderlyingStrat):
