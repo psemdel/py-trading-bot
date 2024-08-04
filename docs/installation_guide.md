@@ -120,6 +120,9 @@ I would recommend to leave TIME_ZONE = 'UTC' except if you know what you are doi
 # Import the dump (optional)
 Reimport the dump file using "python manage.py loaddata dump.json" to fill your database with some financial products: CAC40, DAX, Nasdaq100 and S&P 500.
 
+# Start IB (if applicable)
+Start interactive broker, if you want to trade with it. This step is optional.
+
 # Start the bot
 Click on start_bot.sh
 
