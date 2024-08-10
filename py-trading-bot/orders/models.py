@@ -61,6 +61,7 @@ def check_ib_permission(symbols: list, verbose: bool=True):
                 if _settings["USED_API"][k]=="": 
                     _settings["USED_API"][k]="IB"
             else:
+                _settings["USED_API"][k]="IB"            
                 for symbol in symbols:
                     if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
                         if verbose:
@@ -74,6 +75,7 @@ def check_ib_permission(symbols: list, verbose: bool=True):
                             logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
                         _settings["USED_API"][k]="YF"
                         break
+                  
         elif v=="YF":
             _settings["USED_API"][k]=v
     
