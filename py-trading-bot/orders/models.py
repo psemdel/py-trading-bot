@@ -56,12 +56,8 @@ def check_ib_permission(symbols: list, verbose: bool=True):
         if v in ["CCXT","MT5","TS"]:
             _settings["USED_API"][k]=v
         elif v=="IB":
-            if symbols is None:
-                #then populate only if it is empty
-                if _settings["USED_API"][k]=="": 
-                    _settings["USED_API"][k]="IB"
-            else:
-                _settings["USED_API"][k]="IB"            
+            _settings["USED_API"][k]="IB"
+            if symbols is not None: #symbol none -> clear
                 for symbol in symbols:
                     if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
                         if verbose:
@@ -75,7 +71,6 @@ def check_ib_permission(symbols: list, verbose: bool=True):
                             logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
                         _settings["USED_API"][k]="YF"
                         break
-                  
         elif v=="YF":
             _settings["USED_API"][k]=v
     

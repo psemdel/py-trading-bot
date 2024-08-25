@@ -41,6 +41,7 @@ class TestOrders(TestCase):
         self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=False)
+        self.e5=m.StockEx.objects.create(name="NASDAQ",fees=f,ib_ticker="NASDAQ",main_index=None,ib_auth=False)
         c=m.Currency.objects.create(name="euro")
         self.c=c
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
@@ -117,7 +118,16 @@ class TestOrders(TestCase):
             ) 
         
         self.e2.main_index=self.a6
-        self.e2.save()        
+        self.e2.save()    
+        
+        self.a7=m.Action.objects.create(
+            symbol='AAPL',
+            name='Apple',
+            stock_ex=self.e5,
+            currency=c,
+            category=cat,
+            sector=self.s
+            ) 
 
         self.actions=[self.a, self.a2, self.a3]
         m.Excluded.objects.create(name="all",strategy=self.strategy)
@@ -210,27 +220,98 @@ class TestOrders(TestCase):
             "alerting": "", 
             "reporting": "", 
             }
-        m.check_ib_permission(None)    
+        m.check_ib_permission(None)    #None copy
         self.assertEqual(_settings["USED_API"]["orders"],"IB")
         self.assertEqual(_settings["USED_API"]["alerting"],"IB")
         self.assertEqual(_settings["USED_API"]["reporting"],"YF")
         
-    def test_check_ib_permission2(self):
-        _settings["USED_API_DEFAULT"]={
-            "orders": "CCXT", 
-            "alerting": "MT5", 
-            "reporting": "TS", 
+        m.check_ib_permission(["AI.PA","AC.PA"]) #Paris has auth
+        self.assertEqual(_settings["USED_API"]["orders"],"IB")
+        self.assertEqual(_settings["USED_API"]["alerting"],"IB")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF")
+
+        m.check_ib_permission(["AAPL"]) #Paris has auth
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
+        self.assertEqual(_settings["USED_API"]["alerting"],"YF")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF")
+        
+        
+        
+        #reset before or not should not have influence
+        _settings["USED_API"]={
+            "orders": "", 
+            "alerting": "", 
+            "reporting": "", 
             }
+        m.check_ib_permission(None)    #None copy
+        self.assertEqual(_settings["USED_API"]["orders"],"IB")
+        self.assertEqual(_settings["USED_API"]["alerting"],"IB")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF")
+        
+        _settings["USED_API"]={
+            "orders": "", 
+            "alerting": "", 
+            "reporting": "", 
+            }        
+        
+        m.check_ib_permission(["AI.PA","AC.PA"]) #Paris has auth
+        self.assertEqual(_settings["USED_API"]["orders"],"IB")
+        self.assertEqual(_settings["USED_API"]["alerting"],"IB")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF") 
+        
+        _settings["USED_API"]={
+            "orders": "", 
+            "alerting": "", 
+            "reporting": "", 
+            }        
+                
+        m.check_ib_permission(["AAPL"]) #Paris has auth
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
+        self.assertEqual(_settings["USED_API"]["alerting"],"YF")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF")        
+        
+        _settings["IB_STOCK_NO_PERMISSION"]=["AI.PA"]
+        m.check_ib_permission(["AI.PA","AC.PA"]) #Paris has auth    
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
+        self.assertEqual(_settings["USED_API"]["alerting"],"YF")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF")  
+        
         _settings["USED_API"]={
             "orders": "", 
             "alerting": "", 
             "reporting": "", 
             }
         
-        m.check_ib_permission(["AI","AC"])    
+        m.check_ib_permission(["AI.PA","AC.PA"]) #Paris has auth    
+        self.assertEqual(_settings["USED_API"]["orders"],"YF")
+        self.assertEqual(_settings["USED_API"]["alerting"],"YF")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF")  
+        
+        _settings["USED_API_DEFAULT"]={
+            "orders": "CCXT", 
+            "alerting": "MT5", 
+            "reporting": "TS", 
+            }
+        
+        m.check_ib_permission(["AI.PA","AC.PA"])    
+        self.assertEqual(_settings["USED_API"]["orders"],"CCXT")
+        self.assertEqual(_settings["USED_API"]["alerting"],"MT5")
+        self.assertEqual(_settings["USED_API"]["reporting"],"TS")          
+ 
+        _settings["USED_API"]={
+            "orders": "", 
+            "alerting": "", 
+            "reporting": "", 
+            }
+
+        m.check_ib_permission(["AI.PA","AC.PA"])    
         self.assertEqual(_settings["USED_API"]["orders"],"CCXT")
         self.assertEqual(_settings["USED_API"]["alerting"],"MT5")
         self.assertEqual(_settings["USED_API"]["reporting"],"TS")      
+
+
+
+
 
         
         

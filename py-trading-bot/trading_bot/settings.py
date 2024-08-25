@@ -25,6 +25,13 @@ _settings={
 "DAILY_REPORT_MINUTE_SHIFT":15,
 
 ## Order settings ##
+'''
+USED_API is handled as a global variable, it is not supposed to change often during the bot execution.
+USED_API_DEFAULT is the wanted value, USED_API is the evaluated value
+For instance, if you want (default) alerting with IB, but not all your symbols have the rights on IB, then YF will be used. 
+Another behavior would mean that the symbol without rights, would not be covered by the alerting
+'''
+
 "USED_API_DEFAULT":{
     "orders": os.environ.get("USED_API_FOR_ORDER_PERF","IB"), #"IB", "MT5", "TS" or "CCXT" (YF does not allow performing orders)
     "alerting":os.environ.get("USED_API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5", "TS" or "CCXT"
