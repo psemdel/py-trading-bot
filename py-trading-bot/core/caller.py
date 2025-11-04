@@ -11,6 +11,8 @@ try:
 except ImportError:
     ml_loaded=False
 
+print("ml loaded " + str(ml_loaded))
+
 from core import strat, strat_legacy, presel
 import sys
 
@@ -23,6 +25,8 @@ def name_to_ust_or_presel(
         **kwargs):
     '''
     Function to call class from strat or presel
+    
+    ml_model_name and ust_or_presel_name are separated as it is saved in the DB and both fields could be filled
 
     Arguments
     ----------
@@ -47,8 +51,11 @@ def name_to_ust_or_presel(
                         nb=int(ust_or_presel_name[8:])
                         pr=presel.PreselWQ(period,nb=nb,st=st,**kwargs)
                     elif ust_or_presel_name[6:8].lower()=="ml":
-                        PR=getattr(ml,ust_or_presel_name)
-                        pr=PR(period,st=st,**kwargs)
+                        if ml_loaded:
+                            PR=getattr(ml,ust_or_presel_name)
+                            pr=PR(period,st=st,**kwargs)
+                        else:
+                            raise ValueError("Ml strategies are called, but ml is not present")
                     else:
                         PR=getattr(presel,ust_or_presel_name)
                         pr=PR(period,st=st,**kwargs)

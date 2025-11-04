@@ -42,7 +42,7 @@ def save_data(
        end_date: end date for the download
     '''
     symbols=stock_symbols+[symbol_index]
-    data=vbt.YFData.fetch(symbols,start=start_date,end=end_date,\
+    data=vbt.YFData.pull(symbols,start=start_date,end=end_date,\
                              timeframe='1d')
 
     #knowing what we drop
@@ -57,7 +57,7 @@ def save_data(
             print("dropping at least " + str(close.index[ii]))
             
     #print(close.columns[7])            
-    data=vbt.YFData.fetch(symbols,start=start_date,end=end_date,\
+    data=vbt.YFData.pull(symbols,start=start_date,end=end_date,\
                                  timeframe='1d',missing_index="drop")   
     BASE_DIR = Path(__file__).resolve().parent.parent
     data.to_hdf(path_or_buf=os.path.join(BASE_DIR,'saved_cours/'+selector.upper()+'_period.h5'))
@@ -75,7 +75,7 @@ def retrieve_data_offline(
        symbol_index: YF ticker of the index
        period: period in which we want to have the data
     '''
-    data_all=vbt.HDFData.fetch(os.path.join(BASE_DIR,'saved_cours/'+symbol_index+'_' + period+'.h5'))
+    data_all=vbt.HDFData.pull(os.path.join(BASE_DIR,'saved_cours/'+symbol_index+'_' + period+'.h5'))
     retrieve_data_sub(o, data_all)
 
 ### Online retrieval for backtesting purpose, it is downloaded everytime then
@@ -99,7 +99,7 @@ def retrieve_data_live(
        it_is_index: is it indexes that are provided
     '''
     symbols=stock_symbols+[symbol_index]
-    data_all=vbt.YFData.fetch(symbols, period=period,missing_index='drop')
+    data_all=vbt.YFData.pull(symbols, period=period,missing_index='drop')
     retrieve_data_sub(o, data_all, it_is_index=it_is_index)
 
 def retrieve_data_sub(
@@ -148,14 +148,14 @@ def retrieve_debug(
        it_is_index: is it indexes that are provided
     '''    
     symbols=stock_symbols+[symbol_index]
-    data_all=vbt.YFData.fetch(symbols, period=period)
+    data_all=vbt.YFData.pull(symbols, period=period)
 
     nb_nan={}
     for c in data_all.get('Open').columns:
         nb_nan[c]=np.count_nonzero(np.isnan(data_all.get('Open')[c]))
         
     nb_nan=sorted(nb_nan.items(), key=lambda tup: tup[1],reverse=True)
-    print("Number of nan in each column: "+str(nb_nan))
+    print("Number of nan in each column: "+str(int(nb_nan)))
 
 if __name__ == '__main__':
     '''
@@ -168,9 +168,9 @@ if __name__ == '__main__':
     '''
     import constants
     
-    selector="NASDAQ"
-    start_date='2007-01-01'
-    end_date='2024-01-03'
+    selector="CAC40"
+    start_date='2020-01-01'
+    end_date='2025-11-02'
     
     if selector=="CAC40":
         all_symbols=constants.CAC40
@@ -228,3 +228,4 @@ if __name__ == '__main__':
             new_list.append(s)
 
     save_data(selector,index,new_list, start_date, end_date)
+

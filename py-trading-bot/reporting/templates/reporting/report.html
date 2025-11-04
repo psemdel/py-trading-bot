@@ -59,7 +59,7 @@
                 <td class="false">{{ar.stoch_ex}}</td> 
             {% endif %}
             
-            <td>{{ar.stoch}}</td> 
+            <td>{{ar.stoch|floatformat:2 }}</td> 
             
             {% if ar.ma_ent %}
                 <td class="true">{{ar.ma_ent}}</td> 

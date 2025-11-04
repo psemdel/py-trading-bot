@@ -1,5 +1,5 @@
 # Pre-requisites
-For this installation, it is assumed that python with a version >3.8, git and pip are already installed.
+For this installation, it is assumed that python with version 3.12, git and pip are already installed.
 
 * [Python >= 3.8.x](http://docs.python-guide.org/en/latest/starting/installation/)
 * [pip](https://pip.pypa.io/en/stable/installing/)
@@ -18,16 +18,15 @@ Note: it is clearly imaginable to use the bot with the basic version of vbt, but
 
 It will install some other dependencies needed for the bot, for instance: pandas, numpy, python-telegram-bot and TA-Lib. 
 
-# Django
-Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt. Note that you can comment out the keras installation, if you don't want to use the machine learning functions.
-
-    sh
-    pip install -r requirements.txt
-
 # Clone from git
 Pull the project from git:
 
     git clone https://github.com/psemdel/py-trading-bot.git
+
+# Django
+Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt. Note that you can comment out the keras installation, if you don't want to use the machine learning functions.
+
+    pip install -r requirements.txt
 
 # Database
 You can perfectly use SQlite as Database, then go in trading_bot/settings.py and replace DATABASES through this snippet. Then there is no preliminary steps.

@@ -121,7 +121,7 @@ CAC40=[
     "SAN.PA",
     "SGO.PA",
     "SLB.PA",
-    "STLA.PA", 
+   # "STLA.PA",  #too short in it
     "STMPA.PA",
     "SU.PA",
     "SW.PA",

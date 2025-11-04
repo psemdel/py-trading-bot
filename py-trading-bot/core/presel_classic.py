@@ -76,7 +76,7 @@ class PreselClassic(Presel):
     
     #still slow
     def expand_alloc(self,idx_arr, allocations):
-        expanded_allocations = self.pf_opt.wrapper.fill(0, group_by=False)
+        expanded_allocations = self.pf_opt.wrapper.fill(0.0, group_by=False)
         idx=0
     
         for ii in range(np.shape(expanded_allocations)[0]):
@@ -134,9 +134,9 @@ class PreselClassic(Presel):
 
     def apply_underlying_strat(self, strat_name):
         if "ust" in self.__dir__(): #for handle "live" strategy
-            self.ust_classic=name_to_ust_or_presel(strat_name,self.period, input_ust=self.ust)
+            self.ust_classic=name_to_ust_or_presel(strat_name,None,self.period, input_ust=self.ust)
         else:
-            self.ust_classic=name_to_ust_or_presel(strat_name,self.period, symbol_index=self.symbol_index)
+            self.ust_classic=name_to_ust_or_presel(strat_name,None,self.period, symbol_index=self.symbol_index)
 
         self.fill_allocations_underlying()
         

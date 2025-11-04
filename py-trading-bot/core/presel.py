@@ -668,7 +668,7 @@ class PreselRetard(Presel):
         
         v={}   
         for symbol in self.close.columns.values:
-            v[symbol]=self.dur.loc[i,symbol]
+            v[symbol]=int(self.dur.loc[i,symbol])
             if symbol in self.excluded: #if exclude take the next
                 if v[symbol]==0: #trend change
                     self.excluded.remove(symbol)
