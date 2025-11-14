@@ -5,12 +5,23 @@ For this installation, it is assumed that python with version 3.12, git and pip 
 * [pip](https://pip.pypa.io/en/stable/installing/)
 * [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
+# Set up your venv (optional)
+Set up your virtual environment with the tool of your choice.
+
+Adapt the first line of start_bot.sh depending on your venv settings:
+
+```
+#start your venv
+source <your path>/Anaconda/bin/activate
+conda activate <venv name>
+```
+
 # Vectorbt
 The bot requires [vectorbt](https://vectorbt.dev/) in its [pro version](https://vectorbt.pro/) (requires fee). Install it with:
 
 - Vectorbtpro
 
-```sh
+```
 pip install -U "vectorbtpro"
 ```
 
@@ -123,6 +134,9 @@ Reimport the dump file using "python manage.py loaddata dump.json" to fill your 
 Start interactive broker, if you want to trade with it. This step is optional.
 
 # Start the bot
+
+
+
 Click on start_bot.sh
 
 I recommend to open it in a terminal, so you can see the console messages and can close it more easily. Don't open several instances of the bot at the same times, it does not work!

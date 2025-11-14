@@ -10,7 +10,7 @@ from vectorbtpro.data.custom import RemoteData
 from vectorbtpro import _typing as tp
 import warnings
 import math
-from ib_insync import MarketOrder, util, Forex, Option
+from ib_async import MarketOrder, util, Forex, Option
 from core.indicators import rel_dif
 from django.db.models import Q
 from django.utils import timezone
@@ -303,8 +303,9 @@ def connect_ib(func):
     return wrapper
 
 class IBData(RemoteData):
-    def __init__(self):
-        self.resolve_client(None)
+    #def __init__(self, **kwargs):
+    #    self.resolve_client(None)
+    #    super.__init__(**kwargs)
     
     @classmethod
     def connect(cls):
@@ -317,6 +318,7 @@ class IBData(RemoteData):
                 except:                    
                     clientID+=1
                     pass
+                
         if cls.client.isConnected():
             ib_global["connected"]=True
         else:
@@ -327,7 +329,7 @@ class IBData(RemoteData):
             cls, 
             client: tp.Optional[tp.Any] = None, 
             **client_config) -> tp.Any:
-        from ib_insync import IB
+        from ib_async import IB
         import asyncio
 
         if client is None and "cls.client" not in locals(): #create a new connection
@@ -337,7 +339,9 @@ class IBData(RemoteData):
                 
                 cls.client=IB()
                 cls.connect()
+
                 ib_global["client"]=cls.client
+                
             else:
                 cls.client=ib_global["client"]
         elif client is not None:
@@ -348,6 +352,7 @@ class IBData(RemoteData):
         else:
             ib_global["connected"]=False
         
+        print("finish")
         return cls.client
 
     @classmethod
@@ -362,6 +367,7 @@ class IBData(RemoteData):
         timeframe: tp.Optional[str] = None,
         it_is_indexes: tp.Optional[dict] = None,
         exchanges: tp.Optional[dict] = None,
+        currencies: tp.Optional[dict] = None
         ) -> tp.Any:
         """
         Download data for a symbol from IB
@@ -373,7 +379,7 @@ class IBData(RemoteData):
         exchanges: dict containing the stock exchange name associated to the symbol
         
         """
-        from ib_insync import util
+        from ib_async import util
         
         exchange="SMART" #default
         if exchanges is not None:
@@ -383,14 +389,19 @@ class IBData(RemoteData):
         it_is_index=False
         if it_is_indexes is not None:
             if symbol in it_is_indexes:
-                it_is_index=it_is_indexes[symbol]        
-        
+                it_is_index=it_is_indexes[symbol]  
+                
+        currency=None
+        if currencies is not None:
+            if symbol in currencies:
+                currency=currencies[symbol]
+
         if client_config is None:
             client_config = {}
         cls.resolve_client(client=client, **client_config)
 
         if ib_global["connected"]:
-            contract=cls.get_contract(symbol,exchange,it_is_index,None)
+            contract=cls.get_contract(symbol,exchange,it_is_index,currency=currency)
             #check period and timeframe
             bars = cls.client.reqHistoricalData(
                     contract,
@@ -456,7 +467,7 @@ class IBData(RemoteData):
             it_is_index: is it indexes that are provided
             currency: currency symbol
         """ 
-        from ib_insync import Stock, Index
+        from ib_async import Stock, Index
         
         if it_is_index:
             return Index(exchange=exchange_ib,symbol=symbol_ib)
