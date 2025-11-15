@@ -214,8 +214,7 @@ class Report(models.Model):
         
         Arguments
        	----------
-           symbols: list of YF ticker
-           symbols_to_YF: dictionary that converts a YF or IB ticker into a YF ticker
+           symbols: list of IB or YF ticker
            ust_hold, ust_trend, ust_kama, ust_ma: underlying strategies containing some calculation results 
            exchange: name of the stock exchange
         '''
@@ -227,6 +226,7 @@ class Report(models.Model):
                 with warnings.catch_warnings():
                     #Necessary because of the presence of NaN
                     warnings.simplefilter("ignore", category=RuntimeWarning)
+                    
                     ar=ActionReport(
                         action=Action.objects.get(symbol=symbols_to_YF[symbol]), 
                         report=Report.objects.get(pk=self.pk))
@@ -338,7 +338,7 @@ class Report(models.Model):
         it_is_index: is it indexes that are provided
         exchange: name of the stock exchange
         sec: sector of the stocks for which we write the report
-        symbols: list of YF symbols
+        symbols: list of IB or YF symbols
         sec: sector of the stocks for which we write the report
         intraday: is it a report at the end of the day or during it
         testing: set to True to perform unittest on the function
@@ -369,38 +369,39 @@ class Report(models.Model):
                 #Uses afterward as source for the data to avoid loading them several times
                 ust_hold=self.init_ust(actions, exchange,it_is_index=it_is_index, **kwargs)
 
-                if not intraday:
-                    ##Populate a report with different statistics
-                    ust_kama=ic.VBTSTOCHKAMA.run(ust_hold.high,ust_hold.low,ust_hold.close)
-                    ust_ma=ic.VBTMA.run(ust_hold.close)
+                if ust_hold is not None:#None show it crashed
+                    if not intraday:
+                        ##Populate a report with different statistics
+                        ust_kama=ic.VBTSTOCHKAMA.run(ust_hold.high,ust_hold.low,ust_hold.close)
+                        ust_ma=ic.VBTMA.run(ust_hold.close)
+        
+                        ust_trend=None
+                        if _settings["CALCULATE_TREND"]:
+                            ust_trend=name_to_ust_or_presel(
+                                "StratKamaStochMatrendMacdbbMacro",
+                                None,
+                                ust_hold.period,
+                                input_ust=ust_hold,
+                                prd=True
+                                )    
+        
+                        self.populate_report(ust_hold.symbols, ust_hold.symbols_to_YF, ust_hold,ust_trend, ust_kama, ust_ma)
+                        logger.info("Strat daily report written " +(exchange or ""))
+                  
+                    if sec is not None:
+                        self.sector=ActionSector.objects.get(name=sec) 
+                    self.save(testing=testing)
+                    
+                    self.perform(
+                            ust_hold,
+                            sec=sec,
+                            intraday=intraday,
+                            it_is_index=it_is_index,
+                            **kwargs)
     
-                    ust_trend=None
-                    if _settings["CALCULATE_TREND"]:
-                        ust_trend=name_to_ust_or_presel(
-                            "StratKamaStochMatrendMacdbbMacro",
-                            None,
-                            ust_hold.period,
-                            input_ust=ust_hold,
-                            prd=True
-                            )    
-    
-                    self.populate_report(ust_hold.symbols, ust_hold.symbols_to_YF, ust_hold,ust_trend, ust_kama, ust_ma)
-                    logger.info("Strat daily report written " +(exchange or ""))
-              
-                if sec is not None:
-                    self.sector=ActionSector.objects.get(name=sec) 
-                self.save(testing=testing)
-                
-                self.perform(
-                        ust_hold,
-                        sec=sec,
-                        intraday=intraday,
-                        it_is_index=it_is_index,
-                        **kwargs)
-
-                self.ss_m.resolve()
-                self.target_ss_by_st=self.ss_m.display_target_ss_by_st(it_is_index=it_is_index)
-                self.save(testing=testing)
+                    self.ss_m.resolve()
+                    self.target_ss_by_st=self.ss_m.display_target_ss_by_st(it_is_index=it_is_index)
+                    self.save(testing=testing)
 
         except ValueError as e:
             logger.error(e, stack_info=True, exc_info=True)

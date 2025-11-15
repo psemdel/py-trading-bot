@@ -365,7 +365,7 @@ class UnderlyingStrat():
             it_is_index: is it indexes that are provided
             suffix: suffix for files
             actions: list of actions
-            symbols: list of YF tickers
+            symbols: list of IB or YF tickers
             input_ust: input underlying strategy with already all data downloaded, avoid downloading the same several times
             strat_arr: dict of the strategy combination to use
             exchange: stock exchange, only for saving
@@ -380,7 +380,6 @@ class UnderlyingStrat():
             else:
                 setattr(self,k,locals()[k])
         
-        self.symbols_to_YF={}
         self.strat_arr=strat_arr
         
         if input_ust is not None:
@@ -410,12 +409,13 @@ class UnderlyingStrat():
                     if self.symbols is None:
                         raise ValueError("StratPRD, no symbols provided")
                     self.actions=[Action.objects.get(symbol=symbol) for symbol in self.symbols]
-                self.symbols=retrieve_data_online(self,self.actions,period,it_is_index=it_is_index, used_api_key="reporting")  #the symbols as output are then the YF symbols
-                for s in self.symbols:
-                    self.symbols_to_YF[s]=s
+                self.symbols, self.symbols_to_YF=retrieve_data_online(self,self.actions,period,it_is_index=it_is_index, used_api_key="reporting")  #the symbols as output are then the YF symbols
+                if self.symbols is None:
+                    raise ValueError("Data retrieval crashed, strategy calculation interrupted")
                 
         if input_ust is not None and self.prd: 
             self.symbols=[]
+            self.symbols_to_YF={}
             for a in self.actions:
                 if _settings["USED_API"]["reporting"]=="IB":
                     s=a.ib_ticker()
