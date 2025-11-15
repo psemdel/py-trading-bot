@@ -412,6 +412,7 @@ class IBData(RemoteData):
         cls.resolve_client(client=client, **client_config)
 
         if ib_global["connected"]:
+    
             contract=cls.get_contract(symbol,exchange,it_is_index,currency)
             #check period and timeframe
             bars = cls.client.reqHistoricalData(
@@ -442,7 +443,7 @@ class IBData(RemoteData):
             
             return df
     
-    #@classmethod
+    @classmethod
     def get_last_price_sub(cls,contract):
         timeout=2
         t=0
@@ -462,13 +463,13 @@ class IBData(RemoteData):
         cls.client.cancelMktData(contract)
         return out
     
-    #@classmethod 
+    @classmethod 
     def get_contract(
             cls, 
             symbol_ib: str,
             exchange_ib: str,
             it_is_index: bool,
-            currency: str = None):
+            currency: str):
         """
         Search the ib contract corresponding to the product
 
@@ -534,7 +535,7 @@ class IBData(RemoteData):
         else:
             return quantity/price
     
-    #@classmethod     
+    @classmethod     
     def find_option(cls,
                     action: Action,
                     buy:bool, 
@@ -711,7 +712,7 @@ class IBData(RemoteData):
                     return abs(pos.position), np.sign(pos.position), pos.position<0
         return 0, 0, False  
     
-    #@classmethod 
+    @classmethod 
     def get_tradable_contract(
             self,
             action:Action,
