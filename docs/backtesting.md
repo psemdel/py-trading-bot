@@ -16,5 +16,7 @@ Additionally, you can backtest with recent prices, for instance last 3 years, in
 
     "STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
           "PreselDivergenceBlocked","PreselWQ7","PreselWQ31","PreselWQ53","PreselWQ54"],    
+          
+The exchanges scanned are defined in the file stratL.
     
 Note: for strategy on one stock, testing all stocks in the exchange would not make much sense, that's why it is not included in this scan.
