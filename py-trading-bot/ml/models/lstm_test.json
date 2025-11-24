@@ -34,7 +34,6 @@
         "DIVERGENCE",
         "STD",
         "MACRO_TREND",
-        "HT_TRENDMODE",
         "PU_RESISTANCE",
         "PU_SUPPORT"
     ],
@@ -46,10 +45,10 @@
     "indexes": [
         "CAC40"
     ],
-    "period": "2007_2023_08",
-    "n_neurons": 8,
-    "activation": "tanh",
+    "period": "2007_2022_08",
+    "n_neurons": 32,
+    "activation": null,
     "reduce_memory_usage": true,
     "steps": 10,
-    "training_date": "21.02.24"
+    "training_date": "17.11.25"
 }

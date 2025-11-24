@@ -34,6 +34,7 @@ class StratLIVE(UnderlyingStrat):
         """
         for k in ["period","symbols","symbol_index", "it_is_index"]:
             setattr(self,k,locals()[k])
+        
         retrieve_data_live(self, symbols, symbol_index, period, it_is_index=it_is_index )
         
         self.symbols_to_YF={}
@@ -75,7 +76,7 @@ def scan(
         l=strat_l
 
     for p in l:
-        bti=caller.name_to_ust_or_presel(p, ust.period,input_ust=ust)
+        bti=caller.name_to_ust_or_presel(p, None, ust.period,input_ust=ust)
 
         if restriction is not None and type(restriction)==int:
             pf=vbt.Portfolio.from_signals(bti.close[-restriction:], 
@@ -100,7 +101,7 @@ def scan(
                                           fees=fees
                                  )
         
-        res[strategy][p]=pf.get_total_return()
+        res[strategy][p]=float(round(pf.get_total_return(),2))
     return res        
 
 def scan_presel_all(
@@ -115,24 +116,25 @@ def scan_presel_all(
         period: period of time in year for which we shall retrieve the data
     """    
     
-    d={"CAC40":{"symbols":constants.CAC40,"index":"^FCHI"},
-       "DAX":  {"symbols":constants.DAX,"index":"^GDAXI"},
-       "NASDAQ":  {"symbols":constants.NASDAQ,"index":"^IXIC"},
-       "REALESTATE": {"symbols":constants.REALESTATE, "index":"^DJI"},
-       "INDUSTRY": {"symbols":constants.INDUSTRY, "index":"^DJI"},
-       "IT": {"symbols":constants.IT, "index":"^DJI"},
-       "COM": {"symbols":constants.COM, "index":"^DJI"},
-       "STAPLES": {"symbols":constants.STAPLES, "index":"^DJI"},
-       "CONSUMER": {"symbols":constants.CONSUMER, "index":"^DJI"},
-       "ENERGY": {"symbols":constants.ENERGY, "index":"^DJI"},
-       "UTILITIES": {"symbols":constants.UTILITIES, "index":"^DJI"},
-       "FIN": {"symbols":constants.FIN, "index":"^DJI"},
-       "MATERIALS": {"symbols":constants.MATERIALS, "index":"^DJI"},
+    d={
+      "CAC40":{"symbols":constants.CAC40,"index":"^FCHI"},
+      # "DAX":  {"symbols":constants.DAX,"index":"^GDAXI"},
+      # "NASDAQ":  {"symbols":constants.NASDAQ,"index":"^IXIC"},
+     #  "REALESTATE": {"symbols":constants.REALESTATE, "index":"^DJI"},
+      # "INDUSTRY": {"symbols":constants.INDUSTRY, "index":"^DJI"},
+     #  "IT": {"symbols":constants.IT, "index":"^DJI"},
+     #  "COM": {"symbols":constants.COM, "index":"^DJI"},
+     #  "STAPLES": {"symbols":constants.STAPLES, "index":"^DJI"},
+     #  "CONSUMER": {"symbols":constants.CONSUMER, "index":"^DJI"},
+     #  "ENERGY": {"symbols":constants.ENERGY, "index":"^DJI"},
+     #  "UTILITIES": {"symbols":constants.UTILITIES, "index":"^DJI"},
+     #  "FIN": {"symbols":constants.FIN, "index":"^DJI"},
+     #  "MATERIALS": {"symbols":constants.MATERIALS, "index":"^DJI"},
     }
     presel_l= _settings["STRATEGIES_TO_SCAN"]
     res={}
-    
-    for k, v in d.items():
+
+    for k, v in d.items():    
         symbols=common.filter_intro_symbol(v["symbols"],period)
         ust=StratLIVE(symbols,str(period)+"y",v["index"])
         ust=strat.StratHold(str(period)+"y",input_ust=ust) #to populate methods
@@ -140,7 +142,3 @@ def scan_presel_all(
         
     return res
 
-
-
-        
-    

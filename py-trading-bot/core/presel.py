@@ -140,7 +140,7 @@ class Presel():
         self.sorted=None
         self.sorted_rank=None
         self.condition={"long":None,"short":None}
-    
+
     def reinit(self):
         self.capital=self.start_capital        
         self.pf={
@@ -169,7 +169,7 @@ class Presel():
             symbol_simple: YF ticker of the stock
             ent_or_ex: entry or exit
         '''
-        if "entries" not in self.ust.__dir__():
+        if "entries" not in self.ust.__dir__(): #note: even for no_ust we need the underlying to use symbol simple to complex
             self.ust.run()
 
         return self.ust.symbols_simple_to_complex(symbol_simple,ent_or_ex)
@@ -668,7 +668,7 @@ class PreselRetard(Presel):
         
         v={}   
         for symbol in self.close.columns.values:
-            v[symbol]=self.dur.loc[i,symbol]
+            v[symbol]=int(self.dur.loc[i,symbol])
             if symbol in self.excluded: #if exclude take the next
                 if v[symbol]==0: #trend change
                     self.excluded.remove(symbol)
@@ -954,7 +954,7 @@ class PreselSlow(Presel):
                        (not self.blocked or (self.blocked and not short))):
                         
                         self.candidates[short_to_str[short]][i].append(symbol_simple)
-                        cand.append(symbol_simple)           
+                        cand.append(symbol_simple, exchange=self.exchange)           
         
 class PreselVolSlow(PreselSlow):
     def __init__(self,period: str,**kwargs):
@@ -1051,9 +1051,9 @@ class PreselRealMadrid(PreselSlow):
                 if len(t)>0:
                     symbol_simple=t.index[0] 
                     if symbol_simple not in self.excluded:
-                        
                         self.candidates[short_to_str[short]][i].append(symbol_simple)
-                        cand.append(symbol_simple)
+                        cand.append(symbol_simple, exchange=self.exchange)
+                        print("Appending: "+symbol_simple+" to the candidates of Real Madrid")
 
 class PreselRealMadridBlocked(PreselRealMadrid):
     def __init__(self,period,**kwargs):
@@ -1099,9 +1099,6 @@ class PreselWQ(Presel):
             ind_max=np.nanargmax(self.wb_out.loc[i].values)
             self.candidates["long"][i]=[self.wb_out.columns[ind_max]]
 
-    def underlying(self):
-        pass
-    
     def perform(self, r, **kwargs):
         '''
         Preselected actions strategy, using 101 Formulaic Alphas
@@ -1116,6 +1113,7 @@ class PreselWQ(Presel):
 
         strategy="wq"+str(self.nb)
         strats=Strategy.objects.filter(name=strategy) #normally there should be only one
+
         if len(strats)>0 and strats[0] in stock_ex.strategies_in_use.all():
             self.run()
             candidates=self.candidates["long"][self.close.index[-1]] 

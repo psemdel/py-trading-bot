@@ -16,3 +16,6 @@ Following inputs can be defined:
 
 The telegram bot will execute automatically those jobs if `UPDATE_SLOW_STRAT` is set to True (which is the default value) in trading_bot/settings.py.
 
+#One time update
+When you start with the bot, you will want to initialize all these lists. Therefore, type the url "localhost:8000/actualize_all_jobs" in your browser. It will trigger all jobs at once.
+

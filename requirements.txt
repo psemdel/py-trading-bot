@@ -1,23 +1,28 @@
+#Vbt should be installed first
+
 #### Appserver
-django >= 4.1.2
-whitenoise >= 6.2.0
-celery[redis] >= 5.2.7
+django
+redis
+celery
+joblib
+whitenoise
 
 #### trading
-#vectorbtpro >= 1.13.0 #installed separately
-#TA-Lib  # normally included in vectorbt
-#yfinance # normally included in vectorbt
-#pandas # normally included in vectorbt
-#numpy # normally included in vectorbt
-#python-telegram-bot # normally included in vectorbt -> use 13.15, the start in_background does not work for version > 20
-joblib
-ib_insync >= 0.9.70
-django-filter >= 22.1
+ib_async
+django-filter
 psycopg2-binary
-
-backports.zoneinfo; python_version < '3.9'
+python-telegram-bot
+ipykernel #for jupyter notebook to find the env
+requests
+plotly
 
 #### Only if making machine learning, remove the ordner ml if you don't need it.
-#### Deactivated by default, as it uses a huge amount of memory. Not suitable for Docker.
-# tensorflow
-# keras
+#### Deactivated by default, as it uses a huge amount of memory. 
+# tensorflow #optional
+# keras #optional
+
+
+
+
+
+

@@ -16,6 +16,9 @@ I want to trade without having to spend hours every day watching at curves or re
 There are many similar tools out there, that have similar purposes that are certainly more complete and mature. Freqtrade for instance only trades crypto. If you need only American stocks, you can also use QuantConnect. MetaTrader can also be used, if your broker supports it. TradingView offers also similar services against quite high fees. In the end, it's up to you. 
 
 # Structure
+The bot run with Django, however backtesting works without Django running. It explains why there are methods for both. Especially the Stocks are defined in Django admin panel, for when Django runs, and once in core/constants.py, when not. Same applies for general configuration which is in Django admin panel and settings.py.
+
+The file structure is as following:
 - core contains the strategies and all backstaging logic supported by vectorbt. Its indicator factory is extensively used (for more information read https://vectorbt.pro/tutorials/superfast-supertrend/)
 - saved_cours contains some pre-saved data to perform backtesting. The jupyter notebooks are there to perform this backtesting
 - orders contains the Django models relative to orders and financial products. IB communication is handled also there
@@ -23,7 +26,7 @@ There are many similar tools out there, that have similar purposes that are cert
 - trading_bot contains Django configuration
 
 # Get started
-For installation see [installation guide](https://github.com/psemdel/py-trading-bot/blob/main/docs/installation_guide.md), alternatively you can start the bot in Docker, see the [guide](https://github.com/psemdel/py-trading-bot/blob/main/docs/docker_readme.md).
+For installation see [installation guide](https://github.com/psemdel/py-trading-bot/blob/main/docs/installation_guide.md).
 
 # Deployment
 Deployment of the bot on external machine has not been achieved yet for several reasons:

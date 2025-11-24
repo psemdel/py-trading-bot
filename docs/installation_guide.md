@@ -1,16 +1,27 @@
 # Pre-requisites
-For this installation, it is assumed that python with a version >3.8, git and pip are already installed.
+For this installation, it is assumed that python with version 3.12, git and pip are already installed.
 
-* [Python >= 3.8.x](http://docs.python-guide.org/en/latest/starting/installation/)
+* [Python >= 3.12.x](http://docs.python-guide.org/en/latest/starting/installation/)
 * [pip](https://pip.pypa.io/en/stable/installing/)
 * [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+
+# Set up your venv (optional)
+Set up your virtual environment with the tool of your choice.
+
+Adapt the first line of start_bot.sh depending on your venv settings:
+
+```
+#start your venv
+source <your path>/Anaconda/bin/activate
+conda activate <venv name>
+```
 
 # Vectorbt
 The bot requires [vectorbt](https://vectorbt.dev/) in its [pro version](https://vectorbt.pro/) (requires fee). Install it with:
 
 - Vectorbtpro
 
-```sh
+```
 pip install -U "vectorbtpro"
 ```
 
@@ -18,16 +29,15 @@ Note: it is clearly imaginable to use the bot with the basic version of vbt, but
 
 It will install some other dependencies needed for the bot, for instance: pandas, numpy, python-telegram-bot and TA-Lib. 
 
-# Django
-Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt. Note that you can comment out the keras installation, if you don't want to use the machine learning functions.
-
-    sh
-    pip install -r requirements.txt
-
 # Clone from git
 Pull the project from git:
 
     git clone https://github.com/psemdel/py-trading-bot.git
+
+# Django
+Afterwards, you need to install [Django](https://www.djangoproject.com/) on one side and [Redis](https://redis.io/) (or equivalent) with [Celery](https://docs.celeryq.dev/en/stable/getting-started/introduction.html) for the worker. ib_insync is a library to communicate with interactive brokers. They are defined in requirements.txt. Note that you can comment out the keras installation, if you don't want to use the machine learning functions.
+
+    pip install -r requirements.txt
 
 # Database
 You can perfectly use SQlite as Database, then go in trading_bot/settings.py and replace DATABASES through this snippet. Then there is no preliminary steps.
@@ -65,6 +75,13 @@ Note: think of starting it with the command /start in Telegram.
 It is optional, but you Jupyter to read the Jupyter notebooks. Vectorbt is very good to visualize strategies in Jupyter, it would be too bad not to use this possibility.
 
 # Configuration
+The configuration of the bot is done principally in:
+    
+    The file trading_bot/settings.py
+    The admin panel of Django
+    
+However, you may need to modify file like core/constants.py, core/stratL.py... to have exactly the desired behavior. I am still working to centralize everything.
+
 Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software and to uncheck the "read-only" setting). Note that TWS and IB Gateway have different ports.
 
     "IB_LOCALHOST":'127.0.0.1',
@@ -124,6 +141,9 @@ Reimport the dump file using "python manage.py loaddata dump.json" to fill your 
 Start interactive broker, if you want to trade with it. This step is optional.
 
 # Start the bot
+
+
+
 Click on start_bot.sh
 
 I recommend to open it in a terminal, so you can see the console messages and can close it more easily. Don't open several instances of the bot at the same times, it does not work!

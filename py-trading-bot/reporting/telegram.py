@@ -26,7 +26,6 @@ else:
     from backports.zoneinfo import ZoneInfo
 
 from reporting.models import Report, Alert, OrderExecutionMsg 
-from telegram.ext import CommandHandler
 
 from orders.ib import actualize_ss, get_last_price, get_ratio
 from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,\
@@ -36,9 +35,9 @@ from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,
 from core import caller
 
 from trading_bot.settings import _settings
-from reporting import telegram_sub #actually it is the file from vbt, I have it separately if some changes are needed.
 
 from datetime import time, datetime, timedelta, date
+import requests
 '''
 This file contains the logic for:
  - Telegram bot
@@ -59,6 +58,25 @@ def start():
 
     res=async_sched.delay(TELEGRAM_TOKEN)
     print("bot started, task id " + str(res.id))
+    
+def get_chat_id(TELEGRAM_TOKEN:str):
+    '''
+    TELEGRAM_TOKEN : token of the Telegram bot
+        DESCRIPTION.
+
+    Returns
+    -------
+    chat_id: chat id of the Telegram bot used by last /start command
+    '''
+    print("get_chat_id called")
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
+    res=requests.get(url).json()
+
+
+    if 'ok' in res and res['ok'] and 'result' in res and len(res['result'])>0:
+        return res['result'][0]['message']['chat']['id']
+    else:
+        raise ValueError("Chat id not found. Did you type /start in your telegram bot?")
 
 @shared_task(bind=True)   
 def async_sched(self,
@@ -66,16 +84,19 @@ def async_sched(self,
                 ): 
     #note: only serializable data can be sent to async task
     #TelegramBot without change here
-    bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN) #normally vbt.TelegramBot should be sufficient
-    bot.start(in_background=True)
-    MyScheduler(bot)
+    bot = vbt.TelegramBot(token=TELEGRAM_TOKEN) #normally vbt.TelegramBot should be sufficient
+    #TelegramBot normally update itself its chat_ids but it needs to be started first. However, we don't start to avoid being stuck in the loop
+    #As the bot is not started, all message must be sent using asyncio.run()
+    chat_id=get_chat_id(TELEGRAM_TOKEN)
+    bot.chat_ids.add(chat_id)
+    MyScheduler(bot, TELEGRAM_TOKEN)
 
 def stop(bot, sched):
     bot.stop()
     sched.stop()    
 
 class MyScheduler():
-    def __init__(self, telegram_bot,**kwargs):
+    def __init__(self, telegram_bot,token:str,**kwargs):
         '''
         The scheduler contains at the same time the job scheduling and the telegram bot
         
@@ -85,6 +106,7 @@ class MyScheduler():
         '''
         self.manager = vbt.ScheduleManager()
         self.telegram_bot=telegram_bot
+        self.token=token
         
         #Settings
         self.update_ss=True
@@ -121,7 +143,22 @@ class MyScheduler():
         #OOTB vbt start_in_background does not seem to be compatible with django
         if not kwargs.get("test",False):
             self.manager.start() 
-        self.telegram_bot.send_message_to_all("Scheduler started in background")   
+        print("started")
+        self.send_msg("Scheduler started in background")
+    
+    def send_msg(self, msg:str):
+        '''
+        As the bot is not started, all message must be sent using asyncio.run()
+        '''
+        #if "chat_ids" not in self.telegram_bot:
+        #    print("adding chat ids")
+        #    chat_id=get_chat_id(self.token)
+        #    self.telegram.bot.chat_ids.add(chat_id)
+
+        for chat_id in self.telegram_bot.chat_ids:
+            url = f"https://api.telegram.org/bot{self.token}/sendMessage?chat_id={chat_id}&text={msg}"
+            requests.get(url).json() # this sends the message
+        #asyncio.run(self.telegram_bot.send_message_to_all(msg) )
         
     def do_weekday(self, 
                    strh: str, 
@@ -149,7 +186,7 @@ class MyScheduler():
 
     def check_stock_ex_open_from_action(self,action: Action)-> bool:
         '''
-        Check if the stock exchange is open
+        Check if the stock exchange is open. Does not check the day, only the hour. Days are handled by the scheduler above.
         
         Arguments
        	----------
@@ -159,7 +196,7 @@ class MyScheduler():
 
     def check_stock_ex_open(self,s_ex: StockEx)-> bool:
         '''
-        Check if the stock exchange is open
+        Check if the stock exchange is open. Does not check the day, only the hour. Days are handled by the scheduler above.
         
         Arguments
        	----------
@@ -242,14 +279,14 @@ class MyScheduler():
                         
                         if opening:
                             op_text+="Opening "
-                        self.telegram_bot.send_message_to_all(op_text+"Alert, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
+                        self.send_msg(op_text+"Alert, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                         
                     else:
                         if not this_alert.alarm and alarming:
                             this_alert.alarm=alarming
                             this_alert.save()
                            
-                            self.telegram_bot.send_message_to_all(
+                            self.send_msg(
                                 op_text+"Alarm, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                 else:
                     if this_alert is not None and alerting_reco:
@@ -258,7 +295,7 @@ class MyScheduler():
                         this_alert.recovery_date=timezone.now()
                         
                         this_alert.save()
-                        self.telegram_bot.send_message_to_all( 
+                        self.send_msg( 
                                 op_text+"Recovery, action: "+ action.name +"\npresent variation: " + str(round(ratio,2)) + " %")
                 
         except Exception as e:
@@ -363,7 +400,7 @@ class MyScheduler():
                                 r=Report.objects.create()
                                 r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
                                 r.ss_m.resolve()
-                                self.telegram_bot.send_message_to_all(txt+", stop loss")
+                                self.send_msg(txt+", stop loss")
                         
                         if o.daily_sl_threshold is not None:
                             ratio=get_ratio(action)
@@ -374,7 +411,7 @@ class MyScheduler():
                                 r=Report.objects.create()
                                 r.ss_m.add_target_quantity(action.symbol, o.strategy, 0)
                                 r.ss_m.resolve()
-                                self.telegram_bot.send_message_to_all(txt+", daily stop loss")
+                                self.send_msg(txt+", daily stop loss")
            
     def send_order(self,
                    report: Report
@@ -388,9 +425,9 @@ class MyScheduler():
         '''   
         oems=OrderExecutionMsg.objects.filter(report=report)
         for oem in oems:
-            self.telegram_bot.send_message_to_all(oem.text)
+            self.send_msg(oem.text)
         if report.text:
-             self.telegram_bot.send_message_to_all(report.text)       
+             self.send_msg(report.text)       
     
     def daily_report_sub(
             self,
@@ -448,7 +485,7 @@ class MyScheduler():
                 if not intraday:
                     self.daily_report_sub(exchange=None,symbols=[exchange_to_index_symbol(s_ex.name)[1]],it_is_index=True)
                 
-                self.telegram_bot.send_message_to_all("Daily report "+s_ex.name+" ready")
+                self.send_msg("Daily report "+s_ex.name+" ready")
             
         except Exception as e:
             logger.error(e, stack_info=True, exc_info=True)
@@ -458,7 +495,7 @@ class MyScheduler():
         '''
         Function to test if the bot is running
         '''
-        self.telegram_bot.send_message_to_all("Heart beat")
+        self.send_msg("Heart beat")
 
     def heartbeat_ib_f(self):
         '''
@@ -466,7 +503,7 @@ class MyScheduler():
         '''
         a=Action.objects.get(symbol="AAPL")
         t=get_last_price(a)
-        self.telegram_bot.send_message_to_all("Apple current price: " + str(t))
+        self.send_msg("Apple current price: " + str(t))
 
     def update_slow_strat(self):
         '''

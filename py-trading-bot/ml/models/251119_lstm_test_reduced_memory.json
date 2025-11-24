@@ -49,7 +49,7 @@
     "period": "2007_2023_08",
     "n_neurons": 8,
     "activation": "tanh",
-    "reduce_memory_usage": false,
-    "steps": 10,
-    "training_date": "21.02.24"
+    "reduce_memory_usage": true,
+    "steps": 25,
+    "training_date": "19.11.25"
 }

@@ -30,8 +30,7 @@ As those strategies are very slow, there is no automatic implementation. I would
 actions in StratCandidates / normal (in the admin panel)
 """
 @njit
-def signal_to_size(entries,exits, entries_short, exits_short, idx_arr):
-    idx=0
+def signal_to_size(entries,exits, entries_short, exits_short):
     bought=np.full(entries.shape, 0)
     sold=np.full(entries.shape, 0)
     
@@ -40,11 +39,6 @@ def signal_to_size(entries,exits, entries_short, exits_short, idx_arr):
         if ii>0:
             bought[ii]=bought[ii-1]
             sold[ii]=sold[ii-1]
-        if idx<(len(idx_arr)):
-                if ii>=idx_arr[idx]:
-                    idx+=1 
-                    bought[ii]=0
-                    sold[ii]=0
         
         if entries[ii] and not exits[ii]:
             bought[ii]=1
@@ -62,7 +56,6 @@ SIGNALTOSIZE = vbt.IF(
       short_name='signal_to_size',
       input_names=['entries','exits','entries_short', 'exits_short'],
       output_names=["bought","sold"],
-      param_names=["idx_arr"]
  ).with_apply_func(
       signal_to_size, 
       takes_1d=True,  
@@ -74,26 +67,29 @@ class PreselClassic(Presel):
         self.pf_opt=None 
         self.cands={}
     
-    #still slow
     def expand_alloc(self,idx_arr, allocations):
-        expanded_allocations = self.pf_opt.wrapper.fill(0, group_by=False)
-        idx=0
-    
-        for ii in range(np.shape(expanded_allocations)[0]):
-            if idx<(len(idx_arr)):
-                if ii>=idx_arr[idx]:
-                    idx+=1
-                
-            if ii>=idx_arr[0]: #before it is only NaN
-                expanded_allocations.iloc[ii]=allocations[idx-1]
+        '''
+        Allocations has the distribution between stocks on yearly basis
+        We convert it to daily basis
         
+        Arguments
+       	----------
+           idx_arr: Index of the year changes
+           allocations: Allocation of the stocks for one year
+        '''
+        
+        expanded_allocations = self.pf_opt.wrapper.fill(0.0, group_by=False)
+        for jj in range(len(allocations)-1):
+            expanded_allocations.iloc[idx_arr[jj]:idx_arr[jj+1]]=allocations[jj]
+        expanded_allocations.iloc[idx_arr[-1]:]=allocations[-1]
         return expanded_allocations 
 
     #needs sum over a line, so vbt is not a solution
     #increase the allocation to minimize cash available
     #no excess of 1 of allocation in long or short direction
-    def max_alloc(self):
-        self.new_alloc=self.pf_opt.wrapper.fill(0, group_by=False)
+    def max_alloc(self, idx_arr:list):
+        idx=0
+        self.size=self.pf_opt.wrapper.fill(0, group_by=False)
         empt=np.empty(np.shape(self.used_allocations)[1])
         empt[:]=np.nan
         row_last_filled=None
@@ -104,16 +100,20 @@ class PreselClassic(Presel):
             s=max(pos_sum,neg_sum) #neg must not be over -1
 
             if s!=0:
-                self.new_alloc.iloc[ii]=self.used_allocations.iloc[ii]/s
+                self.size.iloc[ii]=self.used_allocations.iloc[ii]/s
             else:
-                self.new_alloc.iloc[ii]=self.used_allocations.iloc[ii]
+                self.size.iloc[ii]=self.used_allocations.iloc[ii]
             
             #nullify row without change to avoid rebalancing all the time, which is not realistic
+            #but not by year changes
             if ii>0:
-                if np.all(self.new_alloc.iloc[ii]==row_last_filled):
-                    self.new_alloc.iloc[ii]=empt
+                if np.all(self.size.iloc[ii]==row_last_filled):
+                    if idx<(len(idx_arr)) and ii>=idx_arr[idx]:
+                        idx+=1 
+                    else:                    
+                        self.size.iloc[ii]=empt
                 else:
-                    row_last_filled=self.new_alloc.iloc[ii]
+                    row_last_filled=self.size.iloc[ii]
 
     def fill_allocations_underlying(self):
         idx_arr = self.pf_opt.alloc_records.get_field_arr("idx")
@@ -124,19 +124,17 @@ class PreselClassic(Presel):
             self.ust_classic.exits,
             self.ust_classic.entries_short,
             self.ust_classic.exits_short,
-            idx_arr=[idx_arr]
             )
 
         self.expanded_allocations= self.expand_alloc(idx_arr, self.pf_opt._allocations) #add the weight
         self.used_allocations=remove_multi(t.bought-t.sold)*remove_multi(self.expanded_allocations)
-        self.max_alloc()
-        self.size=self.new_alloc
+        self.max_alloc(idx_arr)
 
     def apply_underlying_strat(self, strat_name):
         if "ust" in self.__dir__(): #for handle "live" strategy
-            self.ust_classic=name_to_ust_or_presel(strat_name,self.period, input_ust=self.ust)
+            self.ust_classic=name_to_ust_or_presel(strat_name,None,self.period, input_ust=self.ust)
         else:
-            self.ust_classic=name_to_ust_or_presel(strat_name,self.period, symbol_index=self.symbol_index)
+            self.ust_classic=name_to_ust_or_presel(strat_name,None,self.period, symbol_index=self.symbol_index)
 
         self.fill_allocations_underlying()
         

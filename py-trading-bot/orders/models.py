@@ -94,8 +94,12 @@ def get_exchange_actions(exchange:str,sec: str=None):
     c2 = Q(stock_ex=stock_ex)
     c3 = Q(delisted=False) #to be removed
     
+    print(stock_ex.presel_at_sector_level)
+    print(sec)
+    
     if stock_ex.presel_at_sector_level and sec is not None:
         action_sector, _=ActionSector.objects.get_or_create(name=sec)
+        print(action_sector)
         c4 = Q(sector=action_sector)
         actions=Action.objects.filter(c1 & c3 & c4) #c2 & no actual reason, but I use mix of Nasdaq and NYSE for sector
     else:
@@ -327,7 +331,7 @@ def action_to_etf(
             return action.etf_long
     return action
 
-def symbol_to_action(symbol)-> Action:
+def symbol_to_action(symbol,exchange:str=None)-> Action:
     '''
     Return action corresponding to a YF ticker
 
@@ -336,9 +340,38 @@ def symbol_to_action(symbol)-> Action:
     symbol: YF ticker of the product for which the order was performed
     '''  
     if type(symbol)==str:
-        return Action.objects.get(symbol=symbol)
+        try:
+            return Action.objects.get(symbol=symbol)
+        except:
+            return ib_ticker_to_action(symbol,exchange=exchange)
     else:
         return symbol #action in this case
+    
+def ib_ticker_to_action(symbol:str, exchange:str=None):
+    '''
+    Assume that IB ticker is equal to YF symbol or is contained in it. 
+    Not true for index
+    '''
+    a=Action.objects.filter(symbol__contains=symbol)
+    if len(a)==1:
+        return a[0]
+    elif len(a)==0:
+        raise ValueError("Symbol: "+symbol+" not found")
+    else: #several result
+        #search exact
+        for e in a:
+            if e.symbol==symbol:
+                return e
+        
+        if exchange is not None:
+            s_ex=StockEx.objects.get(name=exchange)
+            for e in a:
+                s=e.symbol
+                if s.find(".")!=-1:
+                    arr=s.split(".")
+                    if s_ex.ib_suffix in arr and symbol in arr: #for instance "DE" is in "AIR.DE"
+                        return e 
+        raise ValueError("Symbol: "+symbol+" not found")
 
 class Currency(models.Model):
     '''
@@ -448,6 +481,7 @@ class StockEx(models.Model):
     presel_at_sector_level=models.BooleanField(blank=False,default=False)
     main_index=models.ForeignKey('Action',on_delete=models.CASCADE,blank=True,null=True,default=None)
     calc_report=models.BooleanField(blank=False,default=True)
+    ib_suffix=models.CharField(blank=True,null=True, default=None)
     
     class Meta:
         ordering = ["name"]
@@ -632,8 +666,8 @@ class Candidates(models.Model):
             self.actions.remove(a)
             self.save()
     
-    def append(self,symbol): #so we can name as for list
-        a=symbol_to_action(symbol)
+    def append(self,symbol,exchange:str=None): #so we can name as for list
+        a=symbol_to_action(symbol,exchange=exchange)
         self.actions.add(a)
         self.save()
         
@@ -677,14 +711,14 @@ class Excluded(models.Model):
             self.actions.remove(a)
             self.save()
     
-    def append(self,symbol):
-        a=symbol_to_action(symbol)
+    def append(self,symbol, exchange:str=None):
+        a=symbol_to_action(symbol,exchange=exchange)
         self.actions.add(a)
         self.save()
         
-    def remove(self,symbol):
+    def remove(self,symbol, exchange:str=None):
         try:
-            a=symbol_to_action(symbol)
+            a=symbol_to_action(symbol,exchange=exchange)
             self.actions.remove(a)
             self.save()
         except Exception as e:

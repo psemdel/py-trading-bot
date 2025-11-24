@@ -76,14 +76,15 @@ class TestOptMain(TestCase):
         self.assertEqual(np.shape(self.o.close_dic["CAC40"]["test"])[1],8)
     
     def test_filter_symbols(self):
-        self.o.filter_symbols(symbols_to_keep=["AC"])
-        self.assertEqual(self.o.symbols["CAC40"],['AC'])
 
-        self.o.filter_symbols(symbols_to_keep=["AC","BNP"])
-        self.assertEqual(self.o.symbols["CAC40"],['AC',"BNP"])
+        self.o.filter_symbols(symbols_to_keep=["AC.PA"])
+        self.assertEqual(self.o.symbols["CAC40"],['AC.PA'])
+
+        self.o.filter_symbols(symbols_to_keep=["AC.PA","BNP.PA"])
+        self.assertEqual(self.o.symbols["CAC40"],['AC.PA',"BNP.PA"])
         
-        self.o.filter_symbols(symbols_to_keep=["AC","BNP","APPL"])
-        self.assertEqual(self.o.symbols["CAC40"],['AC',"BNP"])
+        self.o.filter_symbols(symbols_to_keep=["AC.PA","BNP.PA","APPL"])
+        self.assertEqual(self.o.symbols["CAC40"],['AC.PA',"BNP.PA"])
      
     def test_defi_i(self):
         self.o=opt_main.OptMain("2007_2022_08",
@@ -211,7 +212,7 @@ class TestOptMain(TestCase):
                                       short_exits  =self.ust.exits_short)
         t=self.o.get_ret(pf,"CAC40","learn")
         self.assertEqual(len(t),39)
-        self.assertEqual(round(t['VIV'],2),-1.29)
+        self.assertEqual(round(t['VIV.PA'],2),-1.29)
         
     def test_append_row(self):
         self.o.test_arrs=None

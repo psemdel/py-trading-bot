@@ -95,6 +95,7 @@ CAC40=[
     "ATO.PA",
     "BN.PA",
     "BNP.PA",
+    "BVI.PA",
     "CA.PA",
     "CAP.PA",
     "CS.PA",
@@ -120,7 +121,7 @@ CAC40=[
     "SAN.PA",
     "SGO.PA",
     "SLB.PA",
-    "STLA.PA", 
+   # "STLA.PA",  #too short in it
     "STMPA.PA",
     "SU.PA",
     "SW.PA",
@@ -136,6 +137,7 @@ Introduction date of the stocks if relevant, note that it is also in the Django 
 Django, for backtesting.
 '''
 CAC40_INTRO={
+    "BVI.PA":"2007-10-01",
     "STLA.PA":"2021-01-18",
     "LR.PA":"2006-06-01", #from YF
     "WLN.PA":"2014-07-02",
@@ -146,7 +148,10 @@ CAC40_INTRO={
 '''
 Delisting date of the stocks if relevant
 '''
-CAC40_DELIST={}
+CAC40_DELIST={
+    "SLB.PA":"2024-08-16",
+    
+    }
 
 '''
 List of YF tickers for Frankfurt DAX index
@@ -171,6 +176,7 @@ DAX=[
     "ENR.DE", 
     "FME.DE",
     "FRE.DE",
+    "G24.DE",
     "HEI.DE",
     "HEN3.DE",
     "HFG.DE",
@@ -184,6 +190,7 @@ DAX=[
     "PAH3.DE",
     "PUM.DE",
     "QIA.DE",
+    "RHM.DE",
     "RWE.DE",
     "SAP.DE",
     "SHL.DE",
@@ -202,7 +209,8 @@ DAX_INTRO={
     "DTG.DE":"2021-12-10",
     "ENR.DE":"2020-09-28",
     "LIN.DE":"2018-11-01", #buggy before
-    "DHER.DE":"2017-07-01", 
+    "DHER.DE":"2017-07-01",
+    "G24.DE":"2015-11-01",
     "HFG.DE":"2017-11-01",
     "1COV.DE":"2015-11-01",
     "SHL.DE":"2018-05-01",
@@ -215,7 +223,8 @@ DAX_INTRO={
 '''
 Delisting date of the stocks if relevant
 '''
-DAX_DELIST={}
+DAX_DELIST={
+    }
 
 '''
 List of YF tickers for Nasdaq 100 index
@@ -234,9 +243,12 @@ NASDAQ=[
     "AMGN",
     "AMZN", 
     "ANSS",
+    "APP",
+    "ARM",
     "ASML",
     "ATVI",
     "AVGO",
+    "AXON",
     "BIDU",
     "BIIB",
     "BKNG",
@@ -285,6 +297,7 @@ NASDAQ=[
     "MRNA",
     "MRVL",
     "MSFT", 
+    "MSTR",
     "MTCH",
     "MU",
     "NFLX",
@@ -298,6 +311,7 @@ NASDAQ=[
     "PCAR",
     "PDD",
     "PEP",
+    "PLTR",
     "PTON", 
     "PYPL",
     "QCOM",
@@ -306,12 +320,16 @@ NASDAQ=[
     "SBUX",
     "SGEN",
     "SIRI",
+    "SHOP",
     "SNPS",
     "SPLK",
+    "SOLS",
     "SWKS",
     "TEAM",
     "TMUS",
+    "TRI",
     "TSLA",
+    "TTD",
     "TXN",
     "VRSK",
     "VRSN",
@@ -329,12 +347,22 @@ Introduction date of the stocks if relevant
 NASDAQ_INTRO={
     "AAPL":"1982-12-12",
     "ABNB":"2020-12-01",
+    "APP":"2021-06-01",
+    "ARM":"2023-10-01",
     "AVGO":"2009-09-01",
+    "AXON":"2001-07-01",
     "CHTR":"2010-02-01",
+    "COIN":"2021-04-01",
     "CRWD":"2019-07-01",
+    "DASH":"2021-01-01",
     "DDOG":"2019-10-01",
     "DOCU":"2018-05-01",
+    "ERIE":"1995-12-01",
+    "EXE":"2021-02-15",
     "FTNT":"2008-12-01",
+    "GEV":"2024-04-01",
+    "HOOD":"2021-07-01",
+    "IBKR":"2007-06-01",
     "JD":"2014-05-19",
     "KDP":"2008-06-01",
     "KHC":"2015-07-06",
@@ -343,16 +371,24 @@ NASDAQ_INTRO={
     "MELI":"2007-09-01",
     "META":"2012-07-01",
     "MRNA":"2019-01-01",
+    "MSTR":"1998-06-01",
     "NXPI":"2010-09-01",
     "OKTA":"2017-05-01",
     "PANW":"2012-08-01",
     "PDD":"2018-07-01",
+    "PLTR":"2020-10-01",
     "PTON":"2019-10-01",
     "PYPL":"2015-07-06",
+    "SHOP":"2015-05-01",
+    "SMCI":"2007-04-01",
+    "SOLS":"2025-11-02", #!!!To be corrected when it loads!!
     "SPLK":"2012-05-01",
     "TEAM":"2016-01-01",
     "TMUS":"2007-05-01",
+    "TRI":"2002-07-01",
     "TSLA":"2010-07-01",
+    "TTD":"2016-10-01",
+    "XYZ":"2005-12-01",
     "VRSK":"2009-11-01",
     "WDAY":"2012-11-01",
     "ZS":"2018-06-01",
@@ -363,6 +399,8 @@ NASDAQ_INTRO={
 Delisting date of the stocks if relevant
 '''
 NASDAQ_DELIST={
+    "ANSS":"2025-07-17",
+    "SPLK":"2024-03-19",
     "ATVI":"2023-10-20",
     "SGEN":"2023-12-15"
     }
@@ -485,6 +523,7 @@ NYSE=["MMM",
       "DHR",
       "DVA",
       "DE",
+      "DECK",
       "DAL",
       "DVN",
       "FANG",
@@ -493,6 +532,7 @@ NYSE=["MMM",
       "DISH",
       "DIS",
       "DG",
+      "DELL",
       "D",
       "DPZ",
       "DOV",
@@ -517,6 +557,7 @@ NYSE=["MMM",
       "EQR",
       "ESS",
       "EL",
+      "EME",
       "ETSY",
       "ES",
       "EXPE",
@@ -540,6 +581,7 @@ NYSE=["MMM",
       "GRMN",
       "GNRC",
       "GD",
+      "GDDY",
       "GE",
       "GIS",
       "GM",
@@ -590,6 +632,7 @@ NYSE=["MMM",
       "KIM",
       "KMI",
       "KLAC",
+      "KKR",
       "KR",
       "LHX",
       "LH",
@@ -707,6 +750,7 @@ NYSE=["MMM",
       "SJM",
       "SNA",
       "SO",
+      "SOLV",
       "LUV",
       "SWK",
       "STT",
@@ -723,6 +767,7 @@ NYSE=["MMM",
       "TDY",
       "TFX",
       "TER",
+      "TKO",
       "TXT",
       "TMO",
       "TJX",      
@@ -753,6 +798,7 @@ NYSE=["MMM",
       "V",
       "VNO",
       "VMC",
+      "VST",
       "WAB",
       "WMT",
       "WBD",
@@ -766,6 +812,7 @@ NYSE=["MMM",
       "WRK",
       "WY",
       "WHR",
+      "WSM",
       "WMB",
       "WTW",
       "GWW",
@@ -792,12 +839,14 @@ NYSE_INTRO={
     "CDW":"2013-07-01",
     "CTLT":"2014-08-01",
     "CFG":"2014-10-01",
-    "CDAY":"2018-05-01",
+    "DAY":"2018-05-01",
     "CEG":"2022-02-01",
     "CTVA":"2019-06-01",
     "CZR":"2014-10-01",
     "FANG":"2012-11-01",
     "DAL":"2007-06-01",
+    "DECK":"1993-11-01",
+    "DELL":"2016-10-01",
     "DG":"2009-12-01",
     "DFS":"2007-07-01",
     "DOW":"2019-04-01",
@@ -807,6 +856,7 @@ NYSE_INTRO={
     "FLT":"2011-01-01",
     "FRC":"2011-01-01",
     "FBHS":"2011-10-01",
+    "GDDY":"2015-04-01",
     "GM":"2010-12-01",
     "GNRC":"2010-03-01",
     "FOX":"2019-06-01",
@@ -820,6 +870,7 @@ NYSE_INTRO={
     "IQV":"2013-06-01",
     "KEYS":"2014-11-01",
     "KMI":"2011-03-01",
+    "KKR":"2010-08-01",
     "LW":"2016-12-01",
     "LYB":"2010-03-01",
     "MPC":"2011-07-01",
@@ -836,13 +887,16 @@ NYSE_INTRO={
     "QRVO":"2015-01-01",
     "NOW":"2012-07-01",
     "SEDG":"2015-06-01",
+    "SOLV":"2024-04-01",
     "SYF":"2014-08-01",
     "TEL":"2007-07-01",
     "ULTA":"2007-11-01",
     "STLA":"2010-07-01",
+    "TKO":"1999-11-01",
     "TWTR":"2013-12-01",
     "V":"2008-04-01",
     "VICI":"2018-01-01",
+    "VST":"2016-10-01",
     "WRK":"2015-07-01",
     "XYL":"2011-11-01",
     "ZTS":"2013-02-01",
@@ -852,7 +906,20 @@ NYSE_INTRO={
 Delisting date of the stocks if relevant
 '''
 NYSE_DELIST={
-    
+    "PEAK":"2024-03-01",
+    "WRK":"2024-09-06",
+    "CTLT":"2024-12-18",
+    "ABC":"2023-11-01",
+    "RE":"2024-11-29",
+    "DFS":"2025-05-19",
+    "PXD":"2024-05-03",
+    "MPC":"2024-11-21",
+    "HES":"2025-07-18",
+    "PARA":"2025-08-18",
+    "DISH":"2024-01-08",
+    "FLT":"2025-02-28",
+    "JNPR":"2025-07-02",
+    "WBA":"2025-08-28",
     "CTXS":"2022-10-01",
     "DRE":"2022-10-01",
     "FBHS":"2022-10-15",
@@ -864,7 +931,8 @@ NYSE_DELIST={
     "SBNY":"2023-03-24",
     "TWTR":"2022-11-01",
     "PKI":"2023-05-16",
-    "ABMD":"2023-01-01"
+    "ABMD":"2023-01-01",
+    "MRO": "2024-11-22"
     }
 
 
@@ -875,31 +943,32 @@ REALESTATE=["ARE","AMT","AVB","BXP","CPT","CBRE","CCI","DLR","DRE","EQIX","EQR",
             "HST","IRM","KIM","MAA","PLD","PSA","O","REG","SBAC","SPG","UDR","VTR","VICI","VNO","WELL",
             "WY"]
 INDUSTRY=["MMM","AOS","ALK","ALLE","AAL","AME","BA","CHRW","CARR","CAT","CTAS","CPRT","CSX","CMI","DE",
-          "DAL","DOV","ETN","EMR","EFX","EXPD","FAST","FDX","FTV","GNRC","GD","GE","HON","HWM", "FBHS",
+          "DAL","DOV","EME","ETN","EMR","EFX","EXPD","FAST","FDX","FTV","GNRC","GD","GE","HON","HWM", "FBHS",
           "HII","IEX","ITW","IR","JBHT","J","JCI","LHX","LDOS","LMT","MAS","NLSN","NDSN","NSC","NOC",
           "ODFL","OTIS","PCAR","PH","PNR","PWR","RTX","RSG","RHI","ROK","ROL","SNA","LUV","SWK","TXT",
           "TT","TDG","UNP","UAL","UPS","URI","VRSK","WAB","WM","GWW","XYL"]
 IT=["ACN","ADBE","ADP","AKAM","AMD","APH","ADI","ANSS","AAPL","AMAT","ANET","ADSK","AVGO","BR","CDNS",
-    "CDW","CDAY","CSCO","CTSH","GLW","DXC","ENPH","EPAM","FFIV","FIS","FLT","FTNT","IT", "FI", "CTXS",
+    "CDW","DAY","CSCO","CTSH","GLW","DELL","DXC","ENPH","EPAM","FFIV","FIS","FLT","FTNT","IT", "FI", "CTXS",
+    "GDDY",
     "GPN","HPE","HPQ","IBM","INTC","INTU","JKHY","JNPR","KEYS","KLAC","LRCX","MA","MCHP","MU","MSFT",
     "MPWR","MSI","NTAP","NVDA","NXPI","ON","ORCL","PAYX","PAYC","PYPL","PTC","QRVO","QCOM","ROP", "NLOK",
-    "CRM","STX","NOW","SWKS","SEDG","SNPS","TEL","TDY","TER","TXN","TRMB","TYL","VRSN","V","WDC","ZBRA"]
+    "CRM","STX","NOW","SWKS","SEDG","SMCI","SNPS","TEL","TDY","TER","TXN","TRMB","TYL","VRSN","V","WDC","ZBRA"]
 COM=["ATVI","GOOGL","T","CHTR","CMCSA","DISH","DIS","EA","FOX","IPG","LYV","LUMN","MTCH","META","NFLX",
-     "NWS","OMC","PARA","TMUS","TTWO","TWTR","VZ","WBD"]
+     "NWS","OMC","PARA","TKO","TMUS","TTWO","TWTR","VZ","WBD"]
 STAPLES=["ADM","MO","BF-B","CPB","CHD","CLX","KO","CL","CAG","STZ","COST","EL","GIS","HSY","HRL","K",
         "KMB","KHC","KR","LW","MKC","TAP","MDLZ","MNST","PEP","PM","SJM","SYY","TSN","WBA","WMT"]
-CONSUMER=["AAP","AMZN","APTV","AZO","BBWI","BBY","BKNG","BWA","CZR","KMX","CCL","CMG","DHI","DRI","DG",
+CONSUMER=["AAP","AMZN","APTV","AZO","BBWI","BBY","BKNG","BWA","CZR","KMX","CCL","CMG","DECK","DHI","DRI","DG",
           "DLTR","DPZ","EBAY","ETSY","EXPE","F","GRMN","GM","GPC","HAS","HLT","HD","LVS","LEN","LKQ",
           "LOW","MAR","MCD","MGM","MHK","NWL","NKE","NCLH","NVR","ORLY","PENN","POOL","PG","PHM","PVH",
-          "RL","ROST","RCL","SBUX","TPR","TGT","TSLA","TJX","TSCO","ULTA","VFC","WHR","WYNN","YUM",
+          "RL","ROST","RCL","SBUX","TPR","TGT","TSLA","TJX","TSCO","ULTA","VFC","WHR","WSM","WYNN","YUM",
           "ABNB"]
 ENERGY=["APA","BKR","CVX","COP","CTRA","DVN","FANG","EOG","XOM","HAL","HES","KMI","MRO","MPC","OXY",
         "OKE","PSX","PXD","SLB","VLO","WMB"]
 UTILITIES=["AES","LNT","AEE","AEP","AWK","ATO","CNP","CMS","ED","CEG","D","DTE","DUK","EIX","ETR","EVRG",
-           "ES","EXC","FE","NEE","NI","NRG","PNW","PPL","PEG","SRE","SO","WEC","XEL"]
+           "ES","EXC","FE","NEE","NI","NRG","PNW","PPL","PEG","SRE","SO","VST","WEC","XEL"]
 FIN=["AFL","ALL","AXP","AIG","AMP","AON","AJG","AIZ","BAC","WRB","BRK-B","BLK","BK","BRO","COF","CBOE",
     "SCHW","CB","CINF","C","CFG","CME","CMA","DFS","RE","FDS","FITB","BEN","GL","GS","HIG","HBAN",
-    "ICE","IVZ","JPM","KEY","LNC","L","MTB","MKTX","MMC","MET","MCO","MS","MSCI","NDAQ","NTRS","PNC",
+    "ICE","IVZ","JPM","KEY","KKR","LNC","L","MTB","MKTX","MMC","MET","MCO","MS","MSCI","NDAQ","NTRS","PNC",
     "PFG","PGR","PRU","RJF","RF","SPGI","SBNY","STT","SYF","TROW","TRV","TFC","USB","WFC","WTW", "SIVBQ",
     "ZION"]
 MATERIALS=["APD","ALB","AMCR","AVY","BALL","CE","CF","CTVA","DOW","DD","EMN","ECL","FMC","FCX","IP",
@@ -907,7 +976,7 @@ MATERIALS=["APD","ALB","AMCR","AVY","BALL","CE","CF","CTVA","DOW","DD","EMN","EC
 HEALTHCARE=["ABT","ABBV","ABMD","A","ALGN","ABC","AMGN","BAX","BDX","BIO","TECH","BIIB","BSX","BMY","CAH",
    "CTLT","CNC","CRL","CI", "COO", "CVS", "DHR","DVA","XRAY","DXCM","EW","ELV","LLY","GILD","HCA","HSIC",
    "HOLX","HUM","IDXX","ILMN","INCY","ISRG","IQV","JNJ","LH","MCK","MDT","MRK","MTD","MRNA","MOH","OGN",
-   "PKI","PFE","DGX","REGN","RMD","STE","SYK","TFX","TMO","UNH","UHS","VRTX","VTRS","WAT","WST","ZBH",
+   "PKI","PFE","DGX","REGN","RMD","SOLV","STE","SYK","TFX","TMO","UNH","UHS","VRTX","VTRS","WAT","WST","ZBH",
    "ZTS" ]
 
 INTRO={**CAC40_INTRO,**DAX_INTRO,**NASDAQ_INTRO,**NYSE_INTRO}

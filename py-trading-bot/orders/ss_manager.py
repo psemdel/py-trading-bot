@@ -243,7 +243,7 @@ class StockStatusManager():
             for symbol, row in buy_df.iterrows():
 
                 st=Strategy.objects.get(id=row["strategy_id"])
-                logger.info("trying to buy" + symbol + " for strategy: "+str(st))
+                logger.info("trying to buy " + symbol + " for strategy: "+str(st))
                 op= OrderPerformer(
                     symbol,
                     row["strategy_id"],

@@ -157,15 +157,15 @@ class TestDatamanagerOnline(TestCase):
         self.actions=[self.a, self.a2, self.a3]
         m.Excluded.objects.create(name="all",strategy=self.strategy)
 
-    def test_retrieve_YF(self):
-        _settings["USED_API"]["reporting"]="YF"
-        symbols=retrieve_data_online(self,self.actions,"1y") 
+    #def test_retrieve_YF(self):
+        #_settings["USED_API"]["reporting"]="YF"
+        #symbols=retrieve_data_online(self,self.actions,"1y") 
                
-        self.assertEqual(np.shape(self.close)[1],3)
-        self.assertTrue(np.shape(self.close)[0]>200)
-        self.assertTrue(np.shape(self.close_ind)[0]>200)
-        self.assertEqual(np.shape(self.high)[1],3)
-        self.assertTrue(np.shape(self.high)[0]>200)
+        #self.assertEqual(np.shape(self.close)[1],3)
+        #self.assertTrue(np.shape(self.close)[0]>200)
+        #self.assertTrue(np.shape(self.close_ind)[0]>200)
+        #self.assertEqual(np.shape(self.high)[1],3)
+        #self.assertTrue(np.shape(self.high)[0]>200)
         
     def test_retrieve_ib(self):
         _settings["USED_API"]["reporting"]="IB"

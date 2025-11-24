@@ -1,0 +1,1 @@
+If you want that a stock is excluded for trading, a black list, go to the admin panel to the excluded object. For each strategy, you can define which product is excluded. Selecting a product by "all" excludes it from all trades.

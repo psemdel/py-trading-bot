@@ -45,19 +45,19 @@ class TestBT(TestCase):
             )
         
     def test_name_to_ust_or_presel(self):
-        pr=name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("PreselWQ7",None,self.period,symbol_index=self.symbol_index)
         self.assertEqual( type(pr),presel.PreselWQ)
-        pr=name_to_ust_or_presel("PreselWQ7",self.period,symbol_index=self.symbol_index,it_is_index=True)
+        pr=name_to_ust_or_presel("PreselWQ7",None,self.period,symbol_index=self.symbol_index,it_is_index=True)
         self.assertEqual( pr,None)
-        pr=name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("PreselDivergence",None,self.period,symbol_index=self.symbol_index)
         self.assertEqual( type(pr),presel.PreselDivergence)
-        pr=name_to_ust_or_presel("PreselDivergence",self.period,symbol_index=self.symbol_index,it_is_index=True)
+        pr=name_to_ust_or_presel("PreselDivergence",None,self.period,symbol_index=self.symbol_index,it_is_index=True)
         self.assertEqual( pr,None)        
-        pr=name_to_ust_or_presel("abcd",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("abcd",None,self.period,symbol_index=self.symbol_index)
         self.assertEqual( pr,None)  
-        pr=name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index)
+        pr=name_to_ust_or_presel("StratG",None,self.period,symbol_index=self.symbol_index)
         self.assertEqual( type(pr),strat.StratG)  
-        pr=name_to_ust_or_presel("StratG",self.period,symbol_index=self.symbol_index,it_is_index=True) #gives some warnings
+        pr=name_to_ust_or_presel("StratG",None,self.period,symbol_index=self.symbol_index,it_is_index=True) #gives some warnings
         self.assertEqual( type(pr),strat.StratG)
         
     def test_get_order(self):
@@ -74,18 +74,18 @@ class TestBT(TestCase):
         self.bti=presel.Presel(self.period,symbol_index=self.symbol_index,input_ust=self.ust)
         d=datetime(2022,8,27,tzinfo=ZoneInfo('Europe/Paris'))
         #since 2022-08-27, no exit
-        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR"),1)
-        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR",short=True),-1)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR.PA","AIR.PA"),1)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR.PA","AIR.PA",short=True),-1)
         
         d=datetime(2022,8,25,tzinfo=ZoneInfo('Europe/Paris'))
         #since 2022-08-25, there was an exit
-        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR"),0)
-        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR",short=True),-1)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR.PA","AIR.PA"),0)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR.PA","AIR.PA",short=True),-1)
         
         d=datetime(2022,8,26,tzinfo=ZoneInfo('Europe/Paris'))
         #since 2022-08-26, limit case, we should not exit the day we enter
-        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR"),1)
-        self.assertEqual(self.bti.get_last_exit(d,"AIR","AIR",short=True),-1)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR.PA","AIR.PA"),1)
+        self.assertEqual(self.bti.get_last_exit(d,"AIR.PA","AIR.PA",short=True),-1)
         
     def test_preselect_vol(self):
         self.bti=presel.PreselVol(self.period,symbol_index=self.symbol_index)

@@ -23,5 +23,7 @@ urlpatterns = [
     path('cleaning/', views.cleaning,name="cleaning"),
     path('test_order/', views.test_order,name="test_order"),
     path('actualize_ss/',views.actualize_ss_view, name="actualize_ss"),
-    path('create_ss/',views.create_ss)
+    path('create_ss/',views.create_ss),
+    path('actualize_all_jobs',views.trigger_all_jobs),
+    path('scan/',views.scan)
     ]

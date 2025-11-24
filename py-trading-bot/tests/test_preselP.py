@@ -22,8 +22,9 @@ class TestPreselP(TestCase):
         self.strategy2=Strategy.objects.create(name="real_madrid", class_name="PreselRealMadrid")
         e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
+        e4=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e=e
-        c=Currency.objects.create(name="euro")
+        c=Currency.objects.create(name="euro",symbol="EUR")
         s=ActionSector.objects.create(name="sec")
         
         self.strategy=strategy
@@ -77,7 +78,7 @@ class TestPreselP(TestCase):
             symbol='^FCHI',
             ib_ticker_explicit='CAC40',
             name='Cac40',
-            stock_ex=e3,
+            stock_ex=e4,
             currency=c,
             category=cat2,
             etf_long=etf1,
@@ -146,6 +147,7 @@ class TestPreselP(TestCase):
         
         ust_or_pr=name_to_ust_or_presel(
             "PreselRetard",
+            None,
             self.ust.period,
             input_ust=self.ust,
             prd=True,
@@ -159,6 +161,7 @@ class TestPreselP(TestCase):
         
         ust_or_pr=name_to_ust_or_presel(
             "PreselDivergence",
+            None,
             self.ust.period,
             input_ust=self.ust,
             prd=True,

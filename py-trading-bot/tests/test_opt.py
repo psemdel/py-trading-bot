@@ -56,7 +56,7 @@ class TestOptSymbols(TestCase):
     def test_symbols(self):
         self.o=opt_symbols.Opt("2007_2022_08",
                          "CAC40",
-                         ['AC', 'ATO', 'RNO'],
+                         ['AC.PA', 'ATO.PA', 'RNO.PA'],
                          loops=1,
                          nb_macro_modes=3,
                          testing=True,

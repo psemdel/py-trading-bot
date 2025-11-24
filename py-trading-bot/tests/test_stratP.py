@@ -19,7 +19,8 @@ class TestStratP(TestCase):
         
         e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
-        c=Currency.objects.create(name="euro")
+        e4=StockEx.objects.create(name="Monep",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
+        c=Currency.objects.create(name="euro", symbol="EUR")
         cat=ActionCategory.objects.create(name="actions")
         strategy=Strategy.objects.create(name="none")
         s=ActionSector.objects.create(name="sec")
@@ -73,7 +74,7 @@ class TestStratP(TestCase):
             symbol='^FCHI',
             ib_ticker_explicit='CAC40',
             name='Cac40',
-            stock_ex=e3,
+            stock_ex=e4,
             currency=c,
             category=cat2,
             etf_long=etf1,
@@ -97,16 +98,17 @@ class TestStratP(TestCase):
         self.assertTrue(np.shape(st.high)[0]>200)
         
     def test_grow_past(self):
+
         res=self.st.grow_past(50,False)
-        self.assertEqual(res[(50,False,'AC.PA')].values[0],0)
-        self.assertFalse(res[(50,False,'AC.PA')].values[-1]==0)
-        self.assertEqual(res[(50,False,'AIR.PA')].values[0],0)
-        self.assertFalse(res[(50,False,'AIR.PA')].values[-1]==0)
+        self.assertEqual(res[(50,False,'AC')].values[0],0)
+        self.assertFalse(res[(50,False,'AC')].values[-1]==0)
+        self.assertEqual(res[(50,False,'AIR')].values[0],0)
+        self.assertFalse(res[(50,False,'AIR')].values[-1]==0)
         res=self.st.grow_past(50,True)
-        self.assertEqual(res[(50,True,'AC.PA')].values[0],0)
-        self.assertFalse(res[(50,True,'AC.PA')].values[-1]==0)      
-        self.assertEqual(res[(50,True,'AIR.PA')].values[0],0)
-        self.assertFalse(res[(50,True,'AIR.PA')].values[-1]==0)        
+        self.assertEqual(res[(50,True,'AC')].values[0],0)
+        self.assertFalse(res[(50,True,'AC')].values[-1]==0)      
+        self.assertEqual(res[(50,True,'AIR')].values[0],0)
+        self.assertFalse(res[(50,True,'AIR')].values[-1]==0)        
         
     def test_call_strat(self):
         self.ust=getattr(strat, "StratKamaStochMatrendMacdbbMacro")("1y",prd=True, actions=self.actions)

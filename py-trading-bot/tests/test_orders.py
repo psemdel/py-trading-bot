@@ -37,8 +37,8 @@ class TestOrders(TestCase):
     def setUp(self):
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
         
-        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
-        self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
+        self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True,ib_suffix='PA')
+        self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True,ib_suffix='DE')
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=False)
         self.e5=m.StockEx.objects.create(name="NASDAQ",fees=f,ib_ticker="NASDAQ",main_index=None,ib_auth=False)
@@ -70,7 +70,7 @@ class TestOrders(TestCase):
             category=cat,
             #strategy=strategy,
             sector=self.s,
-            intro_date=datetime(2020,1,1,tzinfo=tz_Paris)
+            intro_date=datetime(2024,1,1,tzinfo=tz_Paris)
             )
         self.a2=m.Action.objects.create(
             symbol='AIR.PA',
@@ -135,6 +135,12 @@ class TestOrders(TestCase):
     def test_exchange_to_symbol(self):
         self.assertEqual(m.exchange_to_index_symbol("Paris"),["CAC40","^FCHI"])
         self.assertEqual(m.exchange_to_index_symbol("XETRA"),["DAX","^GDAXI"])
+        
+    def test_ib_ticker_to_action(self):
+        self.assertEqual(self.a, m.ib_ticker_to_action('AI',exchange='Paris'))
+        self.assertEqual(self.a7, m.ib_ticker_to_action('AAPL'))
+        self.assertEqual(self.a7, m.ib_ticker_to_action('AAPL',exchange='NASDAQ'))
+        self.assertRaises(ValueError, m.ib_ticker_to_action,'AI')
 
     def test_get_exchange_actions(self):
         self.assertEqual(len(m.get_exchange_actions("Paris")),3)
@@ -208,6 +214,7 @@ class TestOrders(TestCase):
     def test_symbol_to_action(self):
         self.assertEqual(self.a, m.symbol_to_action('AI.PA'))
         self.assertEqual(self.a, m.symbol_to_action(self.a))
+        self.assertEqual(self.a, m.symbol_to_action('AI',"Paris")) #ib ticker
         
     def test_check_ib_permission(self):
         _settings["USED_API_DEFAULT"]={
