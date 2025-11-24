@@ -22,13 +22,14 @@ class TestReporting(TestCase):
         e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
         self.e=e
         e2=StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
-        e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
+        e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="NASDAQ",main_index=None,ib_auth=True)
         e4=StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True,presel_at_sector_level=True)
         e5=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         e6=StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=True)
+        e7=StockEx.objects.create(name="CME",fees=f,ib_ticker="CME",main_index=None,ib_auth=True)
         
-        c=Currency.objects.create(name="euro")
-        c2=Currency.objects.create(name="dollar")
+        c=Currency.objects.create(name="euro",symbol="EUR")
+        c2=Currency.objects.create(name="dollar",symbol="USD")
         
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         cat2=ActionCategory.objects.create(name="ETF",short="ETF")
@@ -258,7 +259,7 @@ class TestReporting(TestCase):
             symbol='^DJI',
             name='Dow Jones',
             ib_ticker_explicit='INDU',
-            stock_ex=e4,
+            stock_ex=e7,
             currency=c2,
             category=cat3,
             etf_long=etf1,

@@ -19,18 +19,18 @@ class TestStrat(unittest.TestCase):
     def test_symbols_simple_to_complex(self):
         self.ust=strat.StratDiv2(self.period, symbol_index=self.symbol_index)
         self.ust.run()
-        symbol_complex1=self.ust.symbols_simple_to_complex('AI',"ent")
-        self.assertEqual(symbol_complex1,"AI")
-        symbol_complex2=self.ust.symbols_simple_to_complex('AI',"ex")
-        self.assertEqual(symbol_complex2,"AI")
+        symbol_complex1=self.ust.symbols_simple_to_complex('AI.PA',"ent")
+        self.assertEqual(symbol_complex1,"AI.PA")
+        symbol_complex2=self.ust.symbols_simple_to_complex('AI.PA',"ex")
+        self.assertEqual(symbol_complex2,"AI.PA")
         
         self.ust=strat.StratG(self.period, symbol_index=self.symbol_index)
         self.ust.run()
-        symbol_complex1=self.ust.symbols_simple_to_complex('AI',"ent")
-        self.assertFalse(symbol_complex1=="AI")
+        symbol_complex1=self.ust.symbols_simple_to_complex('AI.PA',"ent")
+        self.assertFalse(symbol_complex1=="AI.PA")
         self.assertTrue(type(symbol_complex1)==tuple)        
-        symbol_complex2=self.ust.symbols_simple_to_complex('AI',"ex")
-        self.assertFalse(symbol_complex2=="AI")
+        symbol_complex2=self.ust.symbols_simple_to_complex('AI.PA',"ex")
+        self.assertFalse(symbol_complex2=="AI.PA")
         self.assertTrue(type(symbol_complex2)==tuple)       
 
     def test_strat_kama_stoch_matrend_macdbb_macro(self): 

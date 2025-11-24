@@ -11,15 +11,20 @@ import reporting.telegram as tel
 from reporting.models import Alert
 from orders.models import Fees, StockEx, Action, ActionSector, ActionCategory, Strategy, Currency
 import vectorbtpro as vbt
-from reporting import telegram_sub
 from datetime import time
 
 class MockTelegramBot():
+    def __init__(self):
+        self.chat_ids=[]
+    
     def send_message_to_all(self,msg):
         pass
 
 class TestTelegram(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):
+        super().setUpClass()
+        
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         
         e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True,
@@ -44,31 +49,42 @@ class TestTelegram(TestCase):
         
         self.strategy=strategy
         self.a=Action.objects.create(
-            symbol='AC.PA',
+            symbol='BMW.DE',
             #ib_ticker='AC',
             name="Accor",
-            stock_ex=e,
+            stock_ex=e2,
             currency=c,
             category=cat,
             #strategy=strategy,
             sector=s,
             )
         self.a2=Action.objects.create(
-            symbol='AI.PA',
+            symbol='AIR.DE',
             #ib_ticker='AC',
             name="Air liquide",
-            stock_ex=e,
+            stock_ex=e2,
             currency=c,
             category=cat,
             #strategy=strategy,
             sector=s,
             )
-
-        bot=MockTelegramBot()
-        self.sched=tel.MyScheduler(bot,test=True)
+            
+        #
+        #
+        
+        with open('trading_bot/etc/TELEGRAM_TOKEN') as f:
+            TELEGRAM_TOKEN = f.read().strip()
+        self.bot = vbt.TelegramBot(token=TELEGRAM_TOKEN) 
+        chat_id=tel.get_chat_id(TELEGRAM_TOKEN)
+        self.bot.chat_ids.add(chat_id)
+        
+        #self.bot.start()  #not started, as we don't rely on it
+        self.sched=tel.MyScheduler(self.bot,TELEGRAM_TOKEN,test=True )
     
     #to be tested during opening hours, otherwise will fail
     def test_check_change(self):
+        #You should get two messages in Telegram!
+        
         self.sched.check_change(1, self.a,False)
         self.assertEqual(len(Alert.objects.all()),0)       
         self.sched.check_change(10, self.a,False)
@@ -85,13 +101,6 @@ class TestTelegram(TestCase):
         self.assertEqual(len(Alert.objects.all()),1) 
         self.sched.check_change(10, self.a,True)
         self.assertEqual(len(Alert.objects.all()),2) 
-        
-    def test_start_telegram(self):
-        with open('trading_bot/etc/TELEGRAM_TOKEN') as f:
-            TELEGRAM_TOKEN = f.read().strip()
-        bot = telegram_sub.TelegramBot(token=TELEGRAM_TOKEN) #vbt.TelegramBot should work, don't hesitate to replace it
-        bot.start(in_background=True)
-        bot.stop()
         
     #to be tested during opening hours, otherwise will fail
     def test_check_stock_ex_open(self):
@@ -112,3 +121,6 @@ class TestTelegram(TestCase):
         self.sched.check_cours([self.a],both=True)
         self.sched.check_cours([self.a],opening=True)
         self.sched.check_cours([self.a],both=True,opening=True)
+        
+    #def tearDown(self):
+        #self.bot.stop()
