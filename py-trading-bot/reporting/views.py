@@ -3,8 +3,10 @@ from django.http import HttpResponse
 from reporting.telegram import start, cleaning_sub
 # Create your views here.
 from reporting.models import Report, ActionReport, Alert, OrderExecutionMsg 
+from reporting.scanner import Scanner
 from orders.models import Action, StockStatus, exchange_to_index_symbol, ActionSector, StockEx, Job,\
-                          get_exchange_actions, Strategy
+                          get_exchange_actions, Strategy, filter_intro_action
+         
 from orders.ib import actualize_ss
 from core import caller
 from .filter import ReportFilter
@@ -116,9 +118,11 @@ def trigger_all_jobs(request):
     today=timezone.now()
     for j in Job.objects.all():
         actions=get_exchange_actions(j.stock_ex.name)
+        actions=filter_intro_action(actions,j.period_year)
         st=Strategy.objects.get(name=j.strategy.name)
         pr=caller.name_to_ust_or_presel(
             st.class_name, 
+            None,
             str(j.period_year)+"y",
             prd=True, 
             actions=actions,
@@ -128,7 +132,13 @@ def trigger_all_jobs(request):
         pr.actualize()   
         j.last_execution=today
         j.save()
+    return HttpResponse("All jobs ran")
 
+def scan(request):
+    s=Scanner(restriction=90,fees=0.0005)
+    res=s.scan_all()
+    print(res)
+    return HttpResponse("Scan ran successfully")
 
 def test_order(request):
     symbol=""
