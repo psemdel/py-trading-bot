@@ -30,7 +30,10 @@ from sklearn import metrics
 from sklearn.ensemble import RandomForestRegressor
 
 from keras import Sequential, callbacks
-from keras.layers import LSTM, Dense
+from keras.layers import LSTM, Dense, InputLayer
+
+#Source for LSTM: https://machinelearningmastery.com/understanding-stateful-lstm-recurrent-neural-networks-python-keras/
+
 
 #Object to train the models offline
 class MLPreparator():
@@ -294,7 +297,7 @@ class ML():
            steps: similar to lag but for LSTM model. So number of timesteps to consider for the training of the model
            features_name: explicit features name list
            prod: to be used for production,
-           reduce_memory_usage: use a method to reduce how much memory we use, is against performance. Concretely create a 4th dimension, and we optimized for each symbol separately
+           reduce_memory_usage: only used by LSTM. Use a method to reduce how much memory we use, is against performance. Concretely create a 4th dimension, and we optimized for each symbol separately
         '''
         
         for k in ["test_size","preprocessing","next_day_price","distance", "model_type","features_name","lag", "prod","reduce_memory_usage"]:
@@ -609,10 +612,10 @@ class ML():
             if self.reduce_memory_usage:
                 offset=1
             
+            self.clf.add(InputLayer(batch_input_shape=(scaled_x_train.shape[0+offset], scaled_x_train.shape[1+offset], scaled_x_train.shape[2+offset])))
             self.clf.add(LSTM(
                 self.n_neurons, 
-                batch_input_shape=(scaled_x_train.shape[0+offset], scaled_x_train.shape[1+offset], scaled_x_train.shape[2+offset]), 
-                stateful=True,
+                stateful=False,
                 return_sequences=False,
                 ))
             self.clf.add(Dense(1, activation=activation))
@@ -636,7 +639,7 @@ class ML():
                     for k in range(self.x_train.shape[0]): #for each symbol
                         self.clf.fit(scaled_x_train[k,:,:,:], scaled_y_train[k,:,:], batch_size=self.x_train.shape[1],epochs=1, shuffle=False, 
                                      verbose=0) #
-                        self.clf.reset_states()
+                        #self.clf.reset_states() #clear hidden states of your network, after each symbol. We don't want that AAPL(2024) influences GOOG(2007)
             else: 
                 callback = callbacks.EarlyStopping(monitor='loss',patience=3)
                 self.clf.fit(scaled_x_train, scaled_y_train, batch_size=self.x_train.shape[0],epochs=n_epochs, shuffle=False, 
@@ -819,9 +822,9 @@ class ML():
             if self.reduce_memory_usage:
                 offset=1
                 
+            model.add(InputLayer(batch_input_shape=(x_df.shape[0+offset], x_df.shape[1+offset], x_df.shape[2+offset])))
             model.add(LSTM(self.n_neurons, 
-                           batch_input_shape=(x_df.shape[0+offset], x_df.shape[1+offset], x_df.shape[2+offset]), 
-                           stateful=True, 
+                           stateful=False, 
             ))
             model.add(Dense(1, activation=self.activation))
             old_weights = self.clf.get_weights()
@@ -1052,7 +1055,7 @@ class PreselML_LSTM_A(PreselML):
         
 if __name__=="__main__":
     period="2007_2023_08"
-    m=ML(period,indexes=['CAC40',"DAX", "NASDAQ"]) #,"DAX", "NASDAQ","FIN","HEALTHCARE"
+    m=ML(period,indexes=['CAC40']) #,"DAX", "NASDAQ","FIN","HEALTHCARE"
     features_name=['STOCH', 'RSI',"WILLR","MFI",'BBANDS_BANDWIDTH','ULTOSC',"OBV","AD",
                "GROW_30","GROW_30_RANK","GROW_30_MA","GROW_30_MA_RANK","GROW_30_DEMA","GROW_30_DEMA_RANK",
                "GROW_50","GROW_50_RANK","GROW_50_MA","GROW_50_MA_RANK","GROW_50_DEMA","GROW_50_DEMA_RANK",
@@ -1065,12 +1068,12 @@ if __name__=="__main__":
           next_day_price=False, 
           distance=10, 
           #model_type="Forest",
-          model_type="LSTM",
-          #model_type="MLP",
-          #steps=20,
-          reduce_memory_usage=True,
+          #model_type="LSTM",
+          model_type="MLP",
+          steps=25,
+          reduce_memory_usage=False,
           features_name=features_name)
 
-    m.train("240218_lstm_test_reduced_memory",n_epochs=1000,n_neurons=40, activation="tanh")
+    m.train("251119_mlp_test_no_reduced_memory",n_epochs=1000,n_neurons=8, activation="tanh")
 
     #m.test("240115_lstm_no_memory_steps25_future10_tanh_CAC")
