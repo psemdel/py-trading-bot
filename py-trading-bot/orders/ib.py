@@ -8,7 +8,6 @@ Created on Fri Jan  6 19:41:08 2023
 from trading_bot.settings import _settings
 
 import vectorbtpro as vbt
-from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.data.custom import RemoteData
 from vectorbtpro import _typing as tp
 
@@ -24,7 +23,6 @@ import sys
 from datetime import datetime, timedelta
 
 import numpy as np
-import pandas as pd
 
 import logging
 logger = logging.getLogger(__name__)
@@ -222,6 +220,7 @@ def get_last_price(
     ----------
     action: stock to be checked
     """     
+  
     check_ib_permission([action.symbol],verbose=False) #to populate USED_API
     cours_pres=0
    
@@ -229,8 +228,8 @@ def get_last_price(
          action.stock_ex.ib_auth and\
          action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
 
-         cours_pres=IBData.get_last_price(action)            
-        
+         cours_pres=IBData.get_last_price(action)           
+
     if cours_pres==0: #YF and fallback
         cours=vbt.YFData.fetch([action.symbol], period="2d")
         cours_close=cours.get("Close")
@@ -292,7 +291,10 @@ def place(
     """       
     if _settings["USED_API"]["orders"]=="IB":
         #IB is a bit different
-        return IBData.place(buy,action,quantity=quantity,order_size=order_size,testing=testing)
+        if not testing:
+            return IBData.place(buy,action,quantity=quantity,order_size=order_size,testing=testing)
+        else:
+            return 1.0, 1.0
     else:
         if quantity==0:
             last_price=get_last_price(action)
@@ -312,7 +314,6 @@ def place(
                 return 1.0, 1.0
             else:
                 return 1.0, 1.0
-
 
 class IBData(RemoteData):
     def __init__(cls,*args,**kwargs):
@@ -367,6 +368,13 @@ class IBData(RemoteData):
         return cls.client
 
     @classmethod
+    def convert_end_date(cls,input_date):
+        if input_date=='' or type(input_date)==datetime:
+            return input_date
+        elif type(input_date)==str:
+            return datetime.strptime(input_date,"%Y-%m-%d") #format normally used by YF and assumed        
+
+    @classmethod
     def fetch_symbol(
         cls,
         symbol: str, 
@@ -374,11 +382,11 @@ class IBData(RemoteData):
         client_config: tp.KwargsLike = None,
         period: tp.Optional[str] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
-        end: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = '',
         timeframe: tp.Optional[str] = None,
         it_is_indexes: tp.Optional[dict] = None,
         exchanges: tp.Optional[dict] = None,
-        currencies: tp.Optional[dict] = None
+        currencies: tp.Optional[dict] = None,
         ) -> tp.Any:
         """
         Download data for a symbol from IB
@@ -391,7 +399,7 @@ class IBData(RemoteData):
         
         """
         from ib_async import util
-        
+
         exchange="SMART" #default
         if exchanges is not None:
             if symbol in exchanges:
@@ -417,7 +425,7 @@ class IBData(RemoteData):
             #check period and timeframe
             bars = cls.client.reqHistoricalData(
                     contract,
-                    endDateTime='',
+                    endDateTime=cls.convert_end_date(end),
                     durationStr=period, #"10 D","1 M"
                     barSizeSetting=timeframe, #"1 day", "1 min"
                     whatToShow='TRADES',
@@ -454,13 +462,14 @@ class IBData(RemoteData):
         while (m_data.last != m_data.last) and (m_data.bid != m_data.bid) and t<timeout:  #Wait until data is in. 
             t+=0.1
             cls.client.sleep(0.1)
-        
+
         if np.isnan(m_data.last):
             if not np.isnan(m_data.bid):
                 out=m_data.bid
         else:
             out=m_data.last
         cls.client.cancelMktData(contract)
+
         return out
     
     @classmethod 
@@ -510,7 +519,7 @@ class IBData(RemoteData):
             return quantity
         
         revert=False
-        if currency=="USD": #no need to make a try and fail
+        if currency in ["USD","GBP"]: #no need to make a try and fail
             revert=True
             contract=Forex(_settings["IB_BASE_CURRENCY"]+currency)
         else:
@@ -750,7 +759,6 @@ class IBData(RemoteData):
             action: stock for which the ratio must be retrieved
         '''
         if ib_global["connected"] and self.client:
-            
             contract=self.get_contract(action.ib_ticker(),action.stock_ex.ib_ticker,check_if_index(action),action.currency.symbol)
             if contract is not None:
                 bars = self.client.reqHistoricalData(
@@ -761,11 +769,19 @@ class IBData(RemoteData):
                         whatToShow='TRADES',
                         useRTH=True,
                         formatDate=1)
+                
                 if len(bars)!=0:
                     df=util.df(bars)
                     cours_ref=df.iloc[0]["close"] #closing price of the day before
                     cours_pres=self.get_last_price_sub(contract)
+
+                    if cours_pres in [0, -1]: #probably market closed presently
+                        logger.error("Present price not found in IB for: "+action.ib_ticker()+ " falling back on historical data")
+                        cours_pres=df.iloc[-1]["close"]
+                    
                     return cours_pres, cours_ref
+            else:
+                print("Contract for: "+action.ib_ticker()+ " not found")
         return 0, 0    
     
     @classmethod 
@@ -882,6 +898,7 @@ class OrderPerformer():
         Similar to check_ib_permission
         """
         _settings["USED_API"]["orders"]="YF" #default
+        
         if self.action.stock_ex.perform_order and self.st.perform_order and _settings["PERFORM_ORDER"]: #auto
             if _settings["USED_API_DEFAULT"]["orders"] in ["IB","CCXT","MT5","TS"]:
                 
@@ -936,6 +953,7 @@ class OrderPerformer():
         quantity: quantity, in number of stocks, of the stock to be ordered
         order_size: size, in currency, of the stock to be ordered, has a sign
         """
+        
         if (self.symbol in self.excluded.retrieve() ):
             logger.info(str(self.symbol) + " excluded")  
         
@@ -954,7 +972,8 @@ class OrderPerformer():
                     order_size_option=self.st.option_share_per*order_size
                     order_size_stock=order_size-order_size_option
                 else:
-                    order_size_stock_option=0
+                    order_size_option=0
+
                 self.new_order.entering_price, _= place(buy,
                                         self.action,
                                         quantity=quantity,
@@ -963,6 +982,7 @@ class OrderPerformer():
                                         )
                 logger_trade.info("entering_price: "+ str(self.new_order.entering_price))
                 self.new_order.quantity, sign, short=retrieve_quantity(self.action)
+     
                 self.ss.quantity=sign*self.new_order.quantity
                 
                 self.new_order.short=short

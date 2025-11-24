@@ -17,21 +17,23 @@ if __name__ != '__main__':
     from core import constants
 
 '''
-This file contains the logic to retrieve data.
+This module contains the logic to retrieve data from file, or save it in files. 
+It does not use Django and does not load modules needing Django.
 
 To save data, just run this script (see at the bottom). It will generate 1 files: actions.h5. The main index (Nasdaq 100, Dow jones...) should be the last column by convention.
 The idea behind it, is to determine in some strategies the trend using the index, and adapting the strategy depending on this trend.
 '''
 
 ### Offline retrieval ###
-def save_data(
+def save_data_from_YF(
         selector: str,
         symbol_index: str, 
         stock_symbols: list, 
         start_date: str, 
-        end_date: str):
+        end_date: str        
+        ):
     '''
-    Prepare and save data to file for local usage
+    Prepare and save data to file for local usage. Use YF.
 
     Arguments
     ----------
@@ -43,8 +45,7 @@ def save_data(
     '''
     symbols=stock_symbols+[symbol_index]
     data=vbt.YFData.pull(symbols,start=start_date,end=end_date,\
-                             timeframe='1d')
-
+                            timeframe='1d')
     #knowing what we drop
     close=data.get("Close")
 
@@ -56,9 +57,10 @@ def save_data(
         if math.isnan(close[close.columns[-1]].values[ii]):
             print("dropping at least " + str(close.index[ii]))
             
-    #print(close.columns[7])            
+            
     data=vbt.YFData.pull(symbols,start=start_date,end=end_date,\
                                  timeframe='1d',missing_index="drop")   
+
     BASE_DIR = Path(__file__).resolve().parent.parent
     data.to_hdf(path_or_buf=os.path.join(BASE_DIR,'saved_cours/'+selector.upper()+'_period.h5'))
 
@@ -84,7 +86,8 @@ def retrieve_data_live(
         stock_symbols: list,
         symbol_index: str,
         period: str,
-        it_is_index: bool=False
+        it_is_index: bool=False,
+        source: str="YF"
         ):
     '''
     To plot the last days for instance
@@ -93,11 +96,12 @@ def retrieve_data_live(
     Arguments
     ----------
        o: object where to put the data
-       stock_symbols: list of YF tickers to be downloaded for the stocks
-       symbol_index: YF ticker of the index
+       stock_symbols: list of YF or IB tickers to be downloaded for the stocks
+       symbol_index: YF or IB ticker of the index
        period: period in which we want to have the data
        it_is_index: is it indexes that are provided
     '''
+    
     symbols=stock_symbols+[symbol_index]
     data_all=vbt.YFData.pull(symbols, period=period,missing_index='drop')
     retrieve_data_sub(o, data_all, it_is_index=it_is_index)
@@ -117,8 +121,8 @@ def retrieve_data_sub(
         it_is_index: is it indexes that are provided
     '''
     cols=list(data_all.get("Open").columns)
-    o.data=data_all.select(cols[:-1]) #all columns except last one
-    o.data_ind=data_all.select(cols[-1]) #only last column
+    o.data=data_all.select_symbols(cols[:-1]) #all columns except last one
+    o.data_ind=data_all.select_symbols(cols[-1]) #only last column
     
     for l in ["Close","Open","High","Low","Volume"]:
         setattr(o,l.lower(),o.data.get(l))
@@ -131,14 +135,14 @@ def retrieve_data_sub(
         for l in ["close","open","high","low","volume","data"]:
             setattr(o,l,getattr(o,l+"_ind"))    
 
-def retrieve_debug(
+def retrieve_from_YF_debug(
         stock_symbols: list,
         symbol_index: str,
         period: str,
         it_is_index: bool=False
         ):
     '''
-    To find which stock was delisted
+    To find which stock was delisted, from YF
     
     Arguments
     ----------
@@ -227,5 +231,5 @@ if __name__ == '__main__':
         if ok:
             new_list.append(s)
 
-    save_data(selector,index,new_list, start_date, end_date)
+    save_data_from_YF(selector,index,new_list, start_date, end_date)
 
