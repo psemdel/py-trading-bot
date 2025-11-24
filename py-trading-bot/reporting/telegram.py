@@ -68,9 +68,11 @@ def get_chat_id(TELEGRAM_TOKEN:str):
     -------
     chat_id: chat id of the Telegram bot used by last /start command
     '''
-    
+    print("get_chat_id called")
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
     res=requests.get(url).json()
+
+
     if 'ok' in res and res['ok'] and 'result' in res and len(res['result'])>0:
         return res['result'][0]['message']['chat']['id']
     else:
@@ -148,9 +150,14 @@ class MyScheduler():
         '''
         As the bot is not started, all message must be sent using asyncio.run()
         '''
+        #if "chat_ids" not in self.telegram_bot:
+        #    print("adding chat ids")
+        #    chat_id=get_chat_id(self.token)
+        #    self.telegram.bot.chat_ids.add(chat_id)
+
         for chat_id in self.telegram_bot.chat_ids:
             url = f"https://api.telegram.org/bot{self.token}/sendMessage?chat_id={chat_id}&text={msg}"
-        requests.get(url).json() # this sends the message
+            requests.get(url).json() # this sends the message
         #asyncio.run(self.telegram_bot.send_message_to_all(msg) )
         
     def do_weekday(self, 
@@ -179,7 +186,7 @@ class MyScheduler():
 
     def check_stock_ex_open_from_action(self,action: Action)-> bool:
         '''
-        Check if the stock exchange is open
+        Check if the stock exchange is open. Does not check the day, only the hour. Days are handled by the scheduler above.
         
         Arguments
        	----------
@@ -189,7 +196,7 @@ class MyScheduler():
 
     def check_stock_ex_open(self,s_ex: StockEx)-> bool:
         '''
-        Check if the stock exchange is open
+        Check if the stock exchange is open. Does not check the day, only the hour. Days are handled by the scheduler above.
         
         Arguments
        	----------

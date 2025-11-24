@@ -1,7 +1,7 @@
 # Pre-requisites
 For this installation, it is assumed that python with version 3.12, git and pip are already installed.
 
-* [Python >= 3.8.x](http://docs.python-guide.org/en/latest/starting/installation/)
+* [Python >= 3.12.x](http://docs.python-guide.org/en/latest/starting/installation/)
 * [pip](https://pip.pypa.io/en/stable/installing/)
 * [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
@@ -75,6 +75,13 @@ Note: think of starting it with the command /start in Telegram.
 It is optional, but you Jupyter to read the Jupyter notebooks. Vectorbt is very good to visualize strategies in Jupyter, it would be too bad not to use this possibility.
 
 # Configuration
+The configuration of the bot is done principally in:
+    
+    The file trading_bot/settings.py
+    The admin panel of Django
+    
+However, you may need to modify file like core/constants.py, core/stratL.py... to have exactly the desired behavior. I am still working to centralize everything.
+
 Go in trading_bot/settings.py, set IB settings relative to port (don't forget to open your Api in this software and to uncheck the "read-only" setting). Note that TWS and IB Gateway have different ports.
 
     "IB_LOCALHOST":'127.0.0.1',

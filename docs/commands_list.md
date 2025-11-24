@@ -17,11 +17,15 @@ Install postgresql: apt-get install postgresql
     \c pgtradingbotdb
     GRANT ALL PRIVILEGES ON DATABASE pgtradingbotdb TO <username>;
     GRANT ALL PRIVILEGES ON SCHEMA public TO <username>;
+    ALTER USER <username> CREATEDB; ###For testing
 
 For jupyter notebook to find the venv:
     python -m ipykernel install --user --name tradingbot312
     
 Export the dump:
     python manage.py dumpdata -exclude=auth -exclude=reporting > dump.json
+    
+Start unit tests:
+    python manage.py test
 
 
